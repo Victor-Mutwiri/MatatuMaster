@@ -71,4 +71,7 @@ export interface GameState {
   // Happiness & Mechanics
   happiness: number; // 0-100
   isStereoOn: boolean;
+  
+  // Settings
+  isSoundOn: boolean;
 }

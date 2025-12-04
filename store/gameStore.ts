@@ -34,6 +34,7 @@ interface GameStore extends GameState {
   // Mechanics
   toggleStereo: () => void;
   reportLaneChange: () => void;
+  toggleSound: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -61,6 +62,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   happiness: 100,
   isStereoOn: false,
+  isSoundOn: true,
 
   setScreen: (screen) => set({ currentScreen: screen }),
   
@@ -329,7 +331,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     gameOverReason: null,
     gameTimeRemaining: 0,
     happiness: 100,
-    isStereoOn: false
+    isStereoOn: false,
+    isSoundOn: true
   }),
   
   toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),
@@ -337,4 +340,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   reportLaneChange: () => set((state) => ({ 
     happiness: Math.max(0, state.happiness - 2)
   })),
+
+  toggleSound: () => set((state) => ({ isSoundOn: !state.isSoundOn })),
 }));

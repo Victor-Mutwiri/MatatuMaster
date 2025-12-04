@@ -1,8 +1,9 @@
 
-import React, { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VehicleType } from '../../types';
 import { useGameStore } from '../../store/gameStore';
+import { playSfx } from '../../utils/audio';
 import * as THREE from 'three';
 
 // --- Components ---
@@ -18,6 +19,99 @@ const GameLogic = () => {
   });
 
   return null;
+};
+
+// Camera Rig: Follows player and adds shake
+const CameraRig = () => {
+  const { camera } = useThree();
+  const currentSpeed = useGameStore(state => state.currentSpeed);
+  const startPos = useMemo(() => new THREE.Vector3(0, 6, 8), []);
+  
+  useFrame((state) => {
+    // Basic shake based on speed
+    const t = state.clock.elapsedTime;
+    const shakeIntensity = currentSpeed > 0 ? 0.05 : 0;
+    const shakeY = Math.sin(t * 30) * shakeIntensity * 0.5;
+    const shakeX = Math.cos(t * 25) * shakeIntensity * 0.3;
+
+    // Smooth return to center
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, shakeX, 0.1);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, startPos.y + shakeY, 0.1);
+    camera.position.z = startPos.z;
+    
+    // Look slightly ahead
+    camera.lookAt(0, 0, 0);
+  });
+
+  return null;
+};
+
+// Environment Scenery
+const Scenery = () => {
+  const groupRef = useRef<THREE.Group>(null);
+  const currentSpeed = useGameStore(state => state.currentSpeed);
+  
+  const OBJECT_COUNT = 15;
+  const GAP = 15;
+  
+  useFrame((state, delta) => {
+    if (groupRef.current) {
+      groupRef.current.position.z += currentSpeed * delta;
+      if (groupRef.current.position.z > GAP) {
+        groupRef.current.position.z %= GAP;
+      }
+    }
+  });
+
+  // Pre-generate scenery items positions
+  const sceneryItems = useMemo(() => {
+    return Array.from({ length: OBJECT_COUNT }).map((_, i) => {
+      const side = i % 2 === 0 ? 1 : -1;
+      const x = (8 + Math.random() * 4) * side;
+      const z = -i * GAP;
+      const isSign = i % 5 === 0; // Every 5th item is a sign
+      return { x, z, isSign, side };
+    });
+  }, []);
+
+  return (
+    <group ref={groupRef}>
+      {sceneryItems.map((item, i) => (
+        <group key={i} position={[item.x, 0, item.z]}>
+          {item.isSign ? (
+            // Signpost
+            <group rotation={[0, item.side === -1 ? Math.PI / 4 : -Math.PI / 4, 0]}>
+               <mesh position={[0, 1.5, 0]}>
+                 <cylinderGeometry args={[0.05, 0.05, 3]} />
+                 <meshStandardMaterial color="#333" />
+               </mesh>
+               <mesh position={[0, 2.5, 0]}>
+                 <boxGeometry args={[1.5, 0.8, 0.1]} />
+                 <meshStandardMaterial color="#166534" />
+               </mesh>
+               {/* "Text" placeholder - white strip */}
+               <mesh position={[0, 2.5, 0.06]}>
+                 <planeGeometry args={[1.2, 0.2]} />
+                 <meshBasicMaterial color="white" />
+               </mesh>
+            </group>
+          ) : (
+            // Tree (Abstract)
+            <group scale={[1 + Math.random(), 1 + Math.random(), 1 + Math.random()]}>
+              <mesh position={[0, 0.5, 0]}>
+                <cylinderGeometry args={[0.2, 0.3, 1]} />
+                <meshStandardMaterial color="#451a03" />
+              </mesh>
+              <mesh position={[0, 2, 0]}>
+                <coneGeometry args={[1.5, 3, 8]} />
+                <meshStandardMaterial color="#065f46" />
+              </mesh>
+            </group>
+          )}
+        </group>
+      ))}
+    </group>
+  );
 };
 
 // Scrolling Road
@@ -68,7 +162,7 @@ const Road = () => {
   );
 };
 
-// Stage Marker: Appears when approaching a stage
+// Stage Marker
 const StageMarker = () => {
   const { nextStageDistance, distanceTraveled } = useGameStore();
   const markerRef = useRef<THREE.Group>(null);
@@ -105,7 +199,7 @@ const StageMarker = () => {
   );
 };
 
-// Police Marker: Flashing lights
+// Police Marker
 const PoliceMarker = () => {
   const { nextPoliceDistance, distanceTraveled } = useGameStore();
   const markerRef = useRef<THREE.Group>(null);
@@ -135,25 +229,18 @@ const PoliceMarker = () => {
 
   return (
     <group ref={markerRef} position={[4, 0, 0]}>
-      {/* Barricade / Cone */}
       <mesh position={[0, 0.5, 0]}>
         <coneGeometry args={[0.5, 1, 16]} />
         <meshStandardMaterial color="orange" />
       </mesh>
-      
-      {/* Lights Bar */}
       <mesh position={[0, 1.5, 0]}>
         <boxGeometry args={[1.5, 0.2, 0.2]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      
-      {/* Blue Light */}
       <mesh ref={blueLightRef} position={[-0.5, 1.7, 0]}>
         <sphereGeometry args={[0.2]} />
         <meshStandardMaterial color="blue" emissive="blue" emissiveIntensity={1} />
       </mesh>
-      
-      {/* Red Light */}
       <mesh ref={redLightRef} position={[0.5, 1.7, 0]}>
         <sphereGeometry args={[0.2]} />
         <meshStandardMaterial color="red" emissive="red" emissiveIntensity={1} />
@@ -172,26 +259,22 @@ const Player = ({ type }: { type: VehicleType | null }) => {
 
   const reportLaneChange = useGameStore(state => state.reportLaneChange);
 
+  const changeLane = (dir: -1 | 1) => {
+    setLane((prev) => {
+      const next = prev + dir;
+      if (next >= -1 && next <= 1) {
+        reportLaneChange();
+        playSfx('SWOOSH');
+        return next;
+      }
+      return prev;
+    });
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        setLane((l) => {
-          if (l > -1) {
-            reportLaneChange(); // Penalize happiness
-            return l - 1;
-          }
-          return l;
-        });
-      }
-      if (e.key === 'ArrowRight') {
-        setLane((l) => {
-          if (l < 1) {
-            reportLaneChange(); // Penalize happiness
-            return l + 1;
-          }
-          return l;
-        });
-      }
+      if (e.key === 'ArrowLeft') changeLane(-1);
+      if (e.key === 'ArrowRight') changeLane(1);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -206,23 +289,8 @@ const Player = ({ type }: { type: VehicleType | null }) => {
       if (touchStartX.current === null) return;
       const diff = e.changedTouches[0].clientX - touchStartX.current;
       if (Math.abs(diff) > 50) {
-        if (diff > 0) {
-           setLane((l) => {
-             if (l < 1) {
-               reportLaneChange();
-               return l + 1;
-             }
-             return l;
-           });
-        } else {
-           setLane((l) => {
-             if (l > -1) {
-               reportLaneChange();
-               return l - 1;
-             }
-             return l;
-           });
-        }
+        if (diff > 0) changeLane(1);
+        else changeLane(-1);
       }
       touchStartX.current = null;
     };
@@ -287,12 +355,15 @@ interface GameSceneProps {
 
 export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   return (
-    <div className="w-full h-full bg-slate-900">
+    // Added Sky Gradient here
+    <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-black">
       <Canvas shadows camera={{ position: [0, 6, 8], fov: 50 }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[20, 20, 10]} intensity={1.2} castShadow shadow-mapSize={[1024, 1024]} />
         
+        <CameraRig />
         <GameLogic />
+        <Scenery />
         <Road />
         <StageMarker />
         <PoliceMarker />

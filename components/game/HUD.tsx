@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2 } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 
 export const HUD: React.FC = () => {
-  const { gameTimeRemaining, currentPassengers, maxPassengers, stats, happiness, isStereoOn, toggleStereo } = useGameStore();
+  const { gameTimeRemaining, currentPassengers, maxPassengers, stats, happiness, isStereoOn, toggleStereo, isSoundOn, toggleSound } = useGameStore();
 
   // Format Seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -40,8 +40,9 @@ export const HUD: React.FC = () => {
           </div>
         </div>
 
-        {/* Happiness & Stereo */}
+        {/* Controls Column */}
         <div className="flex flex-col gap-2 items-end pointer-events-auto">
+          
           {/* Happiness Meter */}
           <div className="bg-slate-900/80 backdrop-blur-md border-r-4 border-neon-blue px-4 py-2 rounded-l-lg shadow-lg flex items-center gap-3">
              <div className="flex flex-col items-end">
@@ -53,20 +54,37 @@ export const HUD: React.FC = () => {
              <Smile className={happinessColor} size={20} />
           </div>
 
-          {/* Stereo Toggle */}
-          <button 
-            onClick={toggleStereo}
-            className={`
-              flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-lg
-              ${isStereoOn 
-                ? 'bg-purple-600 text-white shadow-purple-500/30 ring-2 ring-purple-400 animate-pulse-fast' 
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }
-            `}
-          >
-            {isStereoOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            <span>Stereo {isStereoOn ? 'ON' : 'OFF'}</span>
-          </button>
+          <div className="flex gap-2">
+            {/* SFX Toggle */}
+            <button 
+                onClick={toggleSound}
+                className={`
+                  flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-lg
+                  ${isSoundOn 
+                    ? 'bg-slate-700 text-white hover:bg-slate-600' 
+                    : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
+                  }
+                `}
+                title="Toggle Sound Effects"
+              >
+                {isSoundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+              </button>
+
+            {/* Stereo Toggle */}
+            <button 
+              onClick={toggleStereo}
+              className={`
+                flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-lg
+                ${isStereoOn 
+                  ? 'bg-purple-600 text-white shadow-purple-500/30 ring-2 ring-purple-400 animate-pulse-fast' 
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }
+              `}
+            >
+              {isStereoOn ? <Music size={14} /> : <Music2 size={14} />}
+              <span>Stereo</span>
+            </button>
+          </div>
         </div>
       </div>
 
