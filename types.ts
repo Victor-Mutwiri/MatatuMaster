@@ -1,6 +1,6 @@
 
 
-export type ScreenName = 'LANDING' | 'SETUP' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP';
+export type ScreenName = 'LANDING' | 'SETUP' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD';
 
 export type VehicleType = '14-seater' | '32-seater' | '52-seater';
 
@@ -15,6 +15,13 @@ export interface PlayerStats {
   reputation: number; // 0-100
   time: string; // e.g., "06:00 AM" (In-game world clock)
   energy: number; // 0-100
+}
+
+export interface LifetimeStats {
+  totalCashEarned: number;
+  totalDistanceKm: number;
+  totalBribesPaid: number;
+  totalTripsCompleted: number;
 }
 
 export interface Route {
@@ -58,6 +65,9 @@ export interface GameState {
   totalPassengersCarried: number; // Session total
   bribesPaid: number; // Session total
   
+  // Lifetime Tracking
+  lifetimeStats: LifetimeStats;
+
   // Controls
   isAccelerating: boolean;
   isBraking: boolean;

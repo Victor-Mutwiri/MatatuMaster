@@ -1,7 +1,7 @@
 
 
 import { create } from 'zustand';
-import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData } from '../types';
+import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats } from '../types';
 import { playSfx } from '../utils/audio';
 
 const INITIAL_STATS: PlayerStats = {
@@ -9,6 +9,13 @@ const INITIAL_STATS: PlayerStats = {
   reputation: 50,
   time: "08:00 AM",
   energy: 100
+};
+
+const INITIAL_LIFETIME: LifetimeStats = {
+  totalCashEarned: 154200, // Fake initial data for feeling of progress
+  totalDistanceKm: 342.5,
+  totalBribesPaid: 5000,
+  totalTripsCompleted: 12
 };
 
 // Consumption in KM per Liter
@@ -73,6 +80,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   fuelUsedLiters: 0,
   totalPassengersCarried: 0,
   bribesPaid: 0,
+  
+  lifetimeStats: INITIAL_LIFETIME,
 
   isAccelerating: false,
   isBraking: false,
@@ -445,11 +454,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return { gameTimeRemaining: newTime, happiness: newHappiness };
   }),
 
-  endGame: (reason) => set({ 
-    gameStatus: 'GAME_OVER', 
-    gameOverReason: reason,
-    activeModal: 'GAME_OVER',
-    isCrashing: false 
+  endGame: (reason) => set((state) => {
+    // Calculate final earnings to add to lifetime
+    const fuelPricePerLiter = 182;
+    const fuelCost = Math.floor(state.fuelUsedLiters * fuelPricePerLiter);
+    const profit = Math.max(0, state.stats.cash - fuelCost);
+    const distanceKm = state.distanceTraveled / 1000;
+
+    const newLifetime = {
+      totalCashEarned: state.lifetimeStats.totalCashEarned + profit,
+      totalDistanceKm: state.lifetimeStats.totalDistanceKm + distanceKm,
+      totalBribesPaid: state.lifetimeStats.totalBribesPaid + state.bribesPaid,
+      totalTripsCompleted: state.lifetimeStats.totalTripsCompleted + (reason === 'COMPLETED' ? 1 : 0)
+    };
+
+    return { 
+      gameStatus: 'GAME_OVER', 
+      gameOverReason: reason,
+      activeModal: 'GAME_OVER',
+      isCrashing: false,
+      lifetimeStats: newLifetime
+    };
   }),
   
   resetGame: () => set({

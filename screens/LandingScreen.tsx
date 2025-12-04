@@ -1,14 +1,18 @@
 
+
 import React from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { BusFront, Play, ShieldAlert, Coins, Map, Zap, Trophy, MousePointer2 } from 'lucide-react';
+import { useGameStore } from '../store/gameStore';
 
 interface LandingScreenProps {
   onStart: () => void;
 }
 
 export const LandingScreen: React.FC<LandingScreenProps> = ({ onStart }) => {
+  const { setScreen } = useGameStore();
+
   return (
     <GameLayout noMaxWidth className="bg-slate-950 relative overflow-x-hidden">
       
@@ -25,6 +29,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onStart }) => {
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full max-w-6xl mx-auto px-4 py-12 lg:py-0">
         
+        {/* Top Right Actions */}
+        <div className="absolute top-6 right-6 flex gap-4">
+           <button 
+             onClick={() => setScreen('LEADERBOARD')}
+             className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 border border-slate-700 rounded-full text-white font-bold text-xs uppercase hover:bg-slate-800 hover:scale-105 transition-all shadow-lg group"
+           >
+              <Trophy size={16} className="text-matatu-yellow group-hover:animate-bounce" /> Leaderboard
+           </button>
+        </div>
+
         {/* --- HERO SECTION --- */}
         <div className="flex flex-col items-center text-center space-y-6 max-w-4xl mx-auto mb-16 animate-fade-in-up">
           
