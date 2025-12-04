@@ -1,11 +1,55 @@
-
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VehicleType } from '../../types';
 import { useGameStore } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 import * as THREE from 'three';
+
+// Fix for TypeScript not recognizing React Three Fiber intrinsic elements
+// We extend both global JSX and React module JSX to ensure compatibility across different TS/React versions.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      group: any;
+      mesh: any;
+      boxGeometry: any;
+      meshStandardMaterial: any;
+      cylinderGeometry: any;
+      planeGeometry: any;
+      meshBasicMaterial: any;
+      sphereGeometry: any;
+      dodecahedronGeometry: any;
+      coneGeometry: any;
+      pointLight: any;
+      ambientLight: any;
+      directionalLight: any;
+      spotLight: any;
+      fog: any;
+    }
+  }
+}
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      group: any;
+      mesh: any;
+      boxGeometry: any;
+      meshStandardMaterial: any;
+      cylinderGeometry: any;
+      planeGeometry: any;
+      meshBasicMaterial: any;
+      sphereGeometry: any;
+      dodecahedronGeometry: any;
+      coneGeometry: any;
+      pointLight: any;
+      ambientLight: any;
+      directionalLight: any;
+      spotLight: any;
+      fog: any;
+    }
+  }
+}
 
 // --- Constants ---
 const ROAD_WIDTH = 8;
@@ -15,7 +59,6 @@ const CAMERA_POS = new THREE.Vector3(0, 8, 15);
 // --- Components ---
 
 // Physics Engine Component
-// Handles acceleration, braking, friction, and updates the store
 const PhysicsController = () => {
   const { 
     gameStatus, 
@@ -81,8 +124,6 @@ const PhysicsController = () => {
     if (closestStopDist < 250) {
         // Linearly decrease speed limit as we approach 0
         const factor = Math.max(0, closestStopDist / 250);
-        // Ensure we don't stop completely (keep 15 units) so we can creep to the stop line
-        // unless distance is literally 0
         const minCrawl = closestStopDist < 5 ? 2 : 15; 
         speedLimit = minCrawl + (factor * (MAX_SPEED - minCrawl));
     }
@@ -106,7 +147,6 @@ const PhysicsController = () => {
 
     // Apply Deceleration Override if speeding towards a stop
     if (newSpeed > speedLimit) {
-        // Stronger braking force to ensure we slow down in time
         const brakeForce = BRAKE_RATE * 1.5 * delta;
         newSpeed = Math.max(speedLimit, newSpeed - brakeForce);
     }
@@ -153,7 +193,6 @@ const CameraRig = () => {
     if (isCrashing) {
        camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z - 5, 0.05);
     } else {
-       // FOV effect based on speed?
        camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z + (currentSpeed * 0.02), 0.05);
     }
     
@@ -163,27 +202,228 @@ const CameraRig = () => {
   return null;
 };
 
+// --- Models ---
+
+const KICC = ({ position }: { position: [number, number, number] }) => {
+  return (
+    <group position={position}>
+      {/* Base - Grounded */}
+      <mesh position={[0, 1, 0]}>
+         <boxGeometry args={[6, 2, 6]} />
+         <meshStandardMaterial color="#52525b" />
+      </mesh>
+      {/* Main Cylinder */}
+      <mesh position={[0, 11, 0]}>
+        <cylinderGeometry args={[2, 2, 20, 32]} />
+        <meshStandardMaterial color="#d4d4d8" roughness={0.3} metalness={0.5} />
+      </mesh>
+      {/* Saucer Top */}
+      <mesh position={[0, 21, 0]}>
+        <cylinderGeometry args={[4, 2, 1, 32]} />
+        <meshStandardMaterial color="#a1a1aa" roughness={0.3} metalness={0.5} />
+      </mesh>
+      {/* Helipad */}
+      <mesh position={[0, 21.6, 0]}>
+        <cylinderGeometry args={[3, 4, 0.2, 32]} />
+        <meshStandardMaterial color="#71717a" />
+      </mesh>
+    </group>
+  );
+};
+
+const TimesTower = ({ position }: { position: [number, number, number] }) => {
+  return (
+    <group position={position}>
+       <mesh position={[0, 12, 0]}>
+         <boxGeometry args={[3, 24, 3]} />
+         <meshStandardMaterial color="#3b82f6" metalness={0.6} roughness={0.1} transparent opacity={0.9} />
+       </mesh>
+       {/* Details */}
+       <mesh position={[0, 12, 1.51]}>
+         <planeGeometry args={[2.5, 23]} />
+         <meshStandardMaterial color="#1e3a8a" />
+       </mesh>
+    </group>
+  );
+};
+
+const Basilica = ({ position }: { position: [number, number, number] }) => {
+  return (
+    <group position={position}>
+      {/* Main Nave - Grounded */}
+      <mesh position={[0, 4, 0]}>
+        <boxGeometry args={[6, 8, 10]} />
+        <meshStandardMaterial color="#fef3c7" roughness={0.9} />
+      </mesh>
+      {/* Roof */}
+      <mesh position={[0, 8.5, 0]} rotation={[0, 0, Math.PI/4]}>
+         <boxGeometry args={[6, 6, 10]} />
+         <meshStandardMaterial color="#78350f" />
+      </mesh>
+      {/* Tower */}
+      <mesh position={[2, 8, 4]}>
+        <boxGeometry args={[1.5, 16, 1.5]} />
+        <meshStandardMaterial color="#fef3c7" />
+      </mesh>
+      {/* Cross */}
+      <group position={[2, 16.5, 4]}>
+         <mesh position={[0, 0.5, 0]}>
+            <boxGeometry args={[0.2, 1.5, 0.2]} />
+            <meshStandardMaterial color="#fbbf24" />
+         </mesh>
+         <mesh position={[0, 0.8, 0]}>
+            <boxGeometry args={[0.8, 0.2, 0.2]} />
+            <meshStandardMaterial color="#fbbf24" />
+         </mesh>
+      </group>
+    </group>
+  );
+};
+
+const ModernBuilding = ({ height, color, position }: { height: number, color: string, position: [number, number, number] }) => {
+  // Ensure building sits on Y=0
+  const yPos = height / 2;
+  
+  return (
+    <group position={[position[0], yPos, position[2]]}>
+      {/* Main Structure */}
+      <mesh>
+        <boxGeometry args={[4, height, 4]} />
+        <meshStandardMaterial color={color} roughness={0.2} metalness={0.3} />
+      </mesh>
+      
+      {/* Window Strips (Visual fake) */}
+      <mesh position={[0, 0, 2.01]}>
+         <planeGeometry args={[3.5, height - 1]} />
+         <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.1} />
+      </mesh>
+      <mesh position={[0, 0, -2.01]} rotation={[0, Math.PI, 0]}>
+         <planeGeometry args={[3.5, height - 1]} />
+         <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.1} />
+      </mesh>
+      
+      {/* Rooftop Details */}
+      <mesh position={[0, height/2 + 0.25, 0]}>
+         <boxGeometry args={[3, 0.5, 3]} />
+         <meshStandardMaterial color="#333" />
+      </mesh>
+    </group>
+  );
+};
+
+// Destination City Logic
+const NairobiCity = () => {
+  const { totalRouteDistance, distanceTraveled } = useGameStore();
+  const groupRef = useRef<THREE.Group>(null);
+  
+  const distRemaining = totalRouteDistance - distanceTraveled;
+  
+  // Render if we are within range
+  const isVisible = distRemaining < 1500;
+  
+  useFrame(() => {
+    if (groupRef.current) {
+       groupRef.current.position.z = -(totalRouteDistance - useGameStore.getState().distanceTraveled);
+    }
+  });
+
+  if (!isVisible) return null;
+
+  return (
+    <group ref={groupRef}>
+      {/* City Ground Plane - Covers the rural ground */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <planeGeometry args={[100, 300]} />
+        <meshStandardMaterial color="#334155" />
+      </mesh>
+      
+      {/* Pavements */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-10, 0.03, 0]}>
+        <planeGeometry args={[10, 300]} />
+        <meshStandardMaterial color="#94a3b8" />
+      </mesh>
+       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[10, 0.03, 0]}>
+        <planeGeometry args={[10, 300]} />
+        <meshStandardMaterial color="#94a3b8" />
+      </mesh>
+
+      {/* Welcome Banner */}
+      <group position={[0, 6, -50]}>
+        <mesh>
+          <boxGeometry args={[14, 1.5, 0.5]} />
+          <meshStandardMaterial color="#10b981" />
+        </mesh>
+        <mesh position={[0, 0, 0.26]}>
+           <planeGeometry args={[12, 1]} />
+           <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        {/* Posts */}
+        <mesh position={[-6.5, -3, 0]}>
+          <cylinderGeometry args={[0.3, 0.3, 6]} />
+          <meshStandardMaterial color="#333" />
+        </mesh>
+        <mesh position={[6.5, -3, 0]}>
+          <cylinderGeometry args={[0.3, 0.3, 6]} />
+          <meshStandardMaterial color="#333" />
+        </mesh>
+      </group>
+
+      {/* Landmarks Right */}
+      <KICC position={[20, 0, 20]} />
+      <TimesTower position={[30, 0, -20]} />
+      
+      {/* Landmarks Left */}
+      <Basilica position={[-25, 0, 10]} />
+      
+      {/* Density Buildings Left */}
+      <ModernBuilding height={25} color="#475569" position={[-18, 0, -40]} />
+      <ModernBuilding height={15} color="#64748b" position={[-18, 0, -70]} />
+      <ModernBuilding height={35} color="#1e293b" position={[-25, 0, -100]} />
+      <ModernBuilding height={18} color="#334155" position={[-18, 0, 50]} />
+      
+      {/* Density Buildings Right */}
+      <ModernBuilding height={28} color="#475569" position={[18, 0, -60]} />
+      <ModernBuilding height={18} color="#64748b" position={[18, 0, -90]} />
+      <ModernBuilding height={30} color="#0f172a" position={[25, 0, -120]} />
+      <ModernBuilding height={22} color="#334155" position={[18, 0, 60]} />
+
+      {/* Street Lights Density */}
+      {Array.from({ length: 15 }).map((_, i) => (
+        <group key={i} position={i % 2 === 0 ? [5, 0, -i * 20 + 40] : [-5, 0, -i * 20 + 40]}>
+           <mesh position={[0, 3, 0]}>
+             <cylinderGeometry args={[0.08, 0.1, 6]} />
+             <meshStandardMaterial color="#1e293b" />
+           </mesh>
+           <mesh position={[i % 2 === 0 ? -1 : 1, 6, 0]}>
+             <boxGeometry args={[2, 0.1, 0.2]} />
+             <meshStandardMaterial color="#1e293b" />
+           </mesh>
+           {/* Glow */}
+           <mesh position={[i % 2 === 0 ? -1.8 : 1.8, 5.9, 0]}>
+              <boxGeometry args={[0.4, 0.1, 0.2]} />
+              <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={2} />
+           </mesh>
+           <pointLight position={[i % 2 === 0 ? -1.8 : 1.8, 5, 0]} intensity={0.5} color="#fbbf24" distance={15} decay={2} />
+        </group>
+      ))}
+    </group>
+  );
+};
+
 // Environment Scenery
 const Scenery = () => {
   const groupRef = useRef<THREE.Group>(null);
-  const timeOfDay = useGameStore(state => state.timeOfDay);
+  const { timeOfDay, totalRouteDistance, distanceTraveled } = useGameStore();
   
   const OBJECT_COUNT = 24;
   const GAP = 15;
   const OFFSET_FROM_ROAD = ROAD_WIDTH / 2 + 3; 
   
-  useFrame((state, delta) => {
-    // Optimization: Read speed directly
-    const speed = useGameStore.getState().currentSpeed;
-    if (groupRef.current && speed > 0) {
-      groupRef.current.position.z += speed * delta;
-      if (groupRef.current.position.z > GAP) {
-        groupRef.current.position.z %= GAP;
-      }
-    }
-  });
+  const distRemaining = totalRouteDistance - distanceTraveled;
+  const isCityApproaching = distRemaining < 800;
 
   // Pre-generate scenery items positions
+  // Move useMemo BEFORE any conditional returns to prevent Hook Error #300
   const sceneryItems = useMemo(() => {
     return Array.from({ length: OBJECT_COUNT }).map((_, i) => {
       const side = i % 2 === 0 ? 1 : -1;
@@ -194,6 +434,19 @@ const Scenery = () => {
       return { x, z, type, side, scale };
     });
   }, []);
+
+  useFrame((state, delta) => {
+    const speed = useGameStore.getState().currentSpeed;
+    if (groupRef.current && speed > 0 && !isCityApproaching) {
+      groupRef.current.position.z += speed * delta;
+      if (groupRef.current.position.z > GAP) {
+        groupRef.current.position.z %= GAP;
+      }
+    }
+  });
+
+  // Fade out rural scenery if city is here
+  if (isCityApproaching) return null;
 
   return (
     <group ref={groupRef}>
@@ -419,16 +672,10 @@ const StageModel = ({
       markerRef.current.position.z = -distToStage;
       
       // Visibility Logic:
-      // Approaching: distToStage reduces from +3000 down to 0. Visible range e.g., < 300.
-      // Departing: distToStage becomes negative (e.g. -50). Visible range e.g., > -200.
-      
       let isVisible = false;
       if (!isDeparting) {
          isVisible = distToStage < 300 && distToStage > -20;
       } else {
-         // Departing: Behind the bus (negative distance relative to stage, so positive Z in world space?? No, Z is -dist)
-         // If distToStage is -50 (50m behind), Z is +50.
-         // We want to see it as we drive away.
          isVisible = distToStage > -200 && distToStage <= 20; 
       }
       markerRef.current.visible = isVisible;
@@ -1164,6 +1411,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <PhysicsController />
         <CameraRig />
         <Scenery />
+        <NairobiCity />
         <Road />
         <StageMarker />
         <PoliceMarker />

@@ -11,6 +11,20 @@ const INITIAL_STATS: PlayerStats = {
   energy: 100
 };
 
+// Consumption in KM per Liter
+const FUEL_EFFICIENCY = {
+  '14-seater': 9,
+  '32-seater': 7,
+  '52-seater': 5
+};
+
+// Assumed Tank Capacities in Liters for gauge calculation
+const TANK_CAPACITY = {
+  '14-seater': 70,
+  '32-seater': 100,
+  '52-seater': 150
+};
+
 interface GameStore extends GameState {
   setScreen: (screen: ScreenName) => void;
   setPlayerInfo: (name: string, sacco: string) => void;
@@ -55,6 +69,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   distanceTraveled: 0,
   totalRouteDistance: 0,
   
+  fuel: 100,
+  fuelUsedLiters: 0,
+  totalPassengersCarried: 0,
+  bribesPaid: 0,
+
   isAccelerating: false,
   isBraking: false,
 
@@ -96,7 +115,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   updateDistance: (amount) => {
-    const { distanceTraveled, totalRouteDistance, nextStageDistance, nextPoliceDistance, currentSpeed, activeModal, triggerStage, triggerPoliceCheck, endGame } = get();
+    const { 
+      distanceTraveled, 
+      totalRouteDistance, 
+      nextStageDistance, 
+      nextPoliceDistance, 
+      currentSpeed, 
+      activeModal, 
+      triggerStage, 
+      triggerPoliceCheck, 
+      endGame, 
+      fuel, 
+      fuelUsedLiters,
+      vehicleType,
+      isAccelerating
+    } = get();
     
     // Check Destination / Completion
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= totalRouteDistance) {
@@ -105,21 +138,51 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
+    // --- Fuel Logic ---
+    let newFuel = fuel;
+    let newFuelUsedLiters = fuelUsedLiters;
+
+    if (vehicleType && currentSpeed > 0) {
+      const kmTraveled = amount / 1000; // Convert game units to km
+      const baseEfficiency = FUEL_EFFICIENCY[vehicleType] || 9;
+      
+      // Speed Penalty: Optimal speed is ~80. Above that, efficiency drops.
+      // Approx +30% consumption at top speed.
+      let speedPenalty = 1;
+      const kmph = currentSpeed * 1.6; // approx conversion to km/h for logic
+      if (kmph > 80) {
+        speedPenalty = 1 + ((kmph - 80) / 100); 
+      }
+      
+      // Acceleration Penalty: +20% consumption if flooring it
+      const accelPenalty = isAccelerating ? 1.2 : 1.0;
+      
+      const realEfficiency = baseEfficiency / (speedPenalty * accelPenalty);
+      
+      const litersConsumed = kmTraveled / realEfficiency;
+      newFuelUsedLiters += litersConsumed;
+
+      // Update Gauge Percentage
+      const capacity = TANK_CAPACITY[vehicleType] || 70;
+      const percentConsumed = (litersConsumed / capacity) * 100;
+      newFuel = Math.max(0, fuel - percentConsumed);
+    }
+
     // Check Police
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
-      set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0 }); // Force stop
+      set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
       triggerPoliceCheck();
       return;
     }
 
     // Check Stage
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
-      set({ distanceTraveled: nextStageDistance, currentSpeed: 0 }); // Force stop
+      set({ distanceTraveled: nextStageDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
       triggerStage();
       return;
     } 
     
-    set({ distanceTraveled: distanceTraveled + amount });
+    set({ distanceTraveled: distanceTraveled + amount, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters });
   },
   
   triggerStage: () => {
@@ -141,11 +204,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   handleStageAction: (action) => {
-    const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness } = get();
+    const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness, totalPassengersCarried } = get();
     if (!stageData) return;
 
     let newPassengerCount = currentPassengers;
     let cashEarned = 0;
+    let boarding = 0;
     const FARE_PER_PAX = 50;
 
     // 1. Process Alighting (Mandatory)
@@ -155,37 +219,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // 2. Process Boarding
     if (action === 'PICKUP_LEGAL') {
       const availableSeats = maxPassengers - newPassengerCount;
-      const boarding = Math.min(availableSeats, stageData.waitingPassengers);
-      newPassengerCount += boarding;
-      cashEarned = boarding * FARE_PER_PAX;
+      boarding = Math.min(availableSeats, stageData.waitingPassengers);
     } 
     else if (action === 'PICKUP_OVERLOAD') {
-      const boarding = stageData.waitingPassengers; 
-      newPassengerCount += boarding;
-      cashEarned = boarding * FARE_PER_PAX;
+      boarding = stageData.waitingPassengers; 
     }
+    
+    newPassengerCount += boarding;
+    cashEarned = boarding * FARE_PER_PAX;
 
     // 3. Update State and Resume
-    // Store current stage as last stage for visuals
     const currentStagePos = nextStageDistance;
-
-    // Generate next stage sooner due to higher speed (approx every 25 seconds of travel)
     const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
     
-    // Pre-calculate next passengers for visuals
     const happinessFactor = Math.max(0.1, happiness / 100);
     const maxPotentialPassengers = Math.floor(8 * happinessFactor);
     const nextPax = Math.floor(Math.random() * (maxPotentialPassengers + 1));
 
     set({
       currentPassengers: newPassengerCount,
+      totalPassengersCarried: totalPassengersCarried + boarding,
       stats: {
         ...stats,
         cash: stats.cash + cashEarned
       },
       activeModal: 'NONE',
       stageData: null,
-      // We do NOT set currentSpeed here. The player must accelerate manually.
       lastStageDistance: currentStagePos,
       nextStageDistance: nextDist,
       nextStagePassengerCount: nextPax
@@ -237,13 +296,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   handlePoliceAction: (action) => {
-    const { policeData, stats } = get();
+    const { policeData, stats, bribesPaid } = get();
     if (!policeData) return;
 
     if (action === 'PAY') {
        if (stats.cash >= policeData.bribeAmount) {
          set({
            stats: { ...stats, cash: stats.cash - policeData.bribeAmount },
+           bribesPaid: bribesPaid + policeData.bribeAmount,
            activeModal: 'NONE',
            policeData: null,
            // Player must accelerate manually
@@ -275,15 +335,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { selectedRoute, vehicleType, stats } = get();
     if (!selectedRoute) return;
 
-    // Time Scaling: Convert Route "Lore Time" to "Game Time"
-    // Target: We want roughly 7 minutes (420 seconds) for a standard 45-min route.
-    // Scale factor: 420s / 45m = ~9.33 seconds per lore minute.
+    // Time Scaling
     let seconds = 420; 
-    
     if (selectedRoute.timeLimit) {
       const timeStr = selectedRoute.timeLimit.toLowerCase();
       let loreMinutes = 0;
-      
       if (timeStr.includes('h')) {
         const parts = timeStr.split('h');
         loreMinutes += parseInt(parts[0]) * 60;
@@ -293,27 +349,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       } else if (timeStr.includes('m')) {
          loreMinutes = parseInt(timeStr);
       }
-      
       if (loreMinutes > 0) {
-        // Apply compression: 1 minute of lore time = ~9.3 seconds of gameplay
         seconds = Math.ceil(loreMinutes * 9.3); 
       }
     }
 
-    // Distance Logic: Convert km to game units (meters)
-    // 1 unit = 1 meter approx for the scale
     const totalDist = selectedRoute.distance * 1000;
     
     let maxPax = 14;
     if (vehicleType === '32-seater') maxPax = 32;
     if (vehicleType === '52-seater') maxPax = 52;
 
-    // Determine Day or Night
     const isNight = Math.random() > 0.5;
     const timeOfDay = isNight ? 'NIGHT' : 'DAY';
     const gameTime = isNight ? "08:00 PM" : "08:00 AM";
 
-    // Initial Passengers for first stage
     const nextPax = Math.floor(Math.random() * 8);
 
     set({ 
@@ -324,6 +374,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentScreen: 'GAME_LOOP',
       distanceTraveled: 0,
       totalRouteDistance: totalDist,
+      fuel: 100,
+      fuelUsedLiters: 0,
+      totalPassengersCarried: 0,
+      bribesPaid: 0,
       currentPassengers: 0,
       maxPassengers: maxPax,
       nextStageDistance: 1500,
@@ -333,7 +387,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       policeData: null,
       stageData: null,
       activeModal: 'NONE',
-      currentSpeed: 0, // Start stopped
+      currentSpeed: 0, 
       isAccelerating: false,
       isBraking: false,
       happiness: 100,
@@ -413,6 +467,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     lastStageDistance: -1000,
     nextStagePassengerCount: 0,
     nextPoliceDistance: 0,
+    fuel: 100,
+    fuelUsedLiters: 0,
     activeModal: 'NONE',
     gameStatus: 'IDLE',
     isCrashing: false,

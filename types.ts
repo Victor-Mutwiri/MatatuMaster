@@ -52,6 +52,12 @@ export interface GameState {
   distanceTraveled: number; // Game units
   totalRouteDistance: number; // Total length of route in Game units
   
+  // Mechanics
+  fuel: number; // 0-100 (Percentage)
+  fuelUsedLiters: number; // Actual liters consumed
+  totalPassengersCarried: number; // Session total
+  bribesPaid: number; // Session total
+  
   // Controls
   isAccelerating: boolean;
   isBraking: boolean;

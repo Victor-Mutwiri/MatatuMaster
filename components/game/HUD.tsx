@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 
 // --- SVG Gauge Component ---
@@ -81,7 +81,8 @@ export const HUD: React.FC = () => {
     currentSpeed,
     distanceTraveled,
     totalRouteDistance,
-    setControl
+    setControl,
+    fuel
   } = useGameStore();
 
   // Format Seconds to MM:SS
@@ -115,7 +116,7 @@ export const HUD: React.FC = () => {
       {/* Top Bar Area */}
       <div className="flex justify-between items-start gap-2">
         
-        {/* Left Side: Time and Distance */}
+        {/* Left Side: Time, Distance, Fuel */}
         <div className="flex flex-col gap-2">
             
             {/* Time Widget */}
@@ -152,6 +153,26 @@ export const HUD: React.FC = () => {
                         <div 
                            className="h-full bg-neon-blue transition-all duration-1000 ease-linear"
                            style={{ width: `${distProgress}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Fuel Widget */}
+            <div className="backdrop-blur-md bg-slate-900/80 border-l-4 border-slate-600 px-3 py-2 rounded-r-lg shadow-lg flex items-center gap-3 min-w-[130px]">
+                <Fuel className={fuel < 20 ? "text-red-500 animate-pulse" : "text-orange-400"} size={18} />
+                <div className="flex flex-col leading-none w-full">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">
+                       Fuel
+                    </span>
+                    <span className="font-display text-lg font-bold text-white">
+                       {Math.round(fuel)}%
+                    </span>
+                     {/* Mini Fuel Bar */}
+                     <div className="w-full h-1 bg-slate-700 mt-1 rounded-full overflow-hidden">
+                        <div 
+                           className={`h-full transition-all duration-300 ${fuel < 20 ? 'bg-red-500' : 'bg-orange-400'}`}
+                           style={{ width: `${fuel}%` }}
                         />
                     </div>
                 </div>
