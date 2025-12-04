@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, Gauge } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 
 export const HUD: React.FC = () => {
-  const { gameTimeRemaining, currentPassengers, maxPassengers, stats, happiness, isStereoOn, toggleStereo, isSoundOn, toggleSound } = useGameStore();
+  const { gameTimeRemaining, currentPassengers, maxPassengers, stats, happiness, isStereoOn, toggleStereo, isSoundOn, toggleSound, currentSpeed } = useGameStore();
 
   // Format Seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -17,6 +17,9 @@ export const HUD: React.FC = () => {
   const happinessColor = happiness > 75 ? 'text-neon-blue' : happiness > 40 ? 'text-yellow-400' : 'text-red-500';
   
   const isOverloaded = currentPassengers > maxPassengers;
+  
+  // Calculate display speed (Game units -> Fake KM/H)
+  const displaySpeed = Math.round(currentSpeed * 1.6);
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
@@ -90,30 +93,44 @@ export const HUD: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Bar: Passengers and Fare */}
+      {/* Bottom Bar */}
       <div className="flex justify-between items-end">
         
-        {/* Passengers */}
-        <div className={`
-          backdrop-blur-md px-4 py-3 rounded-lg border shadow-lg flex items-center gap-3 transition-colors
-          ${isOverloaded 
-            ? 'bg-red-900/90 border-red-500' 
-            : 'bg-slate-900/80 border-slate-700'
-          }
-        `}>
-          {isOverloaded ? (
-            <AlertOctagon className="text-white animate-pulse" size={20} />
-          ) : (
-            <Users className="text-slate-300" size={20} />
-          )}
+        {/* Speedometer & Passengers */}
+        <div className="flex gap-3 items-end">
           
-          <div>
-            <span className={`block text-[10px] uppercase font-bold ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>
-              Pax {isOverloaded && '(Excess)'}
-            </span>
-            <span className="font-display text-lg font-bold text-white">
-              {currentPassengers}/{maxPassengers}
-            </span>
+           {/* Speedometer */}
+           <div className="bg-slate-900/80 backdrop-blur-md px-3 py-3 rounded-lg border border-slate-700 shadow-lg flex flex-col items-center min-w-[80px]">
+             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Speed</span>
+             <div className="flex items-baseline gap-1">
+               <span className="font-display text-2xl font-black text-white">{displaySpeed}</span>
+               <span className="text-[10px] text-slate-500 font-bold">KM/H</span>
+             </div>
+             <Gauge size={16} className="text-matatu-yellow mt-1" />
+           </div>
+
+          {/* Passengers */}
+          <div className={`
+            backdrop-blur-md px-4 py-3 rounded-lg border shadow-lg flex items-center gap-3 transition-colors h-full
+            ${isOverloaded 
+              ? 'bg-red-900/90 border-red-500' 
+              : 'bg-slate-900/80 border-slate-700'
+            }
+          `}>
+            {isOverloaded ? (
+              <AlertOctagon className="text-white animate-pulse" size={20} />
+            ) : (
+              <Users className="text-slate-300" size={20} />
+            )}
+            
+            <div>
+              <span className={`block text-[10px] uppercase font-bold ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>
+                Pax {isOverloaded && '(Excess)'}
+              </span>
+              <span className="font-display text-lg font-bold text-white">
+                {currentPassengers}/{maxPassengers}
+              </span>
+            </div>
           </div>
         </div>
 

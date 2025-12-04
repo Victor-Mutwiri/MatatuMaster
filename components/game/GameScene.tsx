@@ -346,6 +346,82 @@ const GraffitiStrip = ({ position, width, length, color }: { position: [number, 
   );
 };
 
+// --- Vehicle Models ---
+
+const Motorbike = () => {
+  return (
+    <group position={[0, 0.35, 0]}>
+       {/* Wheels */}
+       <Wheel position={[0, 0, 0.6]} radius={0.35} />
+       <Wheel position={[0, 0, -0.6]} radius={0.35} />
+       
+       {/* Body Frame */}
+       <mesh position={[0, 0.4, 0]}>
+          <boxGeometry args={[0.15, 0.3, 1.2]} />
+          <meshStandardMaterial color="#ef4444" />
+       </mesh>
+       
+       {/* Handlebars */}
+       <mesh position={[0, 0.7, 0.4]} rotation={[0, 0, 0]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.8]} />
+          <meshStandardMaterial color="#333" />
+       </mesh>
+       <mesh position={[0, 0.7, 0.4]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.8]} />
+          <meshStandardMaterial color="#333" />
+       </mesh>
+
+       {/* Rider Body */}
+       <mesh position={[0, 0.8, 0]}>
+          <boxGeometry args={[0.4, 0.5, 0.2]} />
+          <meshStandardMaterial color="#1e293b" />
+       </mesh>
+       {/* Rider Head */}
+       <mesh position={[0, 1.15, 0]}>
+          <sphereGeometry args={[0.18]} />
+          <meshStandardMaterial color="#fbbf24" />
+       </mesh>
+    </group>
+  );
+}
+
+const SmallCar = () => {
+  return (
+    <group position={[0, 0.3, 0]}>
+       {/* Body */}
+       <mesh position={[0, 0.35, 0]}>
+          <boxGeometry args={[1.4, 0.6, 3.2]} />
+          <meshStandardMaterial color="#3b82f6" />
+       </mesh>
+       {/* Cabin */}
+       <mesh position={[0, 0.8, -0.2]}>
+          <boxGeometry args={[1.3, 0.5, 2.0]} />
+          <meshStandardMaterial color="#3b82f6" />
+       </mesh>
+       {/* Windows */}
+       <mesh position={[0, 0.82, -0.2]}>
+          <boxGeometry args={[1.32, 0.4, 1.8]} />
+          <meshStandardMaterial color="#1e293b" roughness={0.1} />
+       </mesh>
+       {/* Wheels */}
+       <Wheel position={[0.6, 0, 1.0]} radius={0.3} />
+       <Wheel position={[-0.6, 0, 1.0]} radius={0.3} />
+       <Wheel position={[0.6, 0, -1.0]} radius={0.3} />
+       <Wheel position={[-0.6, 0, -1.0]} radius={0.3} />
+       
+       {/* Lights */}
+       <mesh position={[0, 0.4, 1.6]}>
+         <boxGeometry args={[1.2, 0.1, 0.05]} />
+         <meshStandardMaterial color="white" emissive="white" />
+       </mesh>
+       <mesh position={[0, 0.4, -1.6]}>
+         <boxGeometry args={[1.2, 0.1, 0.05]} />
+         <meshStandardMaterial color="red" emissive="red" />
+       </mesh>
+    </group>
+  );
+}
+
 // 14-Seater: The Shark (Refined)
 const Matatu14Seater = () => {
   return (
@@ -599,7 +675,10 @@ const Matatu52Seater = () => {
 };
 
 // Player Logic Wrapper
-const Player = ({ type }: { type: VehicleType | null }) => {
+// We export current lane to checking collisions in OncomingTraffic
+export const PlayerContext = React.createContext<{ lane: number }>({ lane: -1 });
+
+const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCallback: (l: number) => void }) => {
   const meshRef = useRef<THREE.Group>(null);
   // -1 is Left Lane (Kenya keep left), 1 is Right Lane (Overtaking)
   const [lane, setLane] = useState<-1 | 1>(-1); 
@@ -607,6 +686,11 @@ const Player = ({ type }: { type: VehicleType | null }) => {
   const TILT_ANGLE = 0.1;
 
   const reportLaneChange = useGameStore(state => state.reportLaneChange);
+
+  // Sync local lane state to parent for collision logic
+  useEffect(() => {
+    setLaneCallback(lane);
+  }, [lane, setLaneCallback]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -696,12 +780,85 @@ const Player = ({ type }: { type: VehicleType | null }) => {
   );
 };
 
+// Oncoming Traffic System
+const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
+  const { currentSpeed, triggerCrash, gameStatus } = useGameStore();
+  const [vehicles, setVehicles] = useState<{ id: number, z: number, type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS', speed: number }[]>([]);
+  const nextSpawnRef = useRef(0);
+
+  // Traffic Config
+  const TRAFFIC_LANE_X = LANE_OFFSET; // Right Lane
+  const SPAWN_DISTANCE = -150; // Spawn far ahead (negative Z because objects move +Z)
+  const DESPAWN_DISTANCE = 20;
+
+  useFrame((state, delta) => {
+    if (gameStatus !== 'PLAYING') return;
+
+    // 1. Move Vehicles
+    setVehicles(prev => {
+      const next = [];
+      for (const v of prev) {
+        // Vehicles move towards positive Z (camera)
+        // Speed = Player Speed + Oncoming Speed (Relative)
+        const moveSpeed = currentSpeed + v.speed;
+        const newZ = v.z + moveSpeed * delta;
+        
+        // Collision Detection
+        // If player is in Right Lane (1) and vehicle is close
+        if (playerLane === 1) {
+           const dist = Math.abs(newZ - 0); // Player is at Z=0
+           if (dist < 3.0) {
+             triggerCrash();
+           }
+        }
+
+        if (newZ < DESPAWN_DISTANCE) {
+          next.push({ ...v, z: newZ });
+        }
+      }
+      return next;
+    });
+
+    // 2. Spawn Logic
+    if (currentSpeed > 0 && state.clock.elapsedTime > nextSpawnRef.current) {
+      const types: ('BIKE' | 'CAR' | 'MATATU' | 'BUS')[] = ['BIKE', 'CAR', 'CAR', 'MATATU', 'BUS'];
+      const type = types[Math.floor(Math.random() * types.length)];
+      
+      setVehicles(prev => [...prev, {
+        id: Math.random(),
+        z: SPAWN_DISTANCE,
+        type,
+        speed: 30 + Math.random() * 20 // Traffic speed
+      }]);
+      
+      // Random interval between 1s and 4s depending on speed
+      const interval = 1 + Math.random() * 3;
+      nextSpawnRef.current = state.clock.elapsedTime + interval;
+    }
+  });
+
+  return (
+    <group>
+      {vehicles.map(v => (
+        <group key={v.id} position={[TRAFFIC_LANE_X, 0, v.z]} rotation={[0, Math.PI, 0]}>
+           {v.type === 'BIKE' && <Motorbike />}
+           {v.type === 'CAR' && <SmallCar />}
+           {v.type === 'MATATU' && <Matatu14Seater />}
+           {v.type === 'BUS' && <Matatu52Seater />}
+        </group>
+      ))}
+    </group>
+  );
+};
+
 // --- Main Scene ---
 interface GameSceneProps {
   vehicleType: VehicleType | null;
 }
 
 export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
+  const [playerLane, setPlayerLane] = useState(-1);
+
   return (
     <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-black">
       <Canvas shadows camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: 45 }}>
@@ -714,9 +871,11 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <Road />
         <StageMarker />
         <PoliceMarker />
-        <Player type={vehicleType || '14-seater'} />
         
-        <fog attach="fog" args={['#0f172a', 15, 60]} />
+        <Player type={vehicleType || '14-seater'} setLaneCallback={setPlayerLane} />
+        <OncomingTraffic playerLane={playerLane} />
+        
+        <fog attach="fog" args={['#0f172a', 15, 80]} />
       </Canvas>
       
       <div className="absolute bottom-10 inset-x-0 flex justify-center pointer-events-none opacity-50">

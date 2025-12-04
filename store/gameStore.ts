@@ -22,6 +22,7 @@ interface GameStore extends GameState {
   exitToMapSelection: () => void;
   tickTimer: () => void;
   endGame: (reason: GameOverReason) => void;
+  triggerCrash: () => void;
   
   // Stage Actions
   triggerStage: () => void;
@@ -44,7 +45,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerName: '',
   saccoName: '',
   vehicleType: null,
-  currentSpeed: 60, // Increased base speed for arcade feel
+  currentSpeed: 70, // Increased base speed
   distanceTraveled: 0,
   
   currentPassengers: 0,
@@ -151,7 +152,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       activeModal: 'NONE',
       stageData: null,
-      currentSpeed: 60, // Resume speed
+      currentSpeed: 70, // Resume speed
       nextStageDistance: nextDist
     });
   },
@@ -210,7 +211,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
            stats: { ...stats, cash: stats.cash - policeData.bribeAmount },
            activeModal: 'NONE',
            policeData: null,
-           currentSpeed: 60
+           currentSpeed: 70
          });
        }
     } else if (action === 'REFUSE') {
@@ -229,7 +230,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({
            activeModal: 'NONE',
            policeData: null,
-           currentSpeed: 60
+           currentSpeed: 70
         });
       }
     }
@@ -240,9 +241,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!selectedRoute) return;
 
     // Time Scaling: Convert Route "Lore Time" to "Arcade Time"
-    // Scale Factor: 15x compression. 
-    // 45 mins lore -> 3 mins gameplay (180s)
-    let seconds = 180; 
+    // Target: 45 min route ~= 4 minutes gameplay (240 seconds)
+    // Scale factor: 5.33
+    let seconds = 240; 
     
     if (selectedRoute.timeLimit) {
       const timeStr = selectedRoute.timeLimit.toLowerCase();
@@ -259,8 +260,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       
       if (loreMinutes > 0) {
-        // Apply compression: 1 minute of lore time = 4 seconds of gameplay
-        seconds = Math.ceil(loreMinutes * 4); 
+        // Apply compression: 1 minute of lore time = ~5.5 seconds of gameplay
+        seconds = Math.ceil(loreMinutes * 5.5); 
       }
     }
     
@@ -281,7 +282,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       policeData: null,
       stageData: null,
       activeModal: 'NONE',
-      currentSpeed: 60,
+      currentSpeed: 70,
       happiness: 100,
       isStereoOn: false
     });
@@ -298,6 +299,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     policeData: null,
     stageData: null,
     happiness: 100
+  }),
+
+  triggerCrash: () => set({
+    gameStatus: 'GAME_OVER',
+    gameOverReason: 'CRASH',
+    activeModal: 'GAME_OVER',
+    currentSpeed: 0
   }),
 
   tickTimer: () => set((state) => {
@@ -336,7 +344,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     playerName: '',
     saccoName: '',
     vehicleType: null,
-    currentSpeed: 60,
+    currentSpeed: 70,
     distanceTraveled: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
