@@ -53,6 +53,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   vehicleType: null,
   currentSpeed: 0,
   distanceTraveled: 0,
+  totalRouteDistance: 0,
   
   isAccelerating: false,
   isBraking: false,
@@ -95,8 +96,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   updateDistance: (amount) => {
-    const { distanceTraveled, nextStageDistance, nextPoliceDistance, currentSpeed, activeModal, triggerStage, triggerPoliceCheck } = get();
+    const { distanceTraveled, totalRouteDistance, nextStageDistance, nextPoliceDistance, currentSpeed, activeModal, triggerStage, triggerPoliceCheck, endGame } = get();
     
+    // Check Destination / Completion
+    if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= totalRouteDistance) {
+      set({ distanceTraveled: totalRouteDistance, currentSpeed: 0 }); // Force stop
+      endGame('COMPLETED');
+      return;
+    }
+
     // Check Police
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
       set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0 }); // Force stop
@@ -291,6 +299,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         seconds = Math.ceil(loreMinutes * 9.3); 
       }
     }
+
+    // Distance Logic: Convert km to game units (meters)
+    // 1 unit = 1 meter approx for the scale
+    const totalDist = selectedRoute.distance * 1000;
     
     let maxPax = 14;
     if (vehicleType === '32-seater') maxPax = 32;
@@ -311,6 +323,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameOverReason: null,
       currentScreen: 'GAME_LOOP',
       distanceTraveled: 0,
+      totalRouteDistance: totalDist,
       currentPassengers: 0,
       maxPassengers: maxPax,
       nextStageDistance: 1500,
@@ -338,6 +351,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     activeModal: 'NONE',
     currentSpeed: 0,
     distanceTraveled: 0,
+    totalRouteDistance: 0,
     currentPassengers: 0,
     policeData: null,
     stageData: null,
@@ -393,6 +407,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     vehicleType: null,
     currentSpeed: 0,
     distanceTraveled: 0,
+    totalRouteDistance: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
     lastStageDistance: -1000,

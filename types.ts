@@ -50,6 +50,7 @@ export interface GameState {
   vehicleType: VehicleType | null;
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
+  totalRouteDistance: number; // Total length of route in Game units
   
   // Controls
   isAccelerating: boolean;
