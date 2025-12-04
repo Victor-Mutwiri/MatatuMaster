@@ -4,10 +4,11 @@ import { useGameStore } from '../store/gameStore';
 import { Button } from '../components/ui/Button';
 import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
+import { StageModal } from '../components/game/StageModal';
 import { X, AlertOctagon, RotateCcw } from 'lucide-react';
 
 export const GameLoopScreen: React.FC = () => {
-  const { vehicleType, resetGame, gameStatus, tickTimer, gameOverReason, setScreen } = useGameStore();
+  const { vehicleType, resetGame, gameStatus, tickTimer, gameOverReason, setScreen, activeModal } = useGameStore();
 
   // Timer Effect
   useEffect(() => {
@@ -20,10 +21,6 @@ export const GameLoopScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [gameStatus, tickTimer]);
 
-  const handleReturnHome = () => {
-    setScreen('DASHBOARD'); // Or Map Selection
-  };
-
   return (
     <div className="relative w-full h-screen bg-slate-900 overflow-hidden">
       
@@ -33,7 +30,7 @@ export const GameLoopScreen: React.FC = () => {
       </div>
 
       {/* Heads Up Display */}
-      {gameStatus === 'PLAYING' && <HUD />}
+      {gameStatus === 'PLAYING' && activeModal === 'NONE' && <HUD />}
 
       {/* Pause/Abort Menu Button (Top Right absolute) */}
       <div className="absolute top-4 right-4 z-50">
@@ -47,8 +44,11 @@ export const GameLoopScreen: React.FC = () => {
         </Button>
       </div>
 
+      {/* Stage Modal Overlay */}
+      {activeModal === 'STAGE' && <StageModal />}
+
       {/* Game Over Modal */}
-      {gameStatus === 'GAME_OVER' && (
+      {activeModal === 'GAME_OVER' && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-800 border-2 border-slate-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center relative overflow-hidden">
             

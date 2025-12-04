@@ -7,6 +7,8 @@ export type GameStatus = 'IDLE' | 'PLAYING' | 'PAUSED' | 'GAME_OVER';
 
 export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | null;
 
+export type ActiveModal = 'NONE' | 'STAGE' | 'GAME_OVER';
+
 export interface PlayerStats {
   cash: number;
   reputation: number; // 0-100
@@ -26,6 +28,12 @@ export interface Route {
   isLocked?: boolean;
 }
 
+export interface StageData {
+  name: string;
+  waitingPassengers: number;
+  alightingPassengers: number;
+}
+
 export interface GameState {
   currentScreen: ScreenName;
   stats: PlayerStats;
@@ -35,6 +43,15 @@ export interface GameState {
   vehicleType: VehicleType | null;
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
+  
+  // Passenger State
+  currentPassengers: number;
+  maxPassengers: number;
+  
+  // Stage State
+  nextStageDistance: number;
+  activeModal: ActiveModal;
+  stageData: StageData | null;
   
   // Active Game Session State
   gameStatus: GameStatus;

@@ -4,12 +4,10 @@ import { Users, Smile, Wallet, Clock } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 
 export const HUD: React.FC = () => {
-  const { gameTimeRemaining } = useGameStore();
+  const { gameTimeRemaining, currentPassengers, maxPassengers, stats } = useGameStore();
 
   // Hardcoded values for now
-  const fare = 0;
   const happiness = 100;
-  const passengers = 0;
 
   // Format Seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -62,15 +60,17 @@ export const HUD: React.FC = () => {
           <Users className="text-slate-300" size={20} />
           <div>
             <span className="block text-[10px] text-slate-400 uppercase font-bold">Pax</span>
-            <span className="font-display text-lg font-bold text-white">{passengers}</span>
+            <span className="font-display text-lg font-bold text-white">
+              {currentPassengers}/{maxPassengers}
+            </span>
           </div>
         </div>
 
         {/* Fare (Cash) */}
         <div className="bg-slate-900/80 backdrop-blur-md px-5 py-3 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3">
           <div className="text-right">
-            <span className="block text-[10px] text-matatu-yellow uppercase font-bold tracking-wider">Total Fare</span>
-            <span className="font-display text-xl font-bold text-green-400">KES {fare}</span>
+            <span className="block text-[10px] text-matatu-yellow uppercase font-bold tracking-wider">Total Cash</span>
+            <span className="font-display text-xl font-bold text-green-400">KES {stats.cash.toLocaleString()}</span>
           </div>
           <Wallet className="text-green-400" size={24} />
         </div>
