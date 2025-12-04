@@ -251,37 +251,147 @@ const Road = () => {
   );
 };
 
-// Stage Marker
+// --- Low Poly Humans ---
+interface LowPolyHumanProps {
+  position: [number, number, number];
+  rotation: [number, number, number];
+}
+
+const LowPolyHuman: React.FC<LowPolyHumanProps> = ({ position, rotation }) => {
+  const shirtColor = useMemo(() => ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)], []);
+  const pantsColor = useMemo(() => ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)], []);
+  const skinColor = '#8d5524';
+
+  return (
+    <group position={position} rotation={rotation} scale={[0.7, 0.7, 0.7]}>
+      {/* Head */}
+      <mesh position={[0, 1.6, 0]}>
+        <sphereGeometry args={[0.2, 8, 8]} />
+        <meshStandardMaterial color={skinColor} />
+      </mesh>
+      {/* Body */}
+      <mesh position={[0, 1.0, 0]}>
+        <boxGeometry args={[0.4, 0.8, 0.25]} />
+        <meshStandardMaterial color={shirtColor} />
+      </mesh>
+      {/* Legs */}
+      <mesh position={[-0.12, 0.3, 0]}>
+        <cylinderGeometry args={[0.08, 0.07, 0.6]} />
+        <meshStandardMaterial color={pantsColor} />
+      </mesh>
+      <mesh position={[0.12, 0.3, 0]}>
+         <cylinderGeometry args={[0.08, 0.07, 0.6]} />
+        <meshStandardMaterial color={pantsColor} />
+      </mesh>
+    </group>
+  );
+};
+
+// --- Bus Shelter ---
+const BusStopShelter = () => {
+  return (
+    <group>
+      {/* Concrete Base */}
+      <mesh position={[0, 0.1, 0]}>
+        <boxGeometry args={[4, 0.2, 2.5]} />
+        <meshStandardMaterial color="#64748b" roughness={0.8} />
+      </mesh>
+      
+      {/* Poles */}
+      <mesh position={[-1.8, 1.5, -1]}>
+        <cylinderGeometry args={[0.05, 0.05, 3]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.5} />
+      </mesh>
+      <mesh position={[1.8, 1.5, -1]}>
+        <cylinderGeometry args={[0.05, 0.05, 3]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.5} />
+      </mesh>
+      <mesh position={[-1.8, 1.5, 1]}>
+        <cylinderGeometry args={[0.05, 0.05, 3]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.5} />
+      </mesh>
+      <mesh position={[1.8, 1.5, 1]}>
+        <cylinderGeometry args={[0.05, 0.05, 3]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.5} />
+      </mesh>
+
+      {/* Roof */}
+      <mesh position={[0, 2.8, 0]} rotation={[0.1, 0, 0]}>
+        <boxGeometry args={[4.2, 0.1, 2.8]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.2} />
+      </mesh>
+
+      {/* Bench */}
+      <mesh position={[0, 0.5, -0.5]}>
+        <boxGeometry args={[3, 0.1, 0.6]} />
+        <meshStandardMaterial color="#78350f" />
+      </mesh>
+      <mesh position={[-1.2, 0.3, -0.5]}>
+         <cylinderGeometry args={[0.04, 0.04, 0.5]} />
+         <meshStandardMaterial color="#333" />
+      </mesh>
+      <mesh position={[1.2, 0.3, -0.5]}>
+         <cylinderGeometry args={[0.04, 0.04, 0.5]} />
+         <meshStandardMaterial color="#333" />
+      </mesh>
+
+      {/* Sign */}
+      <mesh position={[2.2, 2, 0]}>
+        <boxGeometry args={[0.1, 0.8, 0.8]} />
+        <meshStandardMaterial color="#fbbf24" />
+      </mesh>
+      <mesh position={[2.21, 2, 0]} rotation={[0, Math.PI/2, 0]}>
+         <planeGeometry args={[0.6, 0.6]} />
+         <meshBasicMaterial color="#000" />
+      </mesh>
+    </group>
+  );
+};
+
+// Stage Marker with Shelter and People
 const StageMarker = () => {
-  const { nextStageDistance, distanceTraveled } = useGameStore();
+  const { nextStageDistance, nextStagePassengerCount } = useGameStore();
   const markerRef = useRef<THREE.Group>(null);
   
-  const distanceToStage = nextStageDistance - distanceTraveled;
-  const isVisible = distanceToStage < 300 && distanceToStage > -20;
-  const MARKER_X = -(ROAD_WIDTH / 2 + 1); 
+  // Position on the Left side of the road (approx -6 units X)
+  const MARKER_X = -(ROAD_WIDTH / 2 + 2.5); 
+
+  // Memoize crowd so they don't re-render/change position on every frame
+  const crowd = useMemo(() => {
+    return Array.from({ length: nextStagePassengerCount }).map((_, i) => {
+      // Random position inside the shelter area
+      const x = (Math.random() - 0.5) * 3; // +/- 1.5 width
+      const z = (Math.random() - 0.5) * 1.5; // +/- 0.75 depth
+      const rotY = (Math.random() - 0.5) * Math.PI; // Face random direction
+      return { x, z, rotY };
+    });
+  }, [nextStagePassengerCount]);
 
   useFrame(() => {
+    const { distanceTraveled } = useGameStore.getState();
+    const distanceToStage = nextStageDistance - distanceTraveled;
+    
     if (markerRef.current) {
       markerRef.current.position.z = -distanceToStage;
+      
+      // Hide if far behind or far ahead to save draw calls
+      markerRef.current.visible = distanceToStage < 300 && distanceToStage > -20;
     }
   });
 
-  if (!isVisible) return null;
-
   return (
     <group ref={markerRef} position={[MARKER_X, 0, 0]}>
-      <mesh position={[0, 1.5, 0]}>
-        <cylinderGeometry args={[0.1, 0.1, 3]} />
-        <meshStandardMaterial color="#555" />
-      </mesh>
-      <mesh position={[0, 2.5, 0]}>
-        <boxGeometry args={[1.5, 1, 0.1]} />
-        <meshStandardMaterial color="#FFD700" />
-      </mesh>
-      <mesh position={[0, 2.5, 0.06]}>
-        <planeGeometry args={[1.2, 0.8]} />
-        <meshBasicMaterial color="#000" />
-      </mesh>
+      {/* 3D Shelter */}
+      <BusStopShelter />
+      
+      {/* Waiting Passengers */}
+      {crowd.map((p, i) => (
+        <LowPolyHuman 
+          key={i} 
+          position={[p.x, 0, p.z]} 
+          rotation={[0, p.rotY, 0]} 
+        />
+      ))}
     </group>
   );
 };

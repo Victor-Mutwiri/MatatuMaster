@@ -60,6 +60,7 @@ export interface GameState {
   
   // Stage State
   nextStageDistance: number;
+  nextStagePassengerCount: number; // Visual representation count
   activeModal: ActiveModal;
   stageData: StageData | null;
   

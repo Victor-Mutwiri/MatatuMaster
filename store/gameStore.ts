@@ -59,6 +59,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   currentPassengers: 0,
   maxPassengers: 14,
   nextStageDistance: 0,
+  nextStagePassengerCount: 0,
   activeModal: 'NONE',
   stageData: null,
   
@@ -112,13 +113,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   triggerStage: () => {
-    const { currentPassengers, happiness } = get();
+    const { currentPassengers, nextStagePassengerCount } = get();
     
-    // Happiness affects passenger availability
-    const happinessFactor = Math.max(0.1, happiness / 100);
-    const maxPotentialPassengers = Math.floor(8 * happinessFactor);
-    
-    const waiting = Math.floor(Math.random() * (maxPotentialPassengers + 1)); 
+    const waiting = nextStagePassengerCount; 
     
     const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
     
@@ -134,7 +131,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   handleStageAction: (action) => {
-    const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance } = get();
+    const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness } = get();
     if (!stageData) return;
 
     let newPassengerCount = currentPassengers;
@@ -161,6 +158,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // 3. Update State and Resume
     // Generate next stage sooner due to higher speed (approx every 25 seconds of travel)
     const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
+    
+    // Pre-calculate next passengers for visuals
+    const happinessFactor = Math.max(0.1, happiness / 100);
+    const maxPotentialPassengers = Math.floor(8 * happinessFactor);
+    const nextPax = Math.floor(Math.random() * (maxPotentialPassengers + 1));
 
     set({
       currentPassengers: newPassengerCount,
@@ -171,7 +173,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       activeModal: 'NONE',
       stageData: null,
       // We do NOT set currentSpeed here. The player must accelerate manually.
-      nextStageDistance: nextDist
+      nextStageDistance: nextDist,
+      nextStagePassengerCount: nextPax
     });
   },
 
@@ -292,6 +295,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const timeOfDay = isNight ? 'NIGHT' : 'DAY';
     const gameTime = isNight ? "08:00 PM" : "08:00 AM";
 
+    // Initial Passengers for first stage
+    const nextPax = Math.floor(Math.random() * 8);
+
     set({ 
       gameStatus: 'PLAYING', 
       isCrashing: false,
@@ -302,6 +308,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentPassengers: 0,
       maxPassengers: maxPax,
       nextStageDistance: 1500,
+      nextStagePassengerCount: nextPax,
       nextPoliceDistance: 3500 + Math.random() * 1000, 
       policeData: null,
       stageData: null,
@@ -381,6 +388,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     distanceTraveled: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
+    nextStagePassengerCount: 0,
     nextPoliceDistance: 0,
     activeModal: 'NONE',
     gameStatus: 'IDLE',
