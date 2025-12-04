@@ -1,22 +1,58 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Button } from '../ui/Button';
-import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle, X } from 'lucide-react';
 
 export const StageModal: React.FC = () => {
   const { stageData, handleStageAction, currentPassengers, maxPassengers } = useGameStore();
+  const [showOverloadConfirm, setShowOverloadConfirm] = useState(false);
 
   if (!stageData) return null;
 
-  const passengersAfterAlight = currentPassengers - stageData.alightingPassengers;
-  const passengersAfterBoarding = passengersAfterAlight + stageData.waitingPassengers;
-  
-  const isOverloaded = passengersAfterBoarding > maxPassengers;
-  const potentialBoarding = stageData.waitingPassengers;
-  const earnings = potentialBoarding * 50; 
-  
+  const passengersAfterAlight = Math.max(0, currentPassengers - stageData.alightingPassengers);
   const availableSeats = maxPassengers - passengersAfterAlight;
+  
+  // Calculate potential overload
+  const totalWaiting = stageData.waitingPassengers;
+  const passengersIfOverload = passengersAfterAlight + totalWaiting;
+  const overloadCount = Math.max(0, passengersIfOverload - maxPassengers);
+  const isOverloadingPossible = overloadCount > 0;
+
+  // Earnings calculation
+  const FARE = 50;
+  const legalEarnings = Math.min(availableSeats, totalWaiting) * FARE;
+  const overloadEarnings = totalWaiting * FARE;
+
+  // Render Confirmation Popup
+  if (showOverloadConfirm) {
+    return (
+      <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="bg-slate-800 border-2 border-red-500 w-full max-w-sm rounded-xl overflow-hidden shadow-2xl p-6 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-red-500/20 p-3 rounded-full animate-pulse">
+              <AlertTriangle size={32} className="text-red-500" />
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2 uppercase">Carry Excess Passengers?</h3>
+          <p className="text-slate-400 text-sm mb-6">
+            You are about to exceed your vehicle capacity by <span className="text-red-400 font-bold">{overloadCount} pax</span>.
+            <br/><br/>
+            <span className="text-green-400 block">Benefit: Earn KES {overloadEarnings} (Max)</span>
+            <span className="text-red-400 block">Risk: High chance of police trouble.</span>
+          </p>
+          <div className="space-y-3">
+             <Button variant="danger" fullWidth onClick={() => handleStageAction('PICKUP_OVERLOAD')}>
+               Confirm & Overload
+             </Button>
+             <Button variant="secondary" fullWidth onClick={() => setShowOverloadConfirm(false)}>
+               Cancel
+             </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
@@ -63,41 +99,40 @@ export const StageModal: React.FC = () => {
           {/* Info */}
           <div className="text-center space-y-1">
             <p className="text-slate-400 text-sm">
-              Seats Available: <span className={availableSeats > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
-                 {Math.max(0, availableSeats)}
-              </span>
+              Seats Available (After Drop): <span className="text-white font-bold">{Math.max(0, availableSeats)}</span>
             </p>
-            {potentialBoarding > 0 && (
-               <p className="text-matatu-yellow font-bold text-sm">
-                 Potential Fare: KES {earnings}
-               </p>
-            )}
           </div>
           
-          {/* Overload Warning */}
-          {isOverloaded && (
-             <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg flex gap-3 items-start">
-               <AlertTriangle className="text-red-500 shrink-0" size={20} />
-               <div className="text-left">
-                  <p className="text-red-400 font-bold text-xs uppercase">Warning: Overloading</p>
-                  <p className="text-slate-300 text-[10px] leading-tight mt-1">
-                    Picking up all passengers will exceed capacity. Police will fine you heavily if caught.
-                  </p>
-               </div>
-             </div>
-          )}
-
           {/* Actions */}
           <div className="space-y-3">
+            
+            {/* Option 1: Legal Fill */}
             <Button 
-              variant={isOverloaded ? 'danger' : 'primary'} 
+              variant="primary" 
               fullWidth 
-              onClick={() => handleStageAction('PICKUP')}
+              onClick={() => handleStageAction('PICKUP_LEGAL')}
             >
-              <span className="flex items-center justify-center gap-2">
-                {isOverloaded ? 'Overload & Go' : 'Pick Up & Go'} <ArrowRight size={16} />
-              </span>
+              <div className="flex justify-between items-center w-full">
+                <span className="text-xs font-bold uppercase">Fill Seats Only</span>
+                <span className="bg-black/20 px-2 py-0.5 rounded text-xs">KES {legalEarnings}</span>
+              </div>
             </Button>
+
+            {/* Option 2: Overload (Conditional) */}
+            {isOverloadingPossible && (
+              <Button 
+                variant="danger" 
+                fullWidth 
+                onClick={() => setShowOverloadConfirm(true)}
+              >
+                <div className="flex justify-between items-center w-full">
+                  <span className="text-xs font-bold uppercase flex items-center gap-1">
+                    <AlertTriangle size={14} /> Overload (+{overloadCount})
+                  </span>
+                  <span className="bg-black/20 px-2 py-0.5 rounded text-xs">KES {overloadEarnings}</span>
+                </div>
+              </Button>
+            )}
             
             <Button 
               variant="secondary" 

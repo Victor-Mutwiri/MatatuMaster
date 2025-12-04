@@ -25,7 +25,7 @@ interface GameStore extends GameState {
   
   // Stage Actions
   triggerStage: () => void;
-  handleStageAction: (action: 'PICKUP' | 'DEPART') => void;
+  handleStageAction: (action: 'PICKUP_LEGAL' | 'PICKUP_OVERLOAD' | 'DEPART') => void;
 
   // Police Actions
   triggerPoliceCheck: () => void;
@@ -115,7 +115,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   handleStageAction: (action) => {
-    const { stageData, currentPassengers, stats, nextStageDistance } = get();
+    const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance } = get();
     if (!stageData) return;
 
     let newPassengerCount = currentPassengers;
@@ -124,10 +124,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // 1. Process Alighting (Mandatory)
     newPassengerCount -= stageData.alightingPassengers;
+    if (newPassengerCount < 0) newPassengerCount = 0;
 
-    // 2. Process Boarding (Allow Overloading!)
-    if (action === 'PICKUP') {
-      const boarding = stageData.waitingPassengers; // Pick up everyone, regardless of seats
+    // 2. Process Boarding
+    if (action === 'PICKUP_LEGAL') {
+      const availableSeats = maxPassengers - newPassengerCount;
+      const boarding = Math.min(availableSeats, stageData.waitingPassengers);
+      newPassengerCount += boarding;
+      cashEarned = boarding * FARE_PER_PAX;
+    } 
+    else if (action === 'PICKUP_OVERLOAD') {
+      const boarding = stageData.waitingPassengers; 
       newPassengerCount += boarding;
       cashEarned = boarding * FARE_PER_PAX;
     }

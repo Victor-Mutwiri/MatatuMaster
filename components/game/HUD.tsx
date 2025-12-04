@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2 } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 
 export const HUD: React.FC = () => {
@@ -15,6 +15,8 @@ export const HUD: React.FC = () => {
 
   const isLowTime = gameTimeRemaining <= 30; // Red alert if under 30s
   const happinessColor = happiness > 75 ? 'text-neon-blue' : happiness > 40 ? 'text-yellow-400' : 'text-red-500';
+  
+  const isOverloaded = currentPassengers > maxPassengers;
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
@@ -92,10 +94,23 @@ export const HUD: React.FC = () => {
       <div className="flex justify-between items-end">
         
         {/* Passengers */}
-        <div className="bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-lg border border-slate-700 shadow-lg flex items-center gap-3">
-          <Users className="text-slate-300" size={20} />
+        <div className={`
+          backdrop-blur-md px-4 py-3 rounded-lg border shadow-lg flex items-center gap-3 transition-colors
+          ${isOverloaded 
+            ? 'bg-red-900/90 border-red-500' 
+            : 'bg-slate-900/80 border-slate-700'
+          }
+        `}>
+          {isOverloaded ? (
+            <AlertOctagon className="text-white animate-pulse" size={20} />
+          ) : (
+            <Users className="text-slate-300" size={20} />
+          )}
+          
           <div>
-            <span className="block text-[10px] text-slate-400 uppercase font-bold">Pax</span>
+            <span className={`block text-[10px] uppercase font-bold ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>
+              Pax {isOverloaded && '(Excess)'}
+            </span>
             <span className="font-display text-lg font-bold text-white">
               {currentPassengers}/{maxPassengers}
             </span>

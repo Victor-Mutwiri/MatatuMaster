@@ -6,6 +6,11 @@ import { useGameStore } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 import * as THREE from 'three';
 
+// --- Constants ---
+const ROAD_WIDTH = 8;
+const LANE_OFFSET = 2.2; // Distance from center to lane center
+const CAMERA_POS = new THREE.Vector3(0, 7, 14); // Zoomed out position
+
 // --- Components ---
 
 // Logic Component: Updates store distance on every frame
@@ -25,7 +30,8 @@ const GameLogic = () => {
 const CameraRig = () => {
   const { camera } = useThree();
   const currentSpeed = useGameStore(state => state.currentSpeed);
-  const startPos = useMemo(() => new THREE.Vector3(0, 6, 8), []);
+  // Re-use constant for consistency
+  const startPos = useMemo(() => CAMERA_POS.clone(), []);
   
   useFrame((state) => {
     // Basic shake based on speed
@@ -39,7 +45,7 @@ const CameraRig = () => {
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, startPos.y + shakeY, 0.1);
     camera.position.z = startPos.z;
     
-    // Look slightly ahead
+    // Look slightly ahead, but lower down to see the road better
     camera.lookAt(0, 0, 0);
   });
 
@@ -53,6 +59,7 @@ const Scenery = () => {
   
   const OBJECT_COUNT = 15;
   const GAP = 15;
+  const OFFSET_FROM_ROAD = ROAD_WIDTH / 2 + 2; // Start placing trees 2 units away from road edge
   
   useFrame((state, delta) => {
     if (groupRef.current) {
@@ -67,7 +74,8 @@ const Scenery = () => {
   const sceneryItems = useMemo(() => {
     return Array.from({ length: OBJECT_COUNT }).map((_, i) => {
       const side = i % 2 === 0 ? 1 : -1;
-      const x = (8 + Math.random() * 4) * side;
+      // Closer to road now
+      const x = (OFFSET_FROM_ROAD + Math.random() * 3) * side;
       const z = -i * GAP;
       const isSign = i % 5 === 0; // Every 5th item is a sign
       return { x, z, isSign, side };
@@ -121,6 +129,7 @@ const Road = () => {
   
   const STRIP_COUNT = 20;
   const STRIP_GAP = 5;
+  const GRASS_OFFSET = ROAD_WIDTH / 2 + 5; // Center of the grass plane
   
   useFrame((state, delta) => {
     if (groupRef.current) {
@@ -135,26 +144,27 @@ const Road = () => {
     <group>
       {/* Asphalt */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
-        <planeGeometry args={[20, 200]} />
+        <planeGeometry args={[ROAD_WIDTH, 200]} />
         <meshStandardMaterial color="#1e293b" roughness={0.9} />
       </mesh>
 
-      {/* Markings */}
+      {/* Markings - Center Line */}
       <group ref={groupRef}>
         {Array.from({ length: STRIP_COUNT }).map((_, i) => (
           <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -i * STRIP_GAP]}>
-            <planeGeometry args={[0.2, 2]} />
-            <meshBasicMaterial color="#ffffff" opacity={0.5} transparent />
+            <planeGeometry args={[0.15, 2]} />
+            <meshBasicMaterial color="#fbbf24" opacity={0.8} transparent />
           </mesh>
         ))}
       </group>
       
-      {/* Grass */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-15, -0.1, 0]}>
+      {/* Grass Left */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 200]} />
         <meshStandardMaterial color="#064e3b" />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[15, -0.1, 0]}>
+      {/* Grass Right */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 200]} />
         <meshStandardMaterial color="#064e3b" />
       </mesh>
@@ -169,6 +179,7 @@ const StageMarker = () => {
   
   const distanceToStage = nextStageDistance - distanceTraveled;
   const isVisible = distanceToStage < 200 && distanceToStage > -10;
+  const MARKER_X = -(ROAD_WIDTH / 2 + 1); // Place just outside road
 
   useFrame(() => {
     if (markerRef.current) {
@@ -179,7 +190,7 @@ const StageMarker = () => {
   if (!isVisible) return null;
 
   return (
-    <group ref={markerRef} position={[-4, 0, 0]}>
+    <group ref={markerRef} position={[MARKER_X, 0, 0]}>
       {/* Pole */}
       <mesh position={[0, 1.5, 0]}>
         <cylinderGeometry args={[0.1, 0.1, 3]} />
@@ -208,6 +219,7 @@ const PoliceMarker = () => {
   
   const distanceToPolice = nextPoliceDistance - distanceTraveled;
   const isVisible = distanceToPolice < 200 && distanceToPolice > -10;
+  const MARKER_X = (ROAD_WIDTH / 2 + 1);
 
   useFrame((state) => {
     if (markerRef.current) {
@@ -228,7 +240,7 @@ const PoliceMarker = () => {
   if (!isVisible) return null;
 
   return (
-    <group ref={markerRef} position={[4, 0, 0]}>
+    <group ref={markerRef} position={[MARKER_X, 0, 0]}>
       <mesh position={[0, 0.5, 0]}>
         <coneGeometry args={[0.5, 1, 16]} />
         <meshStandardMaterial color="orange" />
@@ -252,29 +264,44 @@ const PoliceMarker = () => {
 // Player Matatu
 const Player = ({ type }: { type: VehicleType | null }) => {
   const meshRef = useRef<THREE.Group>(null);
-  const [lane, setLane] = useState(0); 
-  const LANE_WIDTH = 2.5;
+  // -1 is Left Lane (Kenya keep left), 1 is Right Lane (Overtaking)
+  const [lane, setLane] = useState<-1 | 1>(-1); 
   const LERP_SPEED = 10;
-  const TILT_ANGLE = 0.1;
+  const TILT_ANGLE = 0.15;
 
   const reportLaneChange = useGameStore(state => state.reportLaneChange);
 
-  const changeLane = (dir: -1 | 1) => {
-    setLane((prev) => {
-      const next = prev + dir;
-      if (next >= -1 && next <= 1) {
-        reportLaneChange();
-        playSfx('SWOOSH');
-        return next;
-      }
-      return prev;
+  const toggleLane = () => {
+    setLane(prev => {
+      const next = prev === -1 ? 1 : -1;
+      reportLaneChange();
+      playSfx('SWOOSH');
+      return next;
     });
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') changeLane(-1);
-      if (e.key === 'ArrowRight') changeLane(1);
+      if (e.key === 'ArrowLeft') {
+        setLane(prev => {
+           if (prev === 1) {
+             reportLaneChange();
+             playSfx('SWOOSH');
+             return -1;
+           }
+           return prev;
+        });
+      }
+      if (e.key === 'ArrowRight') {
+        setLane(prev => {
+           if (prev === -1) {
+             reportLaneChange();
+             playSfx('SWOOSH');
+             return 1;
+           }
+           return prev;
+        });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -288,9 +315,30 @@ const Player = ({ type }: { type: VehicleType | null }) => {
     const handleTouchEnd = (e: TouchEvent) => {
       if (touchStartX.current === null) return;
       const diff = e.changedTouches[0].clientX - touchStartX.current;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0) changeLane(1);
-        else changeLane(-1);
+      if (Math.abs(diff) > 30) {
+        // Any significant swipe toggles the lane if valid
+        if (diff > 0) {
+             // Swipe Right
+             setLane(prev => {
+                if(prev === -1) {
+                    reportLaneChange();
+                    playSfx('SWOOSH');
+                    return 1;
+                }
+                return prev;
+             });
+        }
+        else {
+             // Swipe Left
+             setLane(prev => {
+                if(prev === 1) {
+                    reportLaneChange();
+                    playSfx('SWOOSH');
+                    return -1;
+                }
+                return prev;
+             });
+        }
       }
       touchStartX.current = null;
     };
@@ -304,9 +352,10 @@ const Player = ({ type }: { type: VehicleType | null }) => {
 
   useFrame((state, delta) => {
     if (meshRef.current) {
-      const targetX = lane * LANE_WIDTH;
+      const targetX = lane * LANE_OFFSET;
       meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, delta * LERP_SPEED);
       const xDiff = targetX - meshRef.current.position.x;
+      // Tilt based on movement direction
       meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, -xDiff * TILT_ANGLE, delta * LERP_SPEED);
       meshRef.current.position.y = 0.5 + Math.sin(state.clock.elapsedTime * 20) * 0.02;
     }
@@ -315,7 +364,7 @@ const Player = ({ type }: { type: VehicleType | null }) => {
   const length = type === '52-seater' ? 4 : type === '32-seater' ? 3 : 2;
 
   return (
-    <group ref={meshRef} position={[0, 0.5, 0]}>
+    <group ref={meshRef} position={[-LANE_OFFSET, 0.5, 0]}>
       <mesh castShadow receiveShadow>
         <boxGeometry args={[1.6, 1.4, length]} />
         <meshStandardMaterial color="#FFD700" roughness={0.2} metalness={0.5} />
@@ -355,9 +404,8 @@ interface GameSceneProps {
 
 export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   return (
-    // Added Sky Gradient here
     <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-black">
-      <Canvas shadows camera={{ position: [0, 6, 8], fov: 50 }}>
+      <Canvas shadows camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: 50 }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[20, 20, 10]} intensity={1.2} castShadow shadow-mapSize={[1024, 1024]} />
         
@@ -369,13 +417,13 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <PoliceMarker />
         <Player type={vehicleType} />
         
-        <fog attach="fog" args={['#0f172a', 5, 40]} />
+        <fog attach="fog" args={['#0f172a', 10, 50]} />
       </Canvas>
       
       <div className="absolute bottom-10 inset-x-0 flex justify-center pointer-events-none opacity-50">
         <p className="text-white/50 text-xs animate-pulse">
-          <span className="hidden sm:inline">Use Arrow Keys to Steer</span>
-          <span className="sm:hidden">Swipe Left/Right to Steer</span>
+          <span className="hidden sm:inline">Use Arrow Keys to Switch Lanes</span>
+          <span className="sm:hidden">Swipe Left/Right to Switch Lanes</span>
         </p>
       </div>
     </div>
