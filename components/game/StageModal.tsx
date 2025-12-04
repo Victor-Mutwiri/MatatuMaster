@@ -2,16 +2,21 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Button } from '../ui/Button';
-import { Users, UserMinus, UserPlus, ArrowRight } from 'lucide-react';
+import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle } from 'lucide-react';
 
 export const StageModal: React.FC = () => {
   const { stageData, handleStageAction, currentPassengers, maxPassengers } = useGameStore();
 
   if (!stageData) return null;
 
-  const availableSeats = maxPassengers - (currentPassengers - stageData.alightingPassengers);
-  const potentialBoarding = Math.min(availableSeats, stageData.waitingPassengers);
-  const earnings = potentialBoarding * 50; // Hardcoded fare for now
+  const passengersAfterAlight = currentPassengers - stageData.alightingPassengers;
+  const passengersAfterBoarding = passengersAfterAlight + stageData.waitingPassengers;
+  
+  const isOverloaded = passengersAfterBoarding > maxPassengers;
+  const potentialBoarding = stageData.waitingPassengers;
+  const earnings = potentialBoarding * 50; 
+  
+  const availableSeats = maxPassengers - passengersAfterAlight;
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
@@ -58,10 +63,8 @@ export const StageModal: React.FC = () => {
           {/* Info */}
           <div className="text-center space-y-1">
             <p className="text-slate-400 text-sm">
-              Capacity: <span className="text-white font-bold">{currentPassengers}/{maxPassengers}</span> 
-              {' '}&rarr;{' '} 
-              <span className={availableSeats > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
-                 {Math.max(0, availableSeats)} seats free
+              Seats Available: <span className={availableSeats > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
+                 {Math.max(0, availableSeats)}
               </span>
             </p>
             {potentialBoarding > 0 && (
@@ -70,16 +73,29 @@ export const StageModal: React.FC = () => {
                </p>
             )}
           </div>
+          
+          {/* Overload Warning */}
+          {isOverloaded && (
+             <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg flex gap-3 items-start">
+               <AlertTriangle className="text-red-500 shrink-0" size={20} />
+               <div className="text-left">
+                  <p className="text-red-400 font-bold text-xs uppercase">Warning: Overloading</p>
+                  <p className="text-slate-300 text-[10px] leading-tight mt-1">
+                    Picking up all passengers will exceed capacity. Police will fine you heavily if caught.
+                  </p>
+               </div>
+             </div>
+          )}
 
           {/* Actions */}
           <div className="space-y-3">
             <Button 
-              variant="primary" 
+              variant={isOverloaded ? 'danger' : 'primary'} 
               fullWidth 
               onClick={() => handleStageAction('PICKUP')}
             >
               <span className="flex items-center justify-center gap-2">
-                Pick Up {potentialBoarding} Pax <ArrowRight size={16} />
+                {isOverloaded ? 'Overload & Go' : 'Pick Up & Go'} <ArrowRight size={16} />
               </span>
             </Button>
             

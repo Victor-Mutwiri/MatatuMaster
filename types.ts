@@ -5,9 +5,9 @@ export type VehicleType = '14-seater' | '32-seater' | '52-seater';
 
 export type GameStatus = 'IDLE' | 'PLAYING' | 'PAUSED' | 'GAME_OVER';
 
-export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | null;
+export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | 'ARRESTED' | null;
 
-export type ActiveModal = 'NONE' | 'STAGE' | 'GAME_OVER';
+export type ActiveModal = 'NONE' | 'STAGE' | 'GAME_OVER' | 'POLICE';
 
 export interface PlayerStats {
   cash: number;
@@ -34,6 +34,12 @@ export interface StageData {
   alightingPassengers: number;
 }
 
+export interface PoliceData {
+  bribeAmount: number;
+  isOverloaded: boolean;
+  message: string;
+}
+
 export interface GameState {
   currentScreen: ScreenName;
   stats: PlayerStats;
@@ -52,6 +58,10 @@ export interface GameState {
   nextStageDistance: number;
   activeModal: ActiveModal;
   stageData: StageData | null;
+  
+  // Police State
+  nextPoliceDistance: number;
+  policeData: PoliceData | null;
   
   // Active Game Session State
   gameStatus: GameStatus;

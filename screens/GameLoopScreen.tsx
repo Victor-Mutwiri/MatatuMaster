@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
+import { PoliceModal } from '../components/game/PoliceModal';
 import { X, AlertOctagon, RotateCcw } from 'lucide-react';
 
 export const GameLoopScreen: React.FC = () => {
@@ -46,6 +47,9 @@ export const GameLoopScreen: React.FC = () => {
 
       {/* Stage Modal Overlay */}
       {activeModal === 'STAGE' && <StageModal />}
+      
+      {/* Police Modal Overlay */}
+      {activeModal === 'POLICE' && <PoliceModal />}
 
       {/* Game Over Modal */}
       {activeModal === 'GAME_OVER' && (
@@ -62,12 +66,15 @@ export const GameLoopScreen: React.FC = () => {
             </div>
 
             <h2 className="font-display text-3xl font-black text-white uppercase mb-2 tracking-tighter">
-              {gameOverReason === 'TIME_UP' ? 'Time Up!' : 'Wasted!'}
+              {gameOverReason === 'TIME_UP' ? 'Time Up!' : 
+               gameOverReason === 'ARRESTED' ? 'BUSTED!' : 'WASTED!'}
             </h2>
             
             <p className="text-slate-400 text-sm mb-8">
               {gameOverReason === 'TIME_UP' 
                 ? "You ran out of time. The passengers are furious and the trip is cancelled." 
+                : gameOverReason === 'ARRESTED' 
+                ? "You've been arrested for corruption and traffic violations. Bail is expensive."
                 : "Your matatu is wrecked."}
             </p>
 

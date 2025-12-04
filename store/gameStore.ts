@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData } from '../types';
+import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData } from '../types';
 
 const INITIAL_STATS: PlayerStats = {
   cash: 500,
@@ -25,6 +25,10 @@ interface GameStore extends GameState {
   // Stage Actions
   triggerStage: () => void;
   handleStageAction: (action: 'PICKUP' | 'DEPART') => void;
+
+  // Police Actions
+  triggerPoliceCheck: () => void;
+  handlePoliceAction: (action: 'PAY' | 'REFUSE') => void;
   
   // Mechanics
   toggleStereo: () => void;
@@ -47,6 +51,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   activeModal: 'NONE',
   stageData: null,
   
+  nextPoliceDistance: 0,
+  policeData: null,
+  
   gameStatus: 'IDLE',
   gameOverReason: null,
   gameTimeRemaining: 0,
@@ -63,30 +70,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectRoute: (route) => set({ selectedRoute: route }),
 
   updateDistance: (amount) => {
-    const { distanceTraveled, nextStageDistance, currentSpeed, activeModal, triggerStage } = get();
+    const { distanceTraveled, nextStageDistance, nextPoliceDistance, currentSpeed, activeModal, triggerStage, triggerPoliceCheck } = get();
     
-    // If we are moving and hit the stage distance, trigger it
+    // Check Police
+    if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
+      set({ distanceTraveled: nextPoliceDistance });
+      triggerPoliceCheck();
+      return;
+    }
+
+    // Check Stage
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
       set({ distanceTraveled: nextStageDistance }); // Snap to stop
       triggerStage();
-    } else {
-      set({ distanceTraveled: distanceTraveled + amount });
-    }
+      return;
+    } 
+    
+    set({ distanceTraveled: distanceTraveled + amount });
   },
   
   triggerStage: () => {
-    const { currentPassengers, maxPassengers, happiness } = get();
+    const { currentPassengers, happiness } = get();
     
     // Happiness affects passenger availability
-    // 100% Happiness = Up to 8 passengers
-    // 50% Happiness = Up to 4 passengers
-    // 0% Happiness = Max 1 passenger
     const happinessFactor = Math.max(0.1, happiness / 100);
     const maxPotentialPassengers = Math.floor(8 * happinessFactor);
     
     const waiting = Math.floor(Math.random() * (maxPotentialPassengers + 1)); 
     
-    // Random alighting (bias towards fewer alighting early game, but purely random for now)
     const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
     
     set({
@@ -101,7 +112,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   handleStageAction: (action) => {
-    const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance } = get();
+    const { stageData, currentPassengers, stats, nextStageDistance } = get();
     if (!stageData) return;
 
     let newPassengerCount = currentPassengers;
@@ -111,16 +122,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // 1. Process Alighting (Mandatory)
     newPassengerCount -= stageData.alightingPassengers;
 
-    // 2. Process Boarding
+    // 2. Process Boarding (Allow Overloading!)
     if (action === 'PICKUP') {
-      const availableSeats = maxPassengers - newPassengerCount;
-      const boarding = Math.min(availableSeats, stageData.waitingPassengers);
+      const boarding = stageData.waitingPassengers; // Pick up everyone, regardless of seats
       newPassengerCount += boarding;
       cashEarned = boarding * FARE_PER_PAX;
     }
 
     // 3. Update State and Resume
-    const nextDist = nextStageDistance + 300 + Math.random() * 300; // Next stage in 300-600 units
+    const nextDist = nextStageDistance + 300 + Math.random() * 300; 
 
     set({
       currentPassengers: newPassengerCount,
@@ -134,13 +144,91 @@ export const useGameStore = create<GameStore>((set, get) => ({
       nextStageDistance: nextDist
     });
   },
+
+  triggerPoliceCheck: () => {
+    const { currentPassengers, maxPassengers, distanceTraveled } = get();
+    const isOverloaded = currentPassengers > maxPassengers;
+    
+    // Police Probability Logic
+    let shouldStop = false;
+    let bribe = 0;
+    let message = "";
+    
+    if (isOverloaded) {
+      shouldStop = true;
+      bribe = 1000 + Math.floor(Math.random() * 1500); // 1000-2500
+      message = "Wewe! You are overloaded! This is a serious offence.";
+    } else {
+      // Clean check: 40% chance of "Tea", 60% chance let go
+      if (Math.random() > 0.6) {
+        shouldStop = true;
+        bribe = 100 + Math.floor(Math.random() * 200); // 100-300
+        message = "Routine check. The boys need some tea.";
+      } else {
+        // Let go
+        shouldStop = false;
+      }
+    }
+    
+    const nextPolice = distanceTraveled + 800 + Math.random() * 800;
+
+    if (shouldStop) {
+      set({
+        currentSpeed: 0,
+        activeModal: 'POLICE',
+        nextPoliceDistance: nextPolice,
+        policeData: {
+          isOverloaded,
+          bribeAmount: bribe,
+          message
+        }
+      });
+    } else {
+      // Just skip and set next police distance
+      set({ nextPoliceDistance: nextPolice });
+    }
+  },
+
+  handlePoliceAction: (action) => {
+    const { policeData, stats } = get();
+    if (!policeData) return;
+
+    if (action === 'PAY') {
+       if (stats.cash >= policeData.bribeAmount) {
+         set({
+           stats: { ...stats, cash: stats.cash - policeData.bribeAmount },
+           activeModal: 'NONE',
+           policeData: null,
+           currentSpeed: 20
+         });
+       }
+    } else if (action === 'REFUSE') {
+      // Arrest Logic
+      const arrestChance = policeData.isOverloaded ? 0.5 : 0.1;
+      
+      if (Math.random() < arrestChance) {
+        set({
+          activeModal: 'GAME_OVER',
+          gameStatus: 'GAME_OVER',
+          gameOverReason: 'ARRESTED',
+          policeData: null
+        });
+      } else {
+        // Success escaping
+        set({
+           activeModal: 'NONE',
+           policeData: null,
+           currentSpeed: 20
+        });
+      }
+    }
+  },
   
   startGameLoop: () => {
     const { selectedRoute, vehicleType } = get();
     if (!selectedRoute) return;
 
-    // Parse time limit string (e.g., "45 mins" or "1h 15m") to seconds
-    let seconds = 300; // Default 5 mins
+    let seconds = 300;
     if (selectedRoute.timeLimit) {
       const timeStr = selectedRoute.timeLimit.toLowerCase();
       let minutes = 0;
@@ -158,7 +246,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (minutes > 0) seconds = minutes * 60;
     }
     
-    // Set Max Passengers based on Vehicle
     let maxPax = 14;
     if (vehicleType === '32-seater') maxPax = 32;
     if (vehicleType === '52-seater') maxPax = 52;
@@ -171,7 +258,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       distanceTraveled: 0,
       currentPassengers: 0,
       maxPassengers: maxPax,
-      nextStageDistance: 400, // First stage is 400 units away
+      nextStageDistance: 400,
+      nextPoliceDistance: 700 + Math.random() * 500, // Initialize first police check
+      policeData: null,
       activeModal: 'NONE',
       currentSpeed: 20,
       happiness: 100,
@@ -184,10 +273,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     const newTime = state.gameTimeRemaining - 1;
     
-    // Happiness Regen from Stereo
     let newHappiness = state.happiness;
     if (state.isStereoOn) {
-      newHappiness = Math.min(100, state.happiness + 0.5); // Regenerate 0.5 per tick (slowly)
+      newHappiness = Math.min(100, state.happiness + 0.5);
     }
 
     if (newTime <= 0) {
@@ -220,6 +308,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     distanceTraveled: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
+    nextPoliceDistance: 0,
     activeModal: 'NONE',
     gameStatus: 'IDLE',
     gameOverReason: null,
@@ -231,6 +320,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),
   
   reportLaneChange: () => set((state) => ({ 
-    happiness: Math.max(0, state.happiness - 2) // Penalize swerving
+    happiness: Math.max(0, state.happiness - 2)
   })),
 }));

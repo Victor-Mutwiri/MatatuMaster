@@ -73,17 +73,11 @@ const StageMarker = () => {
   const { nextStageDistance, distanceTraveled } = useGameStore();
   const markerRef = useRef<THREE.Group>(null);
   
-  // Calculate relative position
-  // If nextStage is 500 and we are at 400, diff is 100.
-  // We want the marker to appear at Z = -100 (in front) and move to 0.
   const distanceToStage = nextStageDistance - distanceTraveled;
   const isVisible = distanceToStage < 200 && distanceToStage > -10;
 
   useFrame(() => {
     if (markerRef.current) {
-      // In ThreeJS, negative Z is forward away from camera usually, 
-      // but here our road moves +Z to simulate forward. 
-      // So objects should be at negative Z relative to camera/player.
       markerRef.current.position.z = -distanceToStage;
     }
   });
@@ -106,6 +100,63 @@ const StageMarker = () => {
       <mesh position={[0, 0, 0]}>
         <cylinderGeometry args={[0.5, 0.5, 0.2]} />
         <meshStandardMaterial color="#333" />
+      </mesh>
+    </group>
+  );
+};
+
+// Police Marker: Flashing lights
+const PoliceMarker = () => {
+  const { nextPoliceDistance, distanceTraveled } = useGameStore();
+  const markerRef = useRef<THREE.Group>(null);
+  const blueLightRef = useRef<THREE.Mesh>(null);
+  const redLightRef = useRef<THREE.Mesh>(null);
+  
+  const distanceToPolice = nextPoliceDistance - distanceTraveled;
+  const isVisible = distanceToPolice < 200 && distanceToPolice > -10;
+
+  useFrame((state) => {
+    if (markerRef.current) {
+      markerRef.current.position.z = -distanceToPolice;
+    }
+    
+    // Flash lights
+    if (blueLightRef.current && redLightRef.current) {
+      const time = state.clock.elapsedTime * 10;
+      const blueIntensity = Math.sin(time) > 0 ? 1 : 0.2;
+      const redIntensity = Math.sin(time) <= 0 ? 1 : 0.2;
+      
+      (blueLightRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = blueIntensity;
+      (redLightRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = redIntensity;
+    }
+  });
+
+  if (!isVisible) return null;
+
+  return (
+    <group ref={markerRef} position={[4, 0, 0]}>
+      {/* Barricade / Cone */}
+      <mesh position={[0, 0.5, 0]}>
+        <coneGeometry args={[0.5, 1, 16]} />
+        <meshStandardMaterial color="orange" />
+      </mesh>
+      
+      {/* Lights Bar */}
+      <mesh position={[0, 1.5, 0]}>
+        <boxGeometry args={[1.5, 0.2, 0.2]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+      
+      {/* Blue Light */}
+      <mesh ref={blueLightRef} position={[-0.5, 1.7, 0]}>
+        <sphereGeometry args={[0.2]} />
+        <meshStandardMaterial color="blue" emissive="blue" emissiveIntensity={1} />
+      </mesh>
+      
+      {/* Red Light */}
+      <mesh ref={redLightRef} position={[0.5, 1.7, 0]}>
+        <sphereGeometry args={[0.2]} />
+        <meshStandardMaterial color="red" emissive="red" emissiveIntensity={1} />
       </mesh>
     </group>
   );
@@ -244,6 +295,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <GameLogic />
         <Road />
         <StageMarker />
+        <PoliceMarker />
         <Player type={vehicleType} />
         
         <fog attach="fog" args={['#0f172a', 5, 40]} />
