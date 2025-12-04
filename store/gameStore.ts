@@ -44,7 +44,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerName: '',
   saccoName: '',
   vehicleType: null,
-  currentSpeed: 20, // Base speed
+  currentSpeed: 60, // Increased base speed for arcade feel
   distanceTraveled: 0,
   
   currentPassengers: 0,
@@ -140,7 +140,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     // 3. Update State and Resume
-    const nextDist = nextStageDistance + 300 + Math.random() * 300; 
+    // Generate next stage sooner due to higher speed (approx every 25 seconds of travel)
+    const nextDist = nextStageDistance + 1500 + Math.random() * 500; 
 
     set({
       currentPassengers: newPassengerCount,
@@ -150,7 +151,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       activeModal: 'NONE',
       stageData: null,
-      currentSpeed: 20, // Resume speed
+      currentSpeed: 60, // Resume speed
       nextStageDistance: nextDist
     });
   },
@@ -180,7 +181,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
     
-    const nextPolice = distanceTraveled + 800 + Math.random() * 800;
+    const nextPolice = distanceTraveled + 2000 + Math.random() * 1500;
 
     if (shouldStop) {
       set({
@@ -209,7 +210,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
            stats: { ...stats, cash: stats.cash - policeData.bribeAmount },
            activeModal: 'NONE',
            policeData: null,
-           currentSpeed: 20
+           currentSpeed: 60
          });
        }
     } else if (action === 'REFUSE') {
@@ -228,7 +229,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({
            activeModal: 'NONE',
            policeData: null,
-           currentSpeed: 20
+           currentSpeed: 60
         });
       }
     }
@@ -238,22 +239,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { selectedRoute, vehicleType } = get();
     if (!selectedRoute) return;
 
-    let seconds = 300;
+    // Time Scaling: Convert Route "Lore Time" to "Arcade Time"
+    // Scale Factor: 15x compression. 
+    // 45 mins lore -> 3 mins gameplay (180s)
+    let seconds = 180; 
+    
     if (selectedRoute.timeLimit) {
       const timeStr = selectedRoute.timeLimit.toLowerCase();
-      let minutes = 0;
+      let loreMinutes = 0;
       
       if (timeStr.includes('h')) {
         const parts = timeStr.split('h');
-        minutes += parseInt(parts[0]) * 60;
+        loreMinutes += parseInt(parts[0]) * 60;
         if (parts[1] && parts[1].includes('m')) {
-          minutes += parseInt(parts[1]);
+          loreMinutes += parseInt(parts[1]);
         }
       } else if (timeStr.includes('m')) {
-         minutes = parseInt(timeStr);
+         loreMinutes = parseInt(timeStr);
       }
       
-      if (minutes > 0) seconds = minutes * 60;
+      if (loreMinutes > 0) {
+        // Apply compression: 1 minute of lore time = 4 seconds of gameplay
+        seconds = Math.ceil(loreMinutes * 4); 
+      }
     }
     
     let maxPax = 14;
@@ -268,12 +276,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       distanceTraveled: 0,
       currentPassengers: 0,
       maxPassengers: maxPax,
-      nextStageDistance: 400,
-      nextPoliceDistance: 700 + Math.random() * 500, // Initialize first police check
+      nextStageDistance: 1000,
+      nextPoliceDistance: 2500 + Math.random() * 1000, 
       policeData: null,
       stageData: null,
       activeModal: 'NONE',
-      currentSpeed: 20,
+      currentSpeed: 60,
       happiness: 100,
       isStereoOn: false
     });
@@ -328,7 +336,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     playerName: '',
     saccoName: '',
     vehicleType: null,
-    currentSpeed: 20,
+    currentSpeed: 60,
     distanceTraveled: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
