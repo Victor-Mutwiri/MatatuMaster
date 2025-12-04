@@ -6,10 +6,10 @@ import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
-import { X, AlertOctagon, RotateCcw } from 'lucide-react';
+import { X, AlertOctagon, RotateCcw, Map } from 'lucide-react';
 
 export const GameLoopScreen: React.FC = () => {
-  const { vehicleType, resetGame, gameStatus, tickTimer, gameOverReason, setScreen, activeModal } = useGameStore();
+  const { vehicleType, resetGame, gameStatus, tickTimer, gameOverReason, activeModal, startGameLoop, exitToMapSelection } = useGameStore();
 
   // Timer Effect
   useEffect(() => {
@@ -38,7 +38,7 @@ export const GameLoopScreen: React.FC = () => {
         <Button 
           variant="danger" 
           size="sm" 
-          onClick={resetGame}
+          onClick={exitToMapSelection}
           className="bg-red-600/80 backdrop-blur hover:bg-red-600 shadow-lg !p-2 rounded-full"
         >
           <X size={20} />
@@ -79,13 +79,20 @@ export const GameLoopScreen: React.FC = () => {
             </p>
 
             <div className="space-y-3">
-              <Button variant="primary" fullWidth onClick={() => setScreen('MAP_SELECT')}>
+              <Button variant="primary" fullWidth onClick={startGameLoop}>
                 <span className="flex items-center justify-center gap-2">
-                   <RotateCcw size={18} /> Try Again
+                   <RotateCcw size={18} /> Retry Route
                 </span>
               </Button>
-              <Button variant="secondary" fullWidth onClick={resetGame}>
-                Return to Menu
+              
+              <Button variant="secondary" fullWidth onClick={exitToMapSelection}>
+                <span className="flex items-center justify-center gap-2">
+                   <Map size={18} /> Return to Maps
+                </span>
+              </Button>
+              
+              <Button variant="danger" fullWidth onClick={resetGame}>
+                End Shift (Logout)
               </Button>
             </div>
 

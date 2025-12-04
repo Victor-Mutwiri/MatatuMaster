@@ -19,6 +19,7 @@ interface GameStore extends GameState {
   
   // Game Loop Actions
   startGameLoop: () => void;
+  exitToMapSelection: () => void;
   tickTimer: () => void;
   endGame: (reason: GameOverReason) => void;
   
@@ -261,12 +262,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
       nextStageDistance: 400,
       nextPoliceDistance: 700 + Math.random() * 500, // Initialize first police check
       policeData: null,
+      stageData: null,
       activeModal: 'NONE',
       currentSpeed: 20,
       happiness: 100,
       isStereoOn: false
     });
   },
+
+  exitToMapSelection: () => set({
+    currentScreen: 'MAP_SELECT',
+    gameStatus: 'IDLE',
+    gameOverReason: null,
+    activeModal: 'NONE',
+    currentSpeed: 0,
+    distanceTraveled: 0,
+    currentPassengers: 0,
+    policeData: null,
+    stageData: null,
+    happiness: 100
+  }),
 
   tickTimer: () => set((state) => {
     if (state.gameStatus !== 'PLAYING') return {};
