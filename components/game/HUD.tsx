@@ -4,7 +4,19 @@ import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, Al
 import { useGameStore } from '../../store/gameStore';
 
 export const HUD: React.FC = () => {
-  const { gameTimeRemaining, currentPassengers, maxPassengers, stats, happiness, isStereoOn, toggleStereo, isSoundOn, toggleSound, currentSpeed } = useGameStore();
+  const { 
+    gameTimeRemaining, 
+    currentPassengers, 
+    maxPassengers, 
+    stats, 
+    happiness, 
+    isStereoOn, 
+    toggleStereo, 
+    isSoundOn, 
+    toggleSound, 
+    currentSpeed,
+    setControl
+  } = useGameStore();
 
   // Format Seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -13,13 +25,18 @@ export const HUD: React.FC = () => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const isLowTime = gameTimeRemaining <= 30; // Red alert if under 30s
+  const isLowTime = gameTimeRemaining <= 30; 
   const happinessColor = happiness > 75 ? 'text-neon-blue' : happiness > 40 ? 'text-yellow-400' : 'text-red-500';
-  
   const isOverloaded = currentPassengers > maxPassengers;
   
-  // Calculate display speed (Game units -> Fake KM/H)
+  // Fake KM/H scaling
   const displaySpeed = Math.round(currentSpeed * 1.6);
+
+  // Pedal Handlers
+  const handleGasStart = () => setControl('GAS', true);
+  const handleGasEnd = () => setControl('GAS', false);
+  const handleBrakeStart = () => setControl('BRAKE', true);
+  const handleBrakeEnd = () => setControl('BRAKE', false);
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
@@ -93,54 +110,94 @@ export const HUD: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Bar */}
-      <div className="flex justify-between items-end">
+      {/* Bottom Area - Pedals and Stats */}
+      <div className="mt-auto flex justify-between items-end pb-2">
         
-        {/* Speedometer & Passengers */}
-        <div className="flex gap-3 items-end">
-          
-           {/* Speedometer */}
-           <div className="bg-slate-900/80 backdrop-blur-md px-3 py-3 rounded-lg border border-slate-700 shadow-lg flex flex-col items-center min-w-[80px]">
-             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Speed</span>
-             <div className="flex items-baseline gap-1">
-               <span className="font-display text-2xl font-black text-white">{displaySpeed}</span>
-               <span className="text-[10px] text-slate-500 font-bold">KM/H</span>
-             </div>
-             <Gauge size={16} className="text-matatu-yellow mt-1" />
-           </div>
+        {/* Left: Brake Pedal & Passengers */}
+        <div className="flex items-end gap-4 pointer-events-auto">
+          {/* Brake Pedal */}
+          <button 
+             className="group active:scale-95 transition-transform"
+             onMouseDown={handleBrakeStart} onMouseUp={handleBrakeEnd} onMouseLeave={handleBrakeEnd}
+             onTouchStart={handleBrakeStart} onTouchEnd={handleBrakeEnd}
+          >
+            <div className="w-16 h-24 bg-red-900 border-4 border-red-600 rounded-lg flex flex-col justify-end p-2 shadow-lg relative overflow-hidden">
+               <span className="text-[10px] font-black text-red-400 uppercase text-center w-full z-10">Brake</span>
+               <div className="absolute inset-0 bg-red-500 opacity-0 group-active:opacity-30 transition-opacity"></div>
+               {/* Grip lines */}
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+            </div>
+          </button>
 
-          {/* Passengers */}
-          <div className={`
-            backdrop-blur-md px-4 py-3 rounded-lg border shadow-lg flex items-center gap-3 transition-colors h-full
-            ${isOverloaded 
-              ? 'bg-red-900/90 border-red-500' 
-              : 'bg-slate-900/80 border-slate-700'
-            }
-          `}>
-            {isOverloaded ? (
-              <AlertOctagon className="text-white animate-pulse" size={20} />
-            ) : (
-              <Users className="text-slate-300" size={20} />
-            )}
+          {/* Speed & Pax Info (Non-interactive) */}
+          <div className="flex flex-col gap-2 pointer-events-none mb-2">
             
-            <div>
-              <span className={`block text-[10px] uppercase font-bold ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>
-                Pax {isOverloaded && '(Excess)'}
-              </span>
-              <span className="font-display text-lg font-bold text-white">
-                {currentPassengers}/{maxPassengers}
-              </span>
+            {/* Speedometer */}
+            <div className="bg-slate-900/80 backdrop-blur-md px-3 py-3 rounded-lg border border-slate-700 shadow-lg flex flex-col items-center min-w-[80px]">
+               <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Speed</span>
+               <div className="flex items-baseline gap-1">
+                 <span className="font-display text-2xl font-black text-white">{displaySpeed}</span>
+                 <span className="text-[10px] text-slate-500 font-bold">KM/H</span>
+               </div>
+               <Gauge size={16} className="text-matatu-yellow mt-1" />
+            </div>
+
+            {/* Pax */}
+            <div className={`
+              backdrop-blur-md px-4 py-2 rounded-lg border shadow-lg flex items-center gap-3 transition-colors
+              ${isOverloaded 
+                ? 'bg-red-900/90 border-red-500' 
+                : 'bg-slate-900/80 border-slate-700'
+              }
+            `}>
+              {isOverloaded ? (
+                <AlertOctagon className="text-white animate-pulse" size={20} />
+              ) : (
+                <Users className="text-slate-300" size={20} />
+              )}
+              
+              <div>
+                <span className={`block text-[10px] uppercase font-bold ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>
+                  Pax {isOverloaded && '!'}
+                </span>
+                <span className="font-display text-lg font-bold text-white">
+                  {currentPassengers}/{maxPassengers}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Fare (Cash) */}
-        <div className="bg-slate-900/80 backdrop-blur-md px-5 py-3 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3">
-          <div className="text-right">
-            <span className="block text-[10px] text-matatu-yellow uppercase font-bold tracking-wider">Total Cash</span>
-            <span className="font-display text-xl font-bold text-green-400">KES {stats.cash.toLocaleString()}</span>
+        {/* Right: Cash & Gas Pedal */}
+        <div className="flex items-end gap-4 pointer-events-auto">
+          
+           {/* Cash (Visual only) */}
+           <div className="bg-slate-900/80 backdrop-blur-md px-5 py-3 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3 mb-2 pointer-events-none">
+            <div className="text-right">
+              <span className="block text-[10px] text-matatu-yellow uppercase font-bold tracking-wider">Cash</span>
+              <span className="font-display text-xl font-bold text-green-400">KES {stats.cash.toLocaleString()}</span>
+            </div>
+            <Wallet className="text-green-400" size={24} />
           </div>
-          <Wallet className="text-green-400" size={24} />
+
+          {/* Gas Pedal */}
+          <button 
+             className="group active:scale-95 transition-transform"
+             onMouseDown={handleGasStart} onMouseUp={handleGasEnd} onMouseLeave={handleGasEnd}
+             onTouchStart={handleGasStart} onTouchEnd={handleGasEnd}
+          >
+            <div className="w-16 h-32 bg-slate-800 border-4 border-green-500 rounded-lg flex flex-col justify-end p-2 shadow-lg relative overflow-hidden">
+               <span className="text-[10px] font-black text-green-400 uppercase text-center w-full z-10">Gas</span>
+               <div className="absolute inset-0 bg-green-500 opacity-0 group-active:opacity-30 transition-opacity"></div>
+               {/* Grip lines */}
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+               <div className="w-full h-1 bg-black/30 mb-1"></div>
+            </div>
+          </button>
         </div>
 
       </div>

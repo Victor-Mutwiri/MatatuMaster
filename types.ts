@@ -50,6 +50,10 @@ export interface GameState {
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
   
+  // Controls
+  isAccelerating: boolean;
+  isBraking: boolean;
+
   // Passenger State
   currentPassengers: number;
   maxPassengers: number;

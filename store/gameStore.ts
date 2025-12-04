@@ -17,7 +17,11 @@ interface GameStore extends GameState {
   selectRoute: (route: Route) => void;
   resetGame: () => void;
   updateDistance: (delta: number) => void;
+  setCurrentSpeed: (speed: number) => void;
   
+  // Controls
+  setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
+
   // Game Loop Actions
   startGameLoop: () => void;
   exitToMapSelection: () => void;
@@ -46,9 +50,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerName: '',
   saccoName: '',
   vehicleType: null,
-  currentSpeed: 70, // Increased base speed
+  currentSpeed: 0,
   distanceTraveled: 0,
   
+  isAccelerating: false,
+  isBraking: false,
+
   currentPassengers: 0,
   maxPassengers: 14,
   nextStageDistance: 0,
@@ -77,19 +84,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   selectRoute: (route) => set({ selectedRoute: route }),
 
+  setCurrentSpeed: (speed) => set({ currentSpeed: speed }),
+
+  setControl: (control, active) => {
+    if (control === 'GAS') set({ isAccelerating: active });
+    if (control === 'BRAKE') set({ isBraking: active });
+  },
+
   updateDistance: (amount) => {
     const { distanceTraveled, nextStageDistance, nextPoliceDistance, currentSpeed, activeModal, triggerStage, triggerPoliceCheck } = get();
     
     // Check Police
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
-      set({ distanceTraveled: nextPoliceDistance });
+      set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0 }); // Force stop
       triggerPoliceCheck();
       return;
     }
 
     // Check Stage
     if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
-      set({ distanceTraveled: nextStageDistance }); // Snap to stop
+      set({ distanceTraveled: nextStageDistance, currentSpeed: 0 }); // Force stop
       triggerStage();
       return;
     } 
@@ -109,7 +123,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
     
     set({
-      currentSpeed: 0, // Stop the bus
+      currentSpeed: 0,
       activeModal: 'STAGE',
       stageData: {
         name: `Stage ${Math.floor(Math.random() * 100)}`,
@@ -146,7 +160,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // 3. Update State and Resume
     // Generate next stage sooner due to higher speed (approx every 25 seconds of travel)
-    const nextDist = nextStageDistance + 1500 + Math.random() * 500; 
+    const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
 
     set({
       currentPassengers: newPassengerCount,
@@ -156,7 +170,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       activeModal: 'NONE',
       stageData: null,
-      currentSpeed: 70, // Resume speed
+      // We do NOT set currentSpeed here. The player must accelerate manually.
       nextStageDistance: nextDist
     });
   },
@@ -186,7 +200,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
     
-    const nextPolice = distanceTraveled + 2000 + Math.random() * 1500;
+    const nextPolice = distanceTraveled + 3000 + Math.random() * 2000;
 
     if (shouldStop) {
       set({
@@ -215,7 +229,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
            stats: { ...stats, cash: stats.cash - policeData.bribeAmount },
            activeModal: 'NONE',
            policeData: null,
-           currentSpeed: 70
+           // Player must accelerate manually
          });
        }
     } else if (action === 'REFUSE') {
@@ -234,7 +248,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({
            activeModal: 'NONE',
            policeData: null,
-           currentSpeed: 70
+           // Player must accelerate manually
         });
       }
     }
@@ -244,10 +258,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { selectedRoute, vehicleType, stats } = get();
     if (!selectedRoute) return;
 
-    // Time Scaling: Convert Route "Lore Time" to "Arcade Time"
-    // Target: 45 min route ~= 4 minutes gameplay (240 seconds)
-    // Scale factor: 5.33
-    let seconds = 240; 
+    // Time Scaling: Convert Route "Lore Time" to "Game Time"
+    // Target: We want roughly 7 minutes (420 seconds) for a standard 45-min route.
+    // Scale factor: 420s / 45m = ~9.33 seconds per lore minute.
+    let seconds = 420; 
     
     if (selectedRoute.timeLimit) {
       const timeStr = selectedRoute.timeLimit.toLowerCase();
@@ -264,8 +278,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       
       if (loreMinutes > 0) {
-        // Apply compression: 1 minute of lore time = ~5.5 seconds of gameplay
-        seconds = Math.ceil(loreMinutes * 5.5); 
+        // Apply compression: 1 minute of lore time = ~9.3 seconds of gameplay
+        seconds = Math.ceil(loreMinutes * 9.3); 
       }
     }
     
@@ -287,12 +301,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       distanceTraveled: 0,
       currentPassengers: 0,
       maxPassengers: maxPax,
-      nextStageDistance: 1000,
-      nextPoliceDistance: 2500 + Math.random() * 1000, 
+      nextStageDistance: 1500,
+      nextPoliceDistance: 3500 + Math.random() * 1000, 
       policeData: null,
       stageData: null,
       activeModal: 'NONE',
-      currentSpeed: 70,
+      currentSpeed: 0, // Start stopped
+      isAccelerating: false,
+      isBraking: false,
       happiness: 100,
       isStereoOn: false,
       timeOfDay,
@@ -315,15 +331,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   }),
 
   triggerCrash: () => {
-    // 1. Play Sound
     playSfx('CRASH');
-    
-    // 2. Set Intermediate Crash State (Drama Phase)
     set({
       gameStatus: 'CRASHING',
       isCrashing: true,
-      currentSpeed: 0, // Stop road movement
-      // Don't show modal yet
+      currentSpeed: 0, 
+      isAccelerating: false
     });
   },
 
@@ -354,7 +367,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     gameStatus: 'GAME_OVER', 
     gameOverReason: reason,
     activeModal: 'GAME_OVER',
-    isCrashing: false // Stop drama animation
+    isCrashing: false 
   }),
   
   resetGame: () => set({
@@ -364,7 +377,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     playerName: '',
     saccoName: '',
     vehicleType: null,
-    currentSpeed: 70,
+    currentSpeed: 0,
     distanceTraveled: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
@@ -377,7 +390,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     happiness: 100,
     isStereoOn: false,
     isSoundOn: true,
-    timeOfDay: 'DAY'
+    timeOfDay: 'DAY',
+    isAccelerating: false,
+    isBraking: false
   }),
   
   toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),

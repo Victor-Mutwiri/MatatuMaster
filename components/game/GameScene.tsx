@@ -8,18 +8,81 @@ import * as THREE from 'three';
 
 // --- Constants ---
 const ROAD_WIDTH = 8;
-const LANE_OFFSET = 2.2; // Distance from center to lane center
-const CAMERA_POS = new THREE.Vector3(0, 8, 15); // Zoomed out position
+const LANE_OFFSET = 2.2; 
+const CAMERA_POS = new THREE.Vector3(0, 8, 15);
 
 // --- Components ---
 
-// Logic Component: Updates store distance on every frame
-const GameLogic = () => {
-  const { currentSpeed, updateDistance, gameStatus } = useGameStore();
-  
+// Physics Engine Component
+// Handles acceleration, braking, friction, and updates the store
+const PhysicsController = () => {
+  const { 
+    gameStatus, 
+    setCurrentSpeed, 
+    updateDistance, 
+    activeModal,
+    setControl
+  } = useGameStore();
+
+  const MAX_SPEED = 120; // Approx 180 km/h in game units
+  const ACCEL_RATE = 40;
+  const BRAKE_RATE = 80;
+  const FRICTION_RATE = 15;
+  const CREEP_SPEED = 5;
+
+  // Listen for keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameStatus !== 'PLAYING') return;
+      if (e.key === 'ArrowUp') setControl('GAS', true);
+      if (e.key === 'ArrowDown') setControl('BRAKE', true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') setControl('GAS', false);
+      if (e.key === 'ArrowDown') setControl('BRAKE', false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [gameStatus, setControl]);
+
   useFrame((state, delta) => {
-    if (gameStatus === 'PLAYING' && currentSpeed > 0) {
-      updateDistance(currentSpeed * delta);
+    if (gameStatus !== 'PLAYING' || activeModal !== 'NONE') return;
+
+    const { currentSpeed, isAccelerating, isBraking } = useGameStore.getState();
+    let newSpeed = currentSpeed;
+
+    if (isAccelerating) {
+      newSpeed += ACCEL_RATE * delta;
+    } else if (isBraking) {
+      newSpeed -= BRAKE_RATE * delta;
+    } else {
+      // Friction / Coasting
+      if (newSpeed > CREEP_SPEED) {
+        newSpeed -= FRICTION_RATE * delta;
+      } else if (newSpeed < CREEP_SPEED) {
+        // Automatic transmission creep
+        newSpeed += FRICTION_RATE * delta;
+        if (newSpeed > CREEP_SPEED) newSpeed = CREEP_SPEED;
+      }
+    }
+
+    // Clamp speed
+    if (newSpeed < 0) newSpeed = 0;
+    if (newSpeed > MAX_SPEED) newSpeed = MAX_SPEED;
+
+    // Only update store if changed significantly to avoid spam, 
+    // but we need it for visuals, so we update frame-by-frame.
+    // The visual components read directly from getState() to avoid re-renders.
+    setCurrentSpeed(newSpeed);
+
+    // Update distance
+    if (newSpeed > 0) {
+      updateDistance(newSpeed * delta);
     }
   });
 
@@ -29,16 +92,16 @@ const GameLogic = () => {
 // Camera Rig: Follows player and adds shake
 const CameraRig = () => {
   const { camera } = useThree();
-  const { currentSpeed, isCrashing } = useGameStore();
-  // Re-use constant for consistency
   const startPos = useMemo(() => CAMERA_POS.clone(), []);
   
   useFrame((state) => {
+    // Optimization: Read transient state directly
+    const { currentSpeed, isCrashing } = useGameStore.getState();
+
     // Basic shake based on speed
     const t = state.clock.elapsedTime;
-    let shakeIntensity = currentSpeed > 0 ? 0.05 : 0;
+    let shakeIntensity = currentSpeed > 0 ? 0.05 * (currentSpeed / 100) : 0;
     
-    // Extreme shake during crash
     if (isCrashing) {
       shakeIntensity = 0.5;
     }
@@ -51,13 +114,12 @@ const CameraRig = () => {
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, startPos.y + shakeY, 0.1);
     
     if (isCrashing) {
-       // Zoom in slightly on crash
        camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z - 5, 0.05);
     } else {
-       camera.position.z = startPos.z;
+       // FOV effect based on speed?
+       camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z + (currentSpeed * 0.02), 0.05);
     }
     
-    // Look slightly ahead, but lower down to see the road better
     camera.lookAt(0, 0, -5);
   });
 
@@ -67,7 +129,6 @@ const CameraRig = () => {
 // Environment Scenery
 const Scenery = () => {
   const groupRef = useRef<THREE.Group>(null);
-  const currentSpeed = useGameStore(state => state.currentSpeed);
   const timeOfDay = useGameStore(state => state.timeOfDay);
   
   const OBJECT_COUNT = 24;
@@ -75,8 +136,10 @@ const Scenery = () => {
   const OFFSET_FROM_ROAD = ROAD_WIDTH / 2 + 3; 
   
   useFrame((state, delta) => {
-    if (groupRef.current) {
-      groupRef.current.position.z += currentSpeed * delta;
+    // Optimization: Read speed directly
+    const speed = useGameStore.getState().currentSpeed;
+    if (groupRef.current && speed > 0) {
+      groupRef.current.position.z += speed * delta;
       if (groupRef.current.position.z > GAP) {
         groupRef.current.position.z %= GAP;
       }
@@ -100,7 +163,6 @@ const Scenery = () => {
       {sceneryItems.map((item, i) => (
         <group key={i} position={[item.x, 0, item.z]} scale={[item.scale, item.scale, item.scale]}>
           {item.type === 'SIGN' ? (
-            // Signpost
             <group rotation={[0, item.side === -1 ? Math.PI / 4 : -Math.PI / 4, 0]}>
                <mesh position={[0, 1.5, 0]}>
                  <cylinderGeometry args={[0.05, 0.05, 3]} />
@@ -116,13 +178,11 @@ const Scenery = () => {
                </mesh>
             </group>
           ) : item.type === 'BUSH' ? (
-            // Bush
             <mesh position={[0, 0.5, 0]}>
               <dodecahedronGeometry args={[0.8, 0]} />
               <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#143311" : "#2d5a27"} />
             </mesh>
           ) : (
-            // Tree
             <group>
               <mesh position={[0, 0.5, 0]}>
                 <cylinderGeometry args={[0.2, 0.3, 1]} />
@@ -143,7 +203,6 @@ const Scenery = () => {
 // Scrolling Road
 const Road = () => {
   const groupRef = useRef<THREE.Group>(null);
-  const currentSpeed = useGameStore((state) => state.currentSpeed);
   
   const STRIP_COUNT = 20;
   const STRIP_GAP = 10; 
@@ -151,8 +210,10 @@ const Road = () => {
   const timeOfDay = useGameStore(state => state.timeOfDay);
   
   useFrame((state, delta) => {
-    if (groupRef.current) {
-      groupRef.current.position.z += currentSpeed * delta;
+    // Optimization: Read speed directly
+    const speed = useGameStore.getState().currentSpeed;
+    if (groupRef.current && speed > 0) {
+      groupRef.current.position.z += speed * delta;
       if (groupRef.current.position.z > STRIP_GAP) {
         groupRef.current.position.z %= STRIP_GAP;
       }
@@ -177,12 +238,11 @@ const Road = () => {
         ))}
       </group>
       
-      {/* Shoulder/Grass Left */}
+      {/* Shoulder/Grass */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
         <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"} />
       </mesh>
-      {/* Shoulder/Grass Right */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
         <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"} />
@@ -210,17 +270,14 @@ const StageMarker = () => {
 
   return (
     <group ref={markerRef} position={[MARKER_X, 0, 0]}>
-      {/* Pole */}
       <mesh position={[0, 1.5, 0]}>
         <cylinderGeometry args={[0.1, 0.1, 3]} />
         <meshStandardMaterial color="#555" />
       </mesh>
-      {/* Sign */}
       <mesh position={[0, 2.5, 0]}>
         <boxGeometry args={[1.5, 1, 0.1]} />
         <meshStandardMaterial color="#FFD700" />
       </mesh>
-      {/* Text Placeholder */}
       <mesh position={[0, 2.5, 0.06]}>
         <planeGeometry args={[1.2, 0.8]} />
         <meshBasicMaterial color="#000" />
@@ -284,24 +341,21 @@ const PoliceMarker = () => {
 
 const Wheel = ({ position, radius = 0.35 }: { position: [number, number, number], radius?: number }) => {
   const ref = useRef<THREE.Group>(null);
-  const { currentSpeed } = useGameStore();
   
   useFrame((state, delta) => {
     if (ref.current) {
-      // Rotate based on speed
-      ref.current.rotation.x -= currentSpeed * delta * (1 / radius);
+      const speed = useGameStore.getState().currentSpeed;
+      ref.current.rotation.x -= speed * delta * (1 / radius);
     }
   });
 
   return (
     <group position={position}>
       <group ref={ref}>
-        {/* Tire */}
         <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
           <cylinderGeometry args={[radius, radius, 0.25, 16]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
         </mesh>
-        {/* Hubcap */}
         <mesh rotation={[0, 0, Math.PI / 2]} position={[0.01, 0, 0]}>
            <cylinderGeometry args={[radius * 0.6, radius * 0.6, 0.26, 8]} />
            <meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.4} />
@@ -689,7 +743,6 @@ const Matatu52Seater = () => {
 };
 
 // Player Logic Wrapper
-// We export current lane to checking collisions in OncomingTraffic
 export const PlayerContext = React.createContext<{ lane: number }>({ lane: -1 });
 
 const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCallback: (l: number) => void }) => {
@@ -697,31 +750,29 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
   const timeOfDay = useGameStore(state => state.timeOfDay);
   const gameStatus = useGameStore(state => state.gameStatus);
   const isCrashing = useGameStore(state => state.isCrashing);
-  // -1 is Left Lane (Kenya keep left), 1 is Right Lane (Overtaking)
   const [lane, setLane] = useState<-1 | 1>(-1); 
   const LERP_SPEED = 8;
   const TILT_ANGLE = 0.1;
 
   const reportLaneChange = useGameStore(state => state.reportLaneChange);
 
-  // Sync local lane state to parent for collision logic
+  // Sync local lane state
   useEffect(() => {
     setLaneCallback(lane);
   }, [lane, setLaneCallback]);
 
-  // Reset Logic: When game restarts (enters PLAYING state), reset transform
+  // Reset Logic
   useEffect(() => {
     if (gameStatus === 'PLAYING' && !isCrashing && meshRef.current) {
-      // Reset rotation completely to fix "flipped" bug after crash
       meshRef.current.rotation.set(0, 0, 0);
       meshRef.current.position.y = 0;
-      meshRef.current.position.x = -LANE_OFFSET; // Force snap to left lane
-      setLane(-1); // Reset state to left lane
+      meshRef.current.position.x = -LANE_OFFSET; 
+      setLane(-1); 
     }
   }, [gameStatus, isCrashing]);
 
   useEffect(() => {
-    if (isCrashing) return; // Disable controls during crash
+    if (isCrashing) return; 
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
@@ -794,20 +845,15 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
   useFrame((state, delta) => {
     if (meshRef.current) {
       if (isCrashing) {
-         // DRAMATIC CRASH ANIMATION
-         // Spin wildly
          meshRef.current.rotation.x += delta * 2;
          meshRef.current.rotation.y += delta * 5;
          meshRef.current.rotation.z += delta * 3;
-         // Lift off ground slightly
          meshRef.current.position.y += delta * 1;
       } else {
          const targetX = lane * LANE_OFFSET;
          meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, delta * LERP_SPEED);
          const xDiff = targetX - meshRef.current.position.x;
-         // Tilt based on movement direction
          meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, -xDiff * TILT_ANGLE, delta * LERP_SPEED);
-         // Gentle bounce
          meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 15) * 0.02; 
       }
     }
@@ -815,17 +861,11 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
 
   return (
     <group ref={meshRef} position={[-LANE_OFFSET, 0, 0]}>
-       {/* 
-          ROTATE 180 DEGREES: 
-          Models were built with Z+ as front, but we drive towards Z-.
-          So we flip them to face forward.
-       */}
        <group rotation={[0, Math.PI, 0]}>
          {type === '14-seater' && <Matatu14Seater />}
          {type === '32-seater' && <Matatu32Seater />}
          {type === '52-seater' && <Matatu52Seater />}
          
-         {/* Headlights (Night Mode Only) */}
          {timeOfDay === 'NIGHT' && (
             <>
               <spotLight position={[0.6, 0.5, 2.2]} angle={0.5} penumbra={0.5} intensity={5} color="#fff" target-position={[0.6, 0, 10]} />
@@ -839,19 +879,17 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
 
 // Oncoming Traffic System
 const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
-  const { currentSpeed, triggerCrash, gameStatus, isCrashing } = useGameStore();
+  const { triggerCrash, gameStatus, isCrashing } = useGameStore();
   const [vehicles, setVehicles] = useState<{ id: number, z: number, type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS', speed: number }[]>([]);
   const nextSpawnRef = useRef(0);
 
-  // Traffic Config
-  const TRAFFIC_LANE_X = LANE_OFFSET; // Right Lane
-  const SPAWN_DISTANCE = -150; // Spawn far ahead (negative Z because objects move +Z)
+  const TRAFFIC_LANE_X = LANE_OFFSET; 
+  const SPAWN_DISTANCE = -150; 
   const DESPAWN_DISTANCE = 20;
 
-  // Reset Traffic on Restart
   useEffect(() => {
     if (gameStatus === 'PLAYING' && !isCrashing) {
-      setVehicles([]); // Clear traffic
+      setVehicles([]); 
       nextSpawnRef.current = 0;
     }
   }, [gameStatus, isCrashing]);
@@ -859,19 +897,18 @@ const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   useFrame((state, delta) => {
     if (gameStatus !== 'PLAYING') return;
 
-    // 1. Move Vehicles
+    // Optimization: Read speed directly
+    const currentSpeed = useGameStore.getState().currentSpeed;
+
     setVehicles(prev => {
       const next = [];
       for (const v of prev) {
-        // Vehicles move towards positive Z (camera)
-        // Speed = Player Speed + Oncoming Speed (Relative)
+        // Relative speed logic
         const moveSpeed = currentSpeed + v.speed;
         const newZ = v.z + moveSpeed * delta;
         
-        // Collision Detection
-        // If player is in Right Lane (1) and vehicle is close
         if (playerLane === 1 && !isCrashing) {
-           const dist = Math.abs(newZ - 0); // Player is at Z=0
+           const dist = Math.abs(newZ - 0); 
            if (dist < 3.0) {
              triggerCrash();
            }
@@ -884,7 +921,6 @@ const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
       return next;
     });
 
-    // 2. Spawn Logic
     if (currentSpeed > 0 && state.clock.elapsedTime > nextSpawnRef.current) {
       const types: ('BIKE' | 'CAR' | 'MATATU' | 'BUS')[] = ['BIKE', 'CAR', 'CAR', 'MATATU', 'BUS'];
       const type = types[Math.floor(Math.random() * types.length)];
@@ -893,10 +929,9 @@ const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
         id: Math.random(),
         z: SPAWN_DISTANCE,
         type,
-        speed: 30 + Math.random() * 20 // Traffic speed
+        speed: 30 + Math.random() * 20 
       }]);
       
-      // Random interval between 1s and 4s depending on speed
       const interval = 1 + Math.random() * 3;
       nextSpawnRef.current = state.clock.elapsedTime + interval;
     }
@@ -925,7 +960,6 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   const [playerLane, setPlayerLane] = useState(-1);
   const timeOfDay = useGameStore(state => state.timeOfDay);
   
-  // Background gradient based on Time of Day
   const bgClass = timeOfDay === 'NIGHT' 
     ? 'bg-gradient-to-b from-black via-slate-900 to-indigo-950'
     : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-400 via-blue-300 to-blue-200';
@@ -933,7 +967,6 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   return (
     <div className={`w-full h-full ${bgClass}`}>
       <Canvas shadows camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: 45 }}>
-        {/* Day/Night Lighting */}
         <ambientLight intensity={timeOfDay === 'NIGHT' ? 0.2 : 0.6} />
         <directionalLight 
           position={timeOfDay === 'NIGHT' ? [-20, 30, -10] : [20, 30, 10]} 
@@ -943,8 +976,8 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
           color={timeOfDay === 'NIGHT' ? "#b0c4de" : "#ffffff"} 
         />
         
+        <PhysicsController />
         <CameraRig />
-        <GameLogic />
         <Scenery />
         <Road />
         <StageMarker />
@@ -956,9 +989,9 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <fog attach="fog" args={[timeOfDay === 'NIGHT' ? '#020617' : '#e0f2fe', 15, 80]} />
       </Canvas>
       
-      <div className="absolute bottom-10 inset-x-0 flex justify-center pointer-events-none opacity-50">
+      <div className="absolute bottom-28 inset-x-0 flex justify-center pointer-events-none opacity-50">
         <p className="text-white/50 text-xs animate-pulse">
-          <span className="hidden sm:inline">Use Arrow Keys to Switch Lanes</span>
+          <span className="hidden sm:inline">Use Arrow Keys to Accelerate/Brake & Switch Lanes</span>
           <span className="sm:hidden">Swipe Left/Right to Switch Lanes</span>
         </p>
       </div>
