@@ -5,7 +5,7 @@ import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, Gam
 const INITIAL_STATS: PlayerStats = {
   cash: 500,
   reputation: 50,
-  time: "05:30 AM",
+  time: "08:00 AM",
   energy: 100
 };
 
@@ -64,6 +64,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   happiness: 100,
   isStereoOn: false,
   isSoundOn: true,
+  
+  timeOfDay: 'DAY',
 
   setScreen: (screen) => set({ currentScreen: screen }),
   
@@ -237,7 +239,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   startGameLoop: () => {
-    const { selectedRoute, vehicleType } = get();
+    const { selectedRoute, vehicleType, stats } = get();
     if (!selectedRoute) return;
 
     // Time Scaling: Convert Route "Lore Time" to "Arcade Time"
@@ -269,6 +271,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (vehicleType === '32-seater') maxPax = 32;
     if (vehicleType === '52-seater') maxPax = 52;
 
+    // Determine Day or Night
+    const isNight = Math.random() > 0.5;
+    const timeOfDay = isNight ? 'NIGHT' : 'DAY';
+    const gameTime = isNight ? "08:00 PM" : "08:00 AM";
+
     set({ 
       gameStatus: 'PLAYING', 
       gameTimeRemaining: seconds,
@@ -284,7 +291,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       activeModal: 'NONE',
       currentSpeed: 70,
       happiness: 100,
-      isStereoOn: false
+      isStereoOn: false,
+      timeOfDay,
+      stats: { ...stats, time: gameTime }
     });
   },
 
@@ -355,7 +364,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     gameTimeRemaining: 0,
     happiness: 100,
     isStereoOn: false,
-    isSoundOn: true
+    isSoundOn: true,
+    timeOfDay: 'DAY'
   }),
   
   toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),

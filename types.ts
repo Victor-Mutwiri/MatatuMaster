@@ -74,4 +74,7 @@ export interface GameState {
   
   // Settings
   isSoundOn: boolean;
+  
+  // Environment
+  timeOfDay: 'DAY' | 'NIGHT';
 }

@@ -56,6 +56,7 @@ const CameraRig = () => {
 const Scenery = () => {
   const groupRef = useRef<THREE.Group>(null);
   const currentSpeed = useGameStore(state => state.currentSpeed);
+  const timeOfDay = useGameStore(state => state.timeOfDay);
   
   const OBJECT_COUNT = 24;
   const GAP = 15;
@@ -106,7 +107,7 @@ const Scenery = () => {
             // Bush
             <mesh position={[0, 0.5, 0]}>
               <dodecahedronGeometry args={[0.8, 0]} />
-              <meshStandardMaterial color="#2d5a27" />
+              <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#143311" : "#2d5a27"} />
             </mesh>
           ) : (
             // Tree
@@ -117,7 +118,7 @@ const Scenery = () => {
               </mesh>
               <mesh position={[0, 2, 0]}>
                 <coneGeometry args={[1.5, 3, 8]} />
-                <meshStandardMaterial color="#065f46" />
+                <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#032b20" : "#065f46"} />
               </mesh>
             </group>
           )}
@@ -133,8 +134,9 @@ const Road = () => {
   const currentSpeed = useGameStore((state) => state.currentSpeed);
   
   const STRIP_COUNT = 20;
-  const STRIP_GAP = 10; // Increased gap for speed illusion
+  const STRIP_GAP = 10; 
   const GRASS_OFFSET = ROAD_WIDTH / 2 + 5; 
+  const timeOfDay = useGameStore(state => state.timeOfDay);
   
   useFrame((state, delta) => {
     if (groupRef.current) {
@@ -150,7 +152,7 @@ const Road = () => {
       {/* Asphalt */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
         <planeGeometry args={[ROAD_WIDTH, 300]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+        <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a"} roughness={0.8} />
       </mesh>
 
       {/* Markings - Center Line */}
@@ -166,12 +168,12 @@ const Road = () => {
       {/* Shoulder/Grass Left */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
-        <meshStandardMaterial color="#064e3b" />
+        <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"} />
       </mesh>
       {/* Shoulder/Grass Right */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
-        <meshStandardMaterial color="#064e3b" />
+        <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"} />
       </mesh>
     </group>
   );
@@ -680,6 +682,7 @@ export const PlayerContext = React.createContext<{ lane: number }>({ lane: -1 })
 
 const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCallback: (l: number) => void }) => {
   const meshRef = useRef<THREE.Group>(null);
+  const timeOfDay = useGameStore(state => state.timeOfDay);
   // -1 is Left Lane (Kenya keep left), 1 is Right Lane (Overtaking)
   const [lane, setLane] = useState<-1 | 1>(-1); 
   const LERP_SPEED = 8;
@@ -773,9 +776,24 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
 
   return (
     <group ref={meshRef} position={[-LANE_OFFSET, 0, 0]}>
-       {type === '14-seater' && <Matatu14Seater />}
-       {type === '32-seater' && <Matatu32Seater />}
-       {type === '52-seater' && <Matatu52Seater />}
+       {/* 
+          ROTATE 180 DEGREES: 
+          Models were built with Z+ as front, but we drive towards Z-.
+          So we flip them to face forward.
+       */}
+       <group rotation={[0, Math.PI, 0]}>
+         {type === '14-seater' && <Matatu14Seater />}
+         {type === '32-seater' && <Matatu32Seater />}
+         {type === '52-seater' && <Matatu52Seater />}
+         
+         {/* Headlights (Night Mode Only) */}
+         {timeOfDay === 'NIGHT' && (
+            <>
+              <spotLight position={[0.6, 0.5, 2.2]} angle={0.5} penumbra={0.5} intensity={5} color="#fff" target-position={[0.6, 0, 10]} />
+              <spotLight position={[-0.6, 0.5, 2.2]} angle={0.5} penumbra={0.5} intensity={5} color="#fff" target-position={[-0.6, 0, 10]} />
+            </>
+         )}
+       </group>
     </group>
   );
 };
@@ -840,7 +858,7 @@ const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   return (
     <group>
       {vehicles.map(v => (
-        <group key={v.id} position={[TRAFFIC_LANE_X, 0, v.z]} rotation={[0, Math.PI, 0]}>
+        <group key={v.id} position={[TRAFFIC_LANE_X, 0, v.z]} rotation={[0, 0, 0]}>
            {v.type === 'BIKE' && <Motorbike />}
            {v.type === 'CAR' && <SmallCar />}
            {v.type === 'MATATU' && <Matatu14Seater />}
@@ -858,12 +876,25 @@ interface GameSceneProps {
 
 export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   const [playerLane, setPlayerLane] = useState(-1);
+  const timeOfDay = useGameStore(state => state.timeOfDay);
+  
+  // Background gradient based on Time of Day
+  const bgClass = timeOfDay === 'NIGHT' 
+    ? 'bg-gradient-to-b from-black via-slate-900 to-indigo-950'
+    : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-400 via-blue-300 to-blue-200';
 
   return (
-    <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-black">
+    <div className={`w-full h-full ${bgClass}`}>
       <Canvas shadows camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: 45 }}>
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[20, 30, 10]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]} />
+        {/* Day/Night Lighting */}
+        <ambientLight intensity={timeOfDay === 'NIGHT' ? 0.2 : 0.6} />
+        <directionalLight 
+          position={timeOfDay === 'NIGHT' ? [-20, 30, -10] : [20, 30, 10]} 
+          intensity={timeOfDay === 'NIGHT' ? 0.3 : 1.5} 
+          castShadow 
+          shadow-mapSize={[1024, 1024]} 
+          color={timeOfDay === 'NIGHT' ? "#b0c4de" : "#ffffff"} 
+        />
         
         <CameraRig />
         <GameLogic />
@@ -875,7 +906,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <Player type={vehicleType || '14-seater'} setLaneCallback={setPlayerLane} />
         <OncomingTraffic playerLane={playerLane} />
         
-        <fog attach="fog" args={['#0f172a', 15, 80]} />
+        <fog attach="fog" args={[timeOfDay === 'NIGHT' ? '#020617' : '#e0f2fe', 15, 80]} />
       </Canvas>
       
       <div className="absolute bottom-10 inset-x-0 flex justify-center pointer-events-none opacity-50">
