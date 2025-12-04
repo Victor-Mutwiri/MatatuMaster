@@ -9,7 +9,18 @@ import { PoliceModal } from '../components/game/PoliceModal';
 import { X, AlertOctagon, RotateCcw, Map } from 'lucide-react';
 
 export const GameLoopScreen: React.FC = () => {
-  const { vehicleType, resetGame, gameStatus, tickTimer, gameOverReason, activeModal, startGameLoop, exitToMapSelection } = useGameStore();
+  const { 
+    vehicleType, 
+    resetGame, 
+    gameStatus, 
+    isCrashing,
+    tickTimer, 
+    gameOverReason, 
+    activeModal, 
+    startGameLoop, 
+    exitToMapSelection,
+    endGame 
+  } = useGameStore();
 
   // Timer Effect
   useEffect(() => {
@@ -22,6 +33,17 @@ export const GameLoopScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [gameStatus, tickTimer]);
 
+  // Crash Sequence Handler
+  useEffect(() => {
+    if (gameStatus === 'CRASHING') {
+      // Wait for dramatic pause before showing modal
+      const crashTimer = setTimeout(() => {
+        endGame('CRASH');
+      }, 2500); // 2.5 seconds of chaos
+      return () => clearTimeout(crashTimer);
+    }
+  }, [gameStatus, endGame]);
+
   return (
     <div className="relative w-full h-screen bg-slate-900 overflow-hidden">
       
@@ -33,17 +55,40 @@ export const GameLoopScreen: React.FC = () => {
       {/* Heads Up Display */}
       {gameStatus === 'PLAYING' && activeModal === 'NONE' && <HUD />}
 
+      {/* Crash Overlay - GTA Style */}
+      {isCrashing && (
+        <div className="absolute inset-0 z-40 pointer-events-none overflow-hidden">
+          {/* Blood Vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle,_transparent_30%,_rgba(180,0,0,0.6)_90%)] animate-pulse"></div>
+          
+          {/* Red Flash */}
+          <div className="absolute inset-0 bg-red-600/30 mix-blend-overlay animate-[ping_0.5s_ease-out_infinite]"></div>
+          
+          {/* Cracks / Damage (Optional CSS flair) */}
+          <div className="absolute inset-0 opacity-40 mix-blend-multiply bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+          
+          {/* Text Animation */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <h1 className="font-display font-black text-6xl sm:text-8xl text-red-600 uppercase tracking-tighter scale-150 animate-[ping_0.2s_ease-out_reverse]">
+              WASTED
+            </h1>
+          </div>
+        </div>
+      )}
+
       {/* Pause/Abort Menu Button (Top Right absolute) */}
-      <div className="absolute top-4 right-4 z-50">
-        <Button 
-          variant="danger" 
-          size="sm" 
-          onClick={exitToMapSelection}
-          className="bg-red-600/80 backdrop-blur hover:bg-red-600 shadow-lg !p-2 rounded-full"
-        >
-          <X size={20} />
-        </Button>
-      </div>
+      {!isCrashing && activeModal !== 'GAME_OVER' && (
+        <div className="absolute top-4 right-4 z-50">
+          <Button 
+            variant="danger" 
+            size="sm" 
+            onClick={exitToMapSelection}
+            className="bg-red-600/80 backdrop-blur hover:bg-red-600 shadow-lg !p-2 rounded-full"
+          >
+            <X size={20} />
+          </Button>
+        </div>
+      )}
 
       {/* Stage Modal Overlay */}
       {activeModal === 'STAGE' && <StageModal />}
@@ -75,7 +120,7 @@ export const GameLoopScreen: React.FC = () => {
                 ? "You ran out of time. The passengers are furious and the trip is cancelled." 
                 : gameOverReason === 'ARRESTED' 
                 ? "You've been arrested for corruption and traffic violations. Bail is expensive."
-                : "Your matatu is wrecked."}
+                : "Fatal crash! The vehicle is totaled and passengers are injured."}
             </p>
 
             <div className="space-y-3">

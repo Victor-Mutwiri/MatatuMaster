@@ -29,21 +29,33 @@ const GameLogic = () => {
 // Camera Rig: Follows player and adds shake
 const CameraRig = () => {
   const { camera } = useThree();
-  const currentSpeed = useGameStore(state => state.currentSpeed);
+  const { currentSpeed, isCrashing } = useGameStore();
   // Re-use constant for consistency
   const startPos = useMemo(() => CAMERA_POS.clone(), []);
   
   useFrame((state) => {
     // Basic shake based on speed
     const t = state.clock.elapsedTime;
-    const shakeIntensity = currentSpeed > 0 ? 0.05 : 0;
+    let shakeIntensity = currentSpeed > 0 ? 0.05 : 0;
+    
+    // Extreme shake during crash
+    if (isCrashing) {
+      shakeIntensity = 0.5;
+    }
+
     const shakeY = Math.sin(t * 30) * shakeIntensity * 0.5;
     const shakeX = Math.cos(t * 25) * shakeIntensity * 0.3;
 
     // Smooth return to center
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, shakeX, 0.1);
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, startPos.y + shakeY, 0.1);
-    camera.position.z = startPos.z;
+    
+    if (isCrashing) {
+       // Zoom in slightly on crash
+       camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z - 5, 0.05);
+    } else {
+       camera.position.z = startPos.z;
+    }
     
     // Look slightly ahead, but lower down to see the road better
     camera.lookAt(0, 0, -5);
@@ -683,6 +695,8 @@ export const PlayerContext = React.createContext<{ lane: number }>({ lane: -1 })
 const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCallback: (l: number) => void }) => {
   const meshRef = useRef<THREE.Group>(null);
   const timeOfDay = useGameStore(state => state.timeOfDay);
+  const gameStatus = useGameStore(state => state.gameStatus);
+  const isCrashing = useGameStore(state => state.isCrashing);
   // -1 is Left Lane (Kenya keep left), 1 is Right Lane (Overtaking)
   const [lane, setLane] = useState<-1 | 1>(-1); 
   const LERP_SPEED = 8;
@@ -695,7 +709,20 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
     setLaneCallback(lane);
   }, [lane, setLaneCallback]);
 
+  // Reset Logic: When game restarts (enters PLAYING state), reset transform
   useEffect(() => {
+    if (gameStatus === 'PLAYING' && !isCrashing && meshRef.current) {
+      // Reset rotation completely to fix "flipped" bug after crash
+      meshRef.current.rotation.set(0, 0, 0);
+      meshRef.current.position.y = 0;
+      meshRef.current.position.x = -LANE_OFFSET; // Force snap to left lane
+      setLane(-1); // Reset state to left lane
+    }
+  }, [gameStatus, isCrashing]);
+
+  useEffect(() => {
+    if (isCrashing) return; // Disable controls during crash
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
         setLane(prev => {
@@ -720,10 +747,12 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [reportLaneChange]);
+  }, [reportLaneChange, isCrashing]);
 
   const touchStartX = useRef<number | null>(null);
   useEffect(() => {
+    if (isCrashing) return;
+
     const handleTouchStart = (e: TouchEvent) => {
       touchStartX.current = e.touches[0].clientX;
     };
@@ -760,17 +789,27 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [reportLaneChange]);
+  }, [reportLaneChange, isCrashing]);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
-      const targetX = lane * LANE_OFFSET;
-      meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, delta * LERP_SPEED);
-      const xDiff = targetX - meshRef.current.position.x;
-      // Tilt based on movement direction
-      meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, -xDiff * TILT_ANGLE, delta * LERP_SPEED);
-      // Gentle bounce
-      meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 15) * 0.02; 
+      if (isCrashing) {
+         // DRAMATIC CRASH ANIMATION
+         // Spin wildly
+         meshRef.current.rotation.x += delta * 2;
+         meshRef.current.rotation.y += delta * 5;
+         meshRef.current.rotation.z += delta * 3;
+         // Lift off ground slightly
+         meshRef.current.position.y += delta * 1;
+      } else {
+         const targetX = lane * LANE_OFFSET;
+         meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, delta * LERP_SPEED);
+         const xDiff = targetX - meshRef.current.position.x;
+         // Tilt based on movement direction
+         meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, -xDiff * TILT_ANGLE, delta * LERP_SPEED);
+         // Gentle bounce
+         meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 15) * 0.02; 
+      }
     }
   });
 
@@ -800,7 +839,7 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
 
 // Oncoming Traffic System
 const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
-  const { currentSpeed, triggerCrash, gameStatus } = useGameStore();
+  const { currentSpeed, triggerCrash, gameStatus, isCrashing } = useGameStore();
   const [vehicles, setVehicles] = useState<{ id: number, z: number, type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS', speed: number }[]>([]);
   const nextSpawnRef = useRef(0);
 
@@ -808,6 +847,14 @@ const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   const TRAFFIC_LANE_X = LANE_OFFSET; // Right Lane
   const SPAWN_DISTANCE = -150; // Spawn far ahead (negative Z because objects move +Z)
   const DESPAWN_DISTANCE = 20;
+
+  // Reset Traffic on Restart
+  useEffect(() => {
+    if (gameStatus === 'PLAYING' && !isCrashing) {
+      setVehicles([]); // Clear traffic
+      nextSpawnRef.current = 0;
+    }
+  }, [gameStatus, isCrashing]);
 
   useFrame((state, delta) => {
     if (gameStatus !== 'PLAYING') return;
@@ -823,7 +870,7 @@ const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
         
         // Collision Detection
         // If player is in Right Lane (1) and vehicle is close
-        if (playerLane === 1) {
+        if (playerLane === 1 && !isCrashing) {
            const dist = Math.abs(newZ - 0); // Player is at Z=0
            if (dist < 3.0) {
              triggerCrash();

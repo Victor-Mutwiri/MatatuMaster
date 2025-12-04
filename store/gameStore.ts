@@ -1,6 +1,7 @@
 
 import { create } from 'zustand';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData } from '../types';
+import { playSfx } from '../utils/audio';
 
 const INITIAL_STATS: PlayerStats = {
   cash: 500,
@@ -58,6 +59,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   policeData: null,
   
   gameStatus: 'IDLE',
+  isCrashing: false,
   gameOverReason: null,
   gameTimeRemaining: 0,
   
@@ -278,6 +280,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ 
       gameStatus: 'PLAYING', 
+      isCrashing: false,
       gameTimeRemaining: seconds,
       gameOverReason: null,
       currentScreen: 'GAME_LOOP',
@@ -300,6 +303,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   exitToMapSelection: () => set({
     currentScreen: 'MAP_SELECT',
     gameStatus: 'IDLE',
+    isCrashing: false,
     gameOverReason: null,
     activeModal: 'NONE',
     currentSpeed: 0,
@@ -310,12 +314,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     happiness: 100
   }),
 
-  triggerCrash: () => set({
-    gameStatus: 'GAME_OVER',
-    gameOverReason: 'CRASH',
-    activeModal: 'GAME_OVER',
-    currentSpeed: 0
-  }),
+  triggerCrash: () => {
+    // 1. Play Sound
+    playSfx('CRASH');
+    
+    // 2. Set Intermediate Crash State (Drama Phase)
+    set({
+      gameStatus: 'CRASHING',
+      isCrashing: true,
+      currentSpeed: 0, // Stop road movement
+      // Don't show modal yet
+    });
+  },
 
   tickTimer: () => set((state) => {
     if (state.gameStatus !== 'PLAYING') return {};
@@ -343,7 +353,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   endGame: (reason) => set({ 
     gameStatus: 'GAME_OVER', 
     gameOverReason: reason,
-    activeModal: 'GAME_OVER'
+    activeModal: 'GAME_OVER',
+    isCrashing: false // Stop drama animation
   }),
   
   resetGame: () => set({
@@ -360,6 +371,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     nextPoliceDistance: 0,
     activeModal: 'NONE',
     gameStatus: 'IDLE',
+    isCrashing: false,
     gameOverReason: null,
     gameTimeRemaining: 0,
     happiness: 100,

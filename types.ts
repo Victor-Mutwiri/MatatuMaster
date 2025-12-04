@@ -3,7 +3,7 @@ export type ScreenName = 'LANDING' | 'SETUP' | 'MAP_SELECT' | 'DASHBOARD' | 'GAM
 
 export type VehicleType = '14-seater' | '32-seater' | '52-seater';
 
-export type GameStatus = 'IDLE' | 'PLAYING' | 'PAUSED' | 'GAME_OVER';
+export type GameStatus = 'IDLE' | 'PLAYING' | 'PAUSED' | 'CRASHING' | 'GAME_OVER';
 
 export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | 'ARRESTED' | null;
 
@@ -65,6 +65,7 @@ export interface GameState {
   
   // Active Game Session State
   gameStatus: GameStatus;
+  isCrashing: boolean; // Visual flag for crash animation
   gameOverReason: GameOverReason;
   gameTimeRemaining: number; // seconds
   
