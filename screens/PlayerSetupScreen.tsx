@@ -1,23 +1,22 @@
 
+
 import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore } from '../store/gameStore';
-import { User, Users, Bus, Zap, Shield, TrendingUp, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { User, Users, Bus, Zap, Shield, TrendingUp, ArrowLeft, CheckCircle2, Settings, AlertTriangle } from 'lucide-react';
 
 export const PlayerSetupScreen: React.FC = () => {
-  const { setPlayerInfo, setVehicleType, setScreen } = useGameStore();
+  const { setVehicleType, setScreen, playerName, saccoName } = useGameStore();
   
-  const [name, setName] = useState('');
-  const [sacco, setSacco] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
 
-  const isFormValid = name.trim().length > 0 && sacco.trim().length > 0 && selectedVehicle !== null;
+  const isProfileValid = playerName.trim().length > 0 && saccoName.trim().length > 0;
+  const isFormValid = isProfileValid && selectedVehicle !== null;
 
   const handleContinue = () => {
     if (isFormValid) {
-      setPlayerInfo(name, sacco);
       setVehicleType(selectedVehicle!);
       setScreen('MAP_SELECT');
     }
@@ -25,6 +24,10 @@ export const PlayerSetupScreen: React.FC = () => {
 
   const handleBack = () => {
     setScreen('LANDING');
+  };
+
+  const goToSettings = () => {
+    setScreen('SETTINGS');
   };
 
   const vehicleOptions = [
@@ -65,64 +68,71 @@ export const PlayerSetupScreen: React.FC = () => {
         <div className="flex flex-col w-full lg:w-[380px] shrink-0 z-20">
           
           {/* Header & Back */}
-          <div className="flex items-center gap-4 mb-4 md:mb-6">
-             <button 
-               onClick={handleBack}
-               className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"
-             >
-               <ArrowLeft size={20} />
-             </button>
-             <div>
-               <h2 className="font-display text-xl md:text-2xl font-bold text-white uppercase tracking-wider leading-none">
-                 New Conductor
-               </h2>
-               <p className="text-slate-400 text-[10px] md:text-xs uppercase tracking-widest mt-1">Registration</p>
-             </div>
-          </div>
-
-          {/* Form Card */}
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-2xl p-5 md:p-6 shadow-2xl space-y-6">
-            
-             <div className="space-y-4">
-               <div>
-                  <label className="text-[10px] font-bold text-matatu-yellow uppercase tracking-wider mb-2 block flex items-center gap-2">
-                    <User size={14} /> Name / Alias
-                  </label>
-                  <input 
-                    type="text" 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Kevo Ma-Coin"
-                    className="w-full bg-slate-800 border-2 border-slate-700 rounded-lg p-3 md:p-4 text-white text-base md:text-lg placeholder-slate-600 focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/50 transition-all"
-                  />
-               </div>
-
-               <div>
-                  <label className="text-[10px] font-bold text-matatu-yellow uppercase tracking-wider mb-2 block flex items-center gap-2">
-                    <Users size={14} /> SACCO
-                  </label>
-                  <input 
-                    type="text" 
-                    value={sacco}
-                    onChange={(e) => setSacco(e.target.value)}
-                    placeholder="e.g. Super Metro"
-                    className="w-full bg-slate-800 border-2 border-slate-700 rounded-lg p-3 md:p-4 text-white text-base md:text-lg placeholder-slate-600 focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/50 transition-all"
-                  />
-               </div>
-             </div>
-
-             {/* ID Card Visual (Hidden on mobile to save space, visible on tablet+) */}
-             <div className="hidden sm:block pt-6 border-t border-slate-800 opacity-50">
-                <div className="flex gap-4 items-center">
-                   <div className="w-16 h-16 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center">
-                      <User size={32} className="text-slate-600"/>
-                   </div>
-                   <div className="space-y-2 w-full">
-                      <div className="h-2 w-3/4 bg-slate-800 rounded"></div>
-                      <div className="h-2 w-1/2 bg-slate-800 rounded"></div>
-                   </div>
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+             <div className="flex items-center gap-4">
+                <button 
+                  onClick={handleBack}
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h2 className="font-display text-xl md:text-2xl font-bold text-white uppercase tracking-wider leading-none">
+                    Shift Setup
+                  </h2>
+                  <p className="text-slate-400 text-[10px] md:text-xs uppercase tracking-widest mt-1">Prepare for departure</p>
                 </div>
              </div>
+             
+             {/* Settings Button Moved Here */}
+             <button 
+               onClick={goToSettings}
+               className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 group"
+               title="Configure Profile"
+             >
+               <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+             </button>
+          </div>
+
+          {/* Profile Card */}
+          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-2xl p-5 md:p-6 shadow-2xl space-y-6">
+             
+             <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-4">
+                <User className="text-matatu-yellow" size={20} />
+                <h3 className="font-display text-lg font-bold text-white uppercase">Driver ID</h3>
+             </div>
+
+             {/* Profile Status */}
+             {isProfileValid ? (
+               <div className="space-y-4">
+                  <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Conductor Name</label>
+                    <div className="text-white font-display text-xl font-bold">{playerName}</div>
+                  </div>
+                  <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Registered SACCO</label>
+                    <div className="text-matatu-yellow font-display text-xl font-bold">{saccoName}</div>
+                  </div>
+                  <div className="text-xs text-slate-500 italic flex items-center gap-2">
+                    <CheckCircle2 size={12} className="text-green-500" /> Profile Active
+                  </div>
+               </div>
+             ) : (
+               <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-lg text-center space-y-3">
+                  <div className="flex justify-center mb-2">
+                    <div className="bg-red-500/20 p-2 rounded-full animate-pulse">
+                       <AlertTriangle className="text-red-500" size={24} />
+                    </div>
+                  </div>
+                  <p className="text-red-200 text-sm font-bold">Profile Incomplete!</p>
+                  <p className="text-red-200/70 text-xs">You must register your Name and SACCO in settings before starting a shift.</p>
+                  <Button variant="secondary" fullWidth onClick={goToSettings} size="sm">
+                     <span className="flex items-center gap-2 justify-center">
+                        <Settings size={14} /> Configure Profile
+                     </span>
+                  </Button>
+               </div>
+             )}
 
           </div>
         </div>
@@ -137,7 +147,7 @@ export const PlayerSetupScreen: React.FC = () => {
              <p className="text-slate-400 text-sm">Choose your daily driver.</p>
           </div>
 
-          {/* Grid Layout: 1 col mobile, 2 col tablet, 2/3 col desktop */}
+          {/* Grid Layout */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
             {vehicleOptions.map((v) => {
               const isSelected = selectedVehicle === v.type;
@@ -216,7 +226,7 @@ export const PlayerSetupScreen: React.FC = () => {
                    ${isFormValid ? 'opacity-100 translate-y-0' : 'opacity-50'}
                 `}
               >
-                Confirm Profile
+                {isProfileValid ? 'Start Shift' : 'Complete Profile First'}
               </Button>
           </div>
 
@@ -234,7 +244,7 @@ export const PlayerSetupScreen: React.FC = () => {
                   ${isFormValid ? 'opacity-100 translate-y-0' : 'opacity-50'}
                `}
              >
-               Confirm Profile
+               {isProfileValid ? 'Start Shift' : 'Complete Profile First'}
              </Button>
         </div>
 

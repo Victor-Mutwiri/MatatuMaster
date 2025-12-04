@@ -7,6 +7,7 @@ import { PlayerSetupScreen } from './screens/PlayerSetupScreen';
 import { MapSelectionScreen } from './screens/MapSelectionScreen';
 import { GameLoopScreen } from './screens/GameLoopScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { useGameStore } from './store/gameStore';
 import { Route } from './types';
 
@@ -32,6 +33,10 @@ const App: React.FC = () => {
         <LandingScreen onStart={handleStartShift} />
       )}
       
+      {currentScreen === 'SETTINGS' && (
+        <SettingsScreen />
+      )}
+
       {currentScreen === 'SETUP' && (
         <PlayerSetupScreen />
       )}

@@ -3,7 +3,7 @@
 import React from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { BusFront, Play, ShieldAlert, Coins, Map, Zap, Trophy, MousePointer2 } from 'lucide-react';
+import { BusFront, Play, ShieldAlert, Coins, Map, Zap, Trophy, Settings } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 
 interface LandingScreenProps {
