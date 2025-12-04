@@ -1,13 +1,10 @@
 
 import React from 'react';
-import { Users, Smile, Wallet, Clock } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 
 export const HUD: React.FC = () => {
-  const { gameTimeRemaining, currentPassengers, maxPassengers, stats } = useGameStore();
-
-  // Hardcoded values for now
-  const happiness = 100;
+  const { gameTimeRemaining, currentPassengers, maxPassengers, stats, happiness, isStereoOn, toggleStereo } = useGameStore();
 
   // Format Seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -17,6 +14,7 @@ export const HUD: React.FC = () => {
   };
 
   const isLowTime = gameTimeRemaining <= 30; // Red alert if under 30s
+  const happinessColor = happiness > 75 ? 'text-neon-blue' : happiness > 40 ? 'text-yellow-400' : 'text-red-500';
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
@@ -42,13 +40,33 @@ export const HUD: React.FC = () => {
           </div>
         </div>
 
-        {/* Happiness */}
-        <div className="bg-slate-900/80 backdrop-blur-md border-r-4 border-neon-blue px-4 py-2 rounded-l-lg shadow-lg flex items-center gap-3">
-           <div className="flex flex-col items-end">
-             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Vibe</span>
-             <span className="font-display text-xl font-bold text-neon-blue leading-none">{happiness}%</span>
-           </div>
-           <Smile className="text-neon-blue" size={20} />
+        {/* Happiness & Stereo */}
+        <div className="flex flex-col gap-2 items-end pointer-events-auto">
+          {/* Happiness Meter */}
+          <div className="bg-slate-900/80 backdrop-blur-md border-r-4 border-neon-blue px-4 py-2 rounded-l-lg shadow-lg flex items-center gap-3">
+             <div className="flex flex-col items-end">
+               <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Vibe</span>
+               <span className={`font-display text-xl font-bold leading-none ${happinessColor}`}>
+                 {Math.round(happiness)}%
+               </span>
+             </div>
+             <Smile className={happinessColor} size={20} />
+          </div>
+
+          {/* Stereo Toggle */}
+          <button 
+            onClick={toggleStereo}
+            className={`
+              flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-lg
+              ${isStereoOn 
+                ? 'bg-purple-600 text-white shadow-purple-500/30 ring-2 ring-purple-400 animate-pulse-fast' 
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }
+            `}
+          >
+            {isStereoOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            <span>Stereo {isStereoOn ? 'ON' : 'OFF'}</span>
+          </button>
         </div>
       </div>
 

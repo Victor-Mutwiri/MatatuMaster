@@ -57,4 +57,8 @@ export interface GameState {
   gameStatus: GameStatus;
   gameOverReason: GameOverReason;
   gameTimeRemaining: number; // seconds
+  
+  // Happiness & Mechanics
+  happiness: number; // 0-100
+  isStereoOn: boolean;
 }

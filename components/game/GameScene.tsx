@@ -119,14 +119,32 @@ const Player = ({ type }: { type: VehicleType | null }) => {
   const LERP_SPEED = 10;
   const TILT_ANGLE = 0.1;
 
+  const reportLaneChange = useGameStore(state => state.reportLaneChange);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') setLane((l) => Math.max(l - 1, -1));
-      if (e.key === 'ArrowRight') setLane((l) => Math.min(l + 1, 1));
+      if (e.key === 'ArrowLeft') {
+        setLane((l) => {
+          if (l > -1) {
+            reportLaneChange(); // Penalize happiness
+            return l - 1;
+          }
+          return l;
+        });
+      }
+      if (e.key === 'ArrowRight') {
+        setLane((l) => {
+          if (l < 1) {
+            reportLaneChange(); // Penalize happiness
+            return l + 1;
+          }
+          return l;
+        });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [reportLaneChange]);
 
   const touchStartX = useRef<number | null>(null);
   useEffect(() => {
@@ -137,8 +155,23 @@ const Player = ({ type }: { type: VehicleType | null }) => {
       if (touchStartX.current === null) return;
       const diff = e.changedTouches[0].clientX - touchStartX.current;
       if (Math.abs(diff) > 50) {
-        if (diff > 0) setLane((l) => Math.min(l + 1, 1));
-        else setLane((l) => Math.max(l - 1, -1));
+        if (diff > 0) {
+           setLane((l) => {
+             if (l < 1) {
+               reportLaneChange();
+               return l + 1;
+             }
+             return l;
+           });
+        } else {
+           setLane((l) => {
+             if (l > -1) {
+               reportLaneChange();
+               return l - 1;
+             }
+             return l;
+           });
+        }
       }
       touchStartX.current = null;
     };
@@ -148,7 +181,7 @@ const Player = ({ type }: { type: VehicleType | null }) => {
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, []);
+  }, [reportLaneChange]);
 
   useFrame((state, delta) => {
     if (meshRef.current) {

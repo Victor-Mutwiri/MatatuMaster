@@ -25,6 +25,10 @@ interface GameStore extends GameState {
   // Stage Actions
   triggerStage: () => void;
   handleStageAction: (action: 'PICKUP' | 'DEPART') => void;
+  
+  // Mechanics
+  toggleStereo: () => void;
+  reportLaneChange: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -46,6 +50,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameStatus: 'IDLE',
   gameOverReason: null,
   gameTimeRemaining: 0,
+  
+  happiness: 100,
+  isStereoOn: false,
 
   setScreen: (screen) => set({ currentScreen: screen }),
   
@@ -68,10 +75,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   triggerStage: () => {
-    const { currentPassengers, maxPassengers } = get();
+    const { currentPassengers, maxPassengers, happiness } = get();
     
-    // Generate random stage data
-    const waiting = Math.floor(Math.random() * 8); // 0-7 waiting
+    // Happiness affects passenger availability
+    // 100% Happiness = Up to 8 passengers
+    // 50% Happiness = Up to 4 passengers
+    // 0% Happiness = Max 1 passenger
+    const happinessFactor = Math.max(0.1, happiness / 100);
+    const maxPotentialPassengers = Math.floor(8 * happinessFactor);
+    
+    const waiting = Math.floor(Math.random() * (maxPotentialPassengers + 1)); 
+    
     // Random alighting (bias towards fewer alighting early game, but purely random for now)
     const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
     
@@ -159,28 +173,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
       maxPassengers: maxPax,
       nextStageDistance: 400, // First stage is 400 units away
       activeModal: 'NONE',
-      currentSpeed: 20
+      currentSpeed: 20,
+      happiness: 100,
+      isStereoOn: false
     });
   },
 
   tickTimer: () => set((state) => {
     if (state.gameStatus !== 'PLAYING') return {};
     
-    // Pause timer if in stage modal?
-    // Let's keep time running to add pressure!
-    
     const newTime = state.gameTimeRemaining - 1;
     
+    // Happiness Regen from Stereo
+    let newHappiness = state.happiness;
+    if (state.isStereoOn) {
+      newHappiness = Math.min(100, state.happiness + 0.5); // Regenerate 0.5 per tick (slowly)
+    }
+
     if (newTime <= 0) {
       return { 
         gameTimeRemaining: 0, 
         gameStatus: 'GAME_OVER', 
         gameOverReason: 'TIME_UP',
-        activeModal: 'GAME_OVER'
+        activeModal: 'GAME_OVER',
+        happiness: newHappiness
       };
     }
     
-    return { gameTimeRemaining: newTime };
+    return { gameTimeRemaining: newTime, happiness: newHappiness };
   }),
 
   endGame: (reason) => set({ 
@@ -203,6 +223,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     activeModal: 'NONE',
     gameStatus: 'IDLE',
     gameOverReason: null,
-    gameTimeRemaining: 0
+    gameTimeRemaining: 0,
+    happiness: 100,
+    isStereoOn: false
   }),
+  
+  toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),
+  
+  reportLaneChange: () => set((state) => ({ 
+    happiness: Math.max(0, state.happiness - 2) // Penalize swerving
+  })),
 }));
