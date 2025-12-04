@@ -1,4 +1,5 @@
 
+
 import { create } from 'zustand';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData } from '../types';
 import { playSfx } from '../utils/audio';
@@ -59,6 +60,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   currentPassengers: 0,
   maxPassengers: 14,
   nextStageDistance: 0,
+  lastStageDistance: -1000,
   nextStagePassengerCount: 0,
   activeModal: 'NONE',
   stageData: null,
@@ -156,6 +158,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     // 3. Update State and Resume
+    // Store current stage as last stage for visuals
+    const currentStagePos = nextStageDistance;
+
     // Generate next stage sooner due to higher speed (approx every 25 seconds of travel)
     const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
     
@@ -173,6 +178,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       activeModal: 'NONE',
       stageData: null,
       // We do NOT set currentSpeed here. The player must accelerate manually.
+      lastStageDistance: currentStagePos,
       nextStageDistance: nextDist,
       nextStagePassengerCount: nextPax
     });
@@ -308,6 +314,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentPassengers: 0,
       maxPassengers: maxPax,
       nextStageDistance: 1500,
+      lastStageDistance: -1000,
       nextStagePassengerCount: nextPax,
       nextPoliceDistance: 3500 + Math.random() * 1000, 
       policeData: null,
@@ -388,6 +395,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     distanceTraveled: 0,
     currentPassengers: 0,
     nextStageDistance: 0,
+    lastStageDistance: -1000,
     nextStagePassengerCount: 0,
     nextPoliceDistance: 0,
     activeModal: 'NONE',

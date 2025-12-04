@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VehicleType } from '../../types';
@@ -53,8 +54,40 @@ const PhysicsController = () => {
   useFrame((state, delta) => {
     if (gameStatus !== 'PLAYING' || activeModal !== 'NONE') return;
 
-    const { currentSpeed, isAccelerating, isBraking } = useGameStore.getState();
+    // Optimization: Read transient state directly
+    const { 
+      currentSpeed, 
+      isAccelerating, 
+      isBraking, 
+      nextStageDistance, 
+      nextPoliceDistance, 
+      distanceTraveled 
+    } = useGameStore.getState();
+
     let newSpeed = currentSpeed;
+
+    // --- Auto Deceleration Logic ---
+    // Check distance to closest mandatory stop (Stage or Police)
+    const distToStage = nextStageDistance - distanceTraveled;
+    const distToPolice = nextPoliceDistance - distanceTraveled;
+    
+    // Find closest valid stop distance
+    let closestStopDist = Infinity;
+    if (distToStage > 0 && distToStage < 300) closestStopDist = Math.min(closestStopDist, distToStage);
+    if (distToPolice > 0 && distToPolice < 300) closestStopDist = Math.min(closestStopDist, distToPolice);
+
+    // Apply speed limiting based on distance
+    let speedLimit = MAX_SPEED;
+    if (closestStopDist < 250) {
+        // Linearly decrease speed limit as we approach 0
+        const factor = Math.max(0, closestStopDist / 250);
+        // Ensure we don't stop completely (keep 15 units) so we can creep to the stop line
+        // unless distance is literally 0
+        const minCrawl = closestStopDist < 5 ? 2 : 15; 
+        speedLimit = minCrawl + (factor * (MAX_SPEED - minCrawl));
+    }
+
+    // --- Physics Update ---
 
     if (isAccelerating) {
       newSpeed += ACCEL_RATE * delta;
@@ -71,13 +104,17 @@ const PhysicsController = () => {
       }
     }
 
+    // Apply Deceleration Override if speeding towards a stop
+    if (newSpeed > speedLimit) {
+        // Stronger braking force to ensure we slow down in time
+        const brakeForce = BRAKE_RATE * 1.5 * delta;
+        newSpeed = Math.max(speedLimit, newSpeed - brakeForce);
+    }
+
     // Clamp speed
     if (newSpeed < 0) newSpeed = 0;
     if (newSpeed > MAX_SPEED) newSpeed = MAX_SPEED;
 
-    // Only update store if changed significantly to avoid spam, 
-    // but we need it for visuals, so we update frame-by-frame.
-    // The visual components read directly from getState() to avoid re-renders.
     setCurrentSpeed(newSpeed);
 
     // Update distance
@@ -348,43 +385,59 @@ const BusStopShelter = () => {
   );
 };
 
-// Stage Marker with Shelter and People
-const StageMarker = () => {
-  const { nextStageDistance, nextStagePassengerCount } = useGameStore();
+// Reusable Stage Model for both approaching and departing
+const StageModel = ({ 
+  distance, 
+  passengerCount, 
+  isDeparting 
+}: { 
+  distance: number, 
+  passengerCount: number, 
+  isDeparting: boolean 
+}) => {
+  const { distanceTraveled } = useGameStore();
   const markerRef = useRef<THREE.Group>(null);
-  
-  // Position on the Left side of the road (approx -6 units X)
-  const MARKER_X = -(ROAD_WIDTH / 2 + 2.5); 
 
-  // Memoize crowd so they don't re-render/change position on every frame
+  // Position on the Left side of the road
+  const MARKER_X = -(ROAD_WIDTH / 2 + 2.5);
+  
+  // Memoize crowd positions for this specific stage instance
   const crowd = useMemo(() => {
-    return Array.from({ length: nextStagePassengerCount }).map((_, i) => {
-      // Random position inside the shelter area
-      const x = (Math.random() - 0.5) * 3; // +/- 1.5 width
-      const z = (Math.random() - 0.5) * 1.5; // +/- 0.75 depth
-      const rotY = (Math.random() - 0.5) * Math.PI; // Face random direction
-      return { x, z, rotY };
-    });
-  }, [nextStagePassengerCount]);
+    // Departing stage has no waiting passengers (assumed picked up)
+    if (isDeparting || passengerCount <= 0) return [];
+    
+    return Array.from({ length: passengerCount }).map((_, i) => ({
+      x: (Math.random() - 0.5) * 3,
+      z: (Math.random() - 0.5) * 1.5,
+      rotY: (Math.random() - 0.5) * Math.PI
+    }));
+  }, [passengerCount, isDeparting]);
 
   useFrame(() => {
-    const { distanceTraveled } = useGameStore.getState();
-    const distanceToStage = nextStageDistance - distanceTraveled;
-    
+    const distToStage = distance - useGameStore.getState().distanceTraveled;
     if (markerRef.current) {
-      markerRef.current.position.z = -distanceToStage;
+      markerRef.current.position.z = -distToStage;
       
-      // Hide if far behind or far ahead to save draw calls
-      markerRef.current.visible = distanceToStage < 300 && distanceToStage > -20;
+      // Visibility Logic:
+      // Approaching: distToStage reduces from +3000 down to 0. Visible range e.g., < 300.
+      // Departing: distToStage becomes negative (e.g. -50). Visible range e.g., > -200.
+      
+      let isVisible = false;
+      if (!isDeparting) {
+         isVisible = distToStage < 300 && distToStage > -20;
+      } else {
+         // Departing: Behind the bus (negative distance relative to stage, so positive Z in world space?? No, Z is -dist)
+         // If distToStage is -50 (50m behind), Z is +50.
+         // We want to see it as we drive away.
+         isVisible = distToStage > -200 && distToStage <= 20; 
+      }
+      markerRef.current.visible = isVisible;
     }
   });
 
   return (
     <group ref={markerRef} position={[MARKER_X, 0, 0]}>
-      {/* 3D Shelter */}
       <BusStopShelter />
-      
-      {/* Waiting Passengers */}
       {crowd.map((p, i) => (
         <LowPolyHuman 
           key={i} 
@@ -393,6 +446,28 @@ const StageMarker = () => {
         />
       ))}
     </group>
+  );
+};
+
+const StageMarker = () => {
+  const { nextStageDistance, lastStageDistance, nextStagePassengerCount } = useGameStore();
+  
+  return (
+    <>
+      {/* Approaching Stage */}
+      <StageModel 
+        distance={nextStageDistance} 
+        passengerCount={nextStagePassengerCount} 
+        isDeparting={false} 
+      />
+      
+      {/* Departing Stage (Previous one we just left) */}
+      <StageModel 
+        distance={lastStageDistance} 
+        passengerCount={0} 
+        isDeparting={true} 
+      />
+    </>
   );
 };
 

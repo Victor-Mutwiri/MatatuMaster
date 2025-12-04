@@ -1,4 +1,5 @@
 
+
 export type ScreenName = 'LANDING' | 'SETUP' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP';
 
 export type VehicleType = '14-seater' | '32-seater' | '52-seater';
@@ -60,6 +61,7 @@ export interface GameState {
   
   // Stage State
   nextStageDistance: number;
+  lastStageDistance: number; // The distance of the stage we just left (for visuals)
   nextStagePassengerCount: number; // Visual representation count
   activeModal: ActiveModal;
   stageData: StageData | null;
