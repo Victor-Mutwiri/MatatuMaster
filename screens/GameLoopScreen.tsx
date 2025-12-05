@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Button } from '../components/ui/Button';
@@ -170,8 +169,8 @@ export const GameLoopScreen: React.FC = () => {
         <GameScene vehicleType={vehicleType} />
       </div>
 
-      {/* Heads Up Display */}
-      {gameStatus === 'PLAYING' && activeModal === 'NONE' && <HUD />}
+      {/* Heads Up Display - Now visible during Modals (Stage/Police) to show timer */}
+      {gameStatus === 'PLAYING' && <HUD />}
 
       {/* Crash Overlay - GTA Style */}
       {isCrashing && (

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGameStore } from '../../../store/gameStore';
+import { useGameStore, VEHICLE_SPECS } from '../../../store/gameStore';
 import { EngineSynthesizer } from '../../../utils/audio';
 import * as THREE from 'three';
 
@@ -14,12 +14,16 @@ export const PhysicsController = () => {
     updateDistance, 
     activeModal,
     setControl,
-    isEngineSoundOn
+    isEngineSoundOn,
+    vehicleType
   } = useGameStore();
 
   const engineRef = useRef<EngineSynthesizer | null>(null);
 
-  const MAX_SPEED = 120; // Approx 180 km/h in game units
+  // Convert KMH to Game Units (Approx 1.6 ratio based on original logic)
+  const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
+  const MAX_SPEED = spec.maxSpeedKmh / 1.6; 
+  
   const ACCEL_RATE = 40;
   const BRAKE_RATE = 80;
   const FRICTION_RATE = 15;

@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Button } from '../ui/Button';
-import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle, X } from 'lucide-react';
+import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle, X, Clock } from 'lucide-react';
 
 export const StageModal: React.FC = () => {
-  const { stageData, handleStageAction, currentPassengers, maxPassengers } = useGameStore();
+  const { stageData, handleStageAction, currentPassengers, maxPassengers, gameTimeRemaining } = useGameStore();
   const [showOverloadConfirm, setShowOverloadConfirm] = useState(false);
 
   if (!stageData) return null;
@@ -23,6 +23,14 @@ export const StageModal: React.FC = () => {
   const FARE = 50;
   const legalEarnings = Math.min(availableSeats, totalWaiting) * FARE;
   const overloadEarnings = totalWaiting * FARE;
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+  
+  const isLowTime = gameTimeRemaining <= 30;
 
   // Render Confirmation Popup
   if (showOverloadConfirm) {
@@ -64,7 +72,12 @@ export const StageModal: React.FC = () => {
             <h2 className="font-display font-black text-xl uppercase tracking-tighter">STAGE REACHED</h2>
             <p className="text-xs font-bold opacity-80">Stop & Pick Up</p>
           </div>
-          <Users size={24} />
+          
+          {/* Active Timer Display */}
+          <div className={`flex items-center gap-2 bg-black/20 px-3 py-1 rounded-full ${isLowTime ? 'animate-pulse text-red-700' : ''}`}>
+             <Clock size={16} />
+             <span className="font-mono font-bold">{formatTime(gameTimeRemaining)}</span>
+          </div>
         </div>
 
         <div className="p-6 space-y-6">

@@ -48,6 +48,16 @@ const VEHICLE_CAPACITY = {
   '52-seater': { legal: 52, max: 70 }
 };
 
+// Vehicle Performance Specs
+export const VEHICLE_SPECS: Record<VehicleType, { maxSpeedKmh: number; timeMultiplier: number }> = {
+  'boda': { maxSpeedKmh: 140, timeMultiplier: 1.0 },
+  'tuktuk': { maxSpeedKmh: 90, timeMultiplier: 1.4 }, // Slower, gets 40% more time
+  'personal-car': { maxSpeedKmh: 190, timeMultiplier: 0.85 }, // Fast, gets less time
+  '14-seater': { maxSpeedKmh: 175, timeMultiplier: 1.0 },
+  '32-seater': { maxSpeedKmh: 130, timeMultiplier: 1.2 },
+  '52-seater': { maxSpeedKmh: 120, timeMultiplier: 1.3 }
+};
+
 interface GameStore extends GameState {
   setScreen: (screen: ScreenName) => void;
   setPlayerInfo: (name: string, sacco: string) => void;
@@ -378,6 +388,10 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
+        // Apply Vehicle Multiplier for fairness
+        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : { timeMultiplier: 1.0 };
+        seconds = Math.ceil(seconds * spec.timeMultiplier);
+
         const totalDist = selectedRoute.distance * 1000;
         
         // Set Max Passengers based on legal limit
@@ -472,6 +486,17 @@ export const useGameStore = create<GameStore>()(
         let newHappiness = state.happiness;
         if (state.isStereoOn) {
           newHappiness = Math.min(100, state.happiness + 0.5);
+        }
+
+        // Speed Penalty Logic
+        if (state.vehicleType && state.currentSpeed > 0) {
+            const spec = VEHICLE_SPECS[state.vehicleType];
+            const currentKmh = state.currentSpeed * 1.6;
+            
+            // If driving at > 90% of vehicle max speed, passengers get scared
+            if (currentKmh > spec.maxSpeedKmh * 0.9) {
+                newHappiness = Math.max(0, newHappiness - 0.5);
+            }
         }
 
         if (newTime <= 0) {

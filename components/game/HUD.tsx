@@ -1,8 +1,7 @@
 
-
 import React from 'react';
 import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause } from 'lucide-react';
-import { useGameStore } from '../../store/gameStore';
+import { useGameStore, VEHICLE_SPECS } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 
 // --- SVG Gauge Component ---
@@ -56,7 +55,8 @@ export const HUD: React.FC = () => {
     totalRouteDistance,
     setControl,
     fuel,
-    pauseGame
+    pauseGame,
+    vehicleType
   } = useGameStore();
 
   const formatTime = (seconds: number) => {
@@ -70,7 +70,10 @@ export const HUD: React.FC = () => {
   const isOverloaded = currentPassengers > maxPassengers;
   
   const displaySpeed = Math.round(currentSpeed * 1.6);
-  const maxDisplaySpeed = 200; 
+  
+  const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
+  const maxDisplaySpeed = spec.maxSpeedKmh;
+
   const distLeftKm = Math.max(0, (totalRouteDistance - distanceTraveled) / 1000).toFixed(1);
   const distProgress = Math.min(100, (distanceTraveled / totalRouteDistance) * 100);
 
