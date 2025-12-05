@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VehicleType } from '../../types';
@@ -142,41 +140,154 @@ const PlayerBoda = ({ passengerCount }: { passengerCount: number }) => {
 };
 
 const PlayerTuktuk = () => {
+  const bodyColor = "#eab308"; // Rustic Yellow
+  const canvasColor = "#1a1a1a"; // Dark canvas
+  
   return (
-    <group position={[0, 0.3, 0]}>
-       {/* Wheels */}
-       <Wheel position={[0, 0, 1.2]} radius={0.3} />
-       <Wheel position={[-0.5, 0, -0.5]} radius={0.3} />
-       <Wheel position={[0.5, 0, -0.5]} radius={0.3} />
-
-       {/* Body */}
-       <mesh position={[0, 0.6, 0.2]}>
-          <boxGeometry args={[1.2, 1.2, 2.0]} />
-          <meshStandardMaterial color="#facc15" />
+    <group position={[0, 0.35, 0]}>
+       {/* --- WHEELS --- */}
+       <Wheel position={[0, 0, 1.4]} radius={0.3} />
+       {/* Front Mudguard */}
+       <mesh position={[0, 0.35, 1.4]} rotation={[0.5, 0, 0]}>
+          <boxGeometry args={[0.25, 0.05, 0.7]} />
+          <meshStandardMaterial color="#111" roughness={0.8} />
        </mesh>
+
+       <Wheel position={[-0.55, 0, -0.8]} radius={0.3} />
+       <Wheel position={[0.55, 0, -0.8]} radius={0.3} />
        
-       {/* Roof */}
-       <mesh position={[0, 1.25, 0.2]}>
-          <boxGeometry args={[1.3, 0.1, 2.1]} />
+       {/* --- CHASSIS --- */}
+       <mesh position={[0, 0.1, -0.2]}>
+          <boxGeometry args={[0.8, 0.1, 2.8]} />
+          <meshStandardMaterial color="#333" />
+       </mesh>
+
+       {/* --- BODY SHELL (Rustic Yellow) --- */}
+       
+       {/* Front Shield */}
+       <mesh position={[0, 0.7, 1.1]}>
+          <boxGeometry args={[0.9, 0.8, 0.1]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.4} />
+       </mesh>
+       {/* Windshield */}
+       <mesh position={[0, 1.0, 1.11]}>
+          <planeGeometry args={[0.8, 0.5]} />
+          <meshStandardMaterial color="#88ccff" transparent opacity={0.6} roughness={0.1} />
+       </mesh>
+       {/* Single Headlight */}
+       <mesh position={[0, 0.5, 1.16]} rotation={[Math.PI/2, 0, 0]}>
+          <cylinderGeometry args={[0.12, 0.12, 0.1, 16]} />
+          <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
+       </mesh>
+
+       {/* Passenger Cabin Floor */}
+       <mesh position={[0, 0.2, -0.5]}>
+          <boxGeometry args={[1.3, 0.1, 1.6]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.4} />
+       </mesh>
+       {/* Back Wall Lower */}
+       <mesh position={[0, 0.5, -1.25]}>
+          <boxGeometry args={[1.3, 0.6, 0.1]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.4} />
+       </mesh>
+       {/* Side Walls Lower */}
+       <mesh position={[-0.6, 0.5, -0.5]}>
+          <boxGeometry args={[0.1, 0.6, 1.5]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.4} />
+       </mesh>
+       <mesh position={[0.6, 0.5, -0.5]}>
+          <boxGeometry args={[0.1, 0.6, 1.5]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.4} />
+       </mesh>
+
+       {/* --- INTERIOR --- */}
+       {/* Handlebars */}
+       <mesh position={[0, 0.8, 0.9]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.7]} />
           <meshStandardMaterial color="#111" />
        </mesh>
+       {/* Passenger Bench */}
+       <mesh position={[0, 0.45, -0.8]}>
+          <boxGeometry args={[1.1, 0.15, 0.5]} />
+          <meshStandardMaterial color="#222" />
+       </mesh>
+       <mesh position={[0, 0.7, -1.15]}>
+          <boxGeometry args={[1.1, 0.4, 0.1]} />
+          <meshStandardMaterial color="#222" />
+       </mesh>
 
-       {/* Front Window Frame */}
-       <mesh position={[0, 0.9, 1.1]}>
-          <boxGeometry args={[1.1, 0.6, 0.1]} />
-          <meshStandardMaterial color="#facc15" />
+       {/* --- BLACK CANVAS ROOF --- */}
+       {/* Roof Top */}
+       <mesh position={[0, 1.55, -0.1]}>
+          <boxGeometry args={[1.4, 0.05, 2.6]} />
+          <meshStandardMaterial color={canvasColor} roughness={0.9} />
        </mesh>
+       {/* Pillars */}
+       <mesh position={[-0.4, 1.1, 1.1]}><cylinderGeometry args={[0.03, 0.03, 0.9]} /><meshStandardMaterial color="#222" /></mesh>
+       <mesh position={[0.4, 1.1, 1.1]}><cylinderGeometry args={[0.03, 0.03, 0.9]} /><meshStandardMaterial color="#222" /></mesh>
+       <mesh position={[-0.6, 1.1, -1.25]}><cylinderGeometry args={[0.03, 0.03, 0.9]} /><meshStandardMaterial color="#222" /></mesh>
+       <mesh position={[0.6, 1.1, -1.25]}><cylinderGeometry args={[0.03, 0.03, 0.9]} /><meshStandardMaterial color="#222" /></mesh>
+
+       {/* Rear Canvas Flap */}
+       <mesh position={[0, 1.25, -1.24]}>
+          <boxGeometry args={[1.3, 0.9, 0.05]} />
+          <meshStandardMaterial color={canvasColor} roughness={0.9} />
+       </mesh>
+       {/* Tiny Rear Window */}
+       <mesh position={[0, 1.35, -1.27]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[0.5, 0.25]} />
+          <meshStandardMaterial color="#444" transparent opacity={0.7} />
+       </mesh>
+
+       {/* --- REAR DETAILS --- */}
+       <group position={[0, 0.4, -1.31]}>
+          {/* License Plate */}
+          <mesh rotation={[0, Math.PI, 0]}>
+             <boxGeometry args={[0.4, 0.12, 0.02]} />
+             <meshStandardMaterial color="#fbbf24" />
+          </mesh>
+          <mesh position={[0, 0, -0.015]} rotation={[0, Math.PI, 0]}>
+             <planeGeometry args={[0.3, 0.08]} />
+             <meshStandardMaterial color="#000" />
+          </mesh>
+       </group>
+
+       {/* Tail Lights */}
+       <group position={[0, 0.5, -1.31]}>
+          <mesh position={[-0.5, 0, 0]}>
+             <boxGeometry args={[0.15, 0.1, 0.05]} />
+             <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" />
+          </mesh>
+          <mesh position={[0.5, 0, 0]}>
+             <boxGeometry args={[0.15, 0.1, 0.05]} />
+             <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" />
+          </mesh>
+       </group>
        
-       {/* Windshield */}
-       <mesh position={[0, 0.9, 1.11]}>
-          <planeGeometry args={[1.0, 0.5]} />
-          <meshStandardMaterial color="#3b82f6" transparent opacity={0.4} />
+       {/* Rear Bumper Bar */}
+       <mesh position={[0, 0.25, -1.35]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.03, 0.03, 1.4]} />
+          <meshStandardMaterial color="#555" metalness={0.8} />
        </mesh>
-       
-       <mesh position={[0, 0.4, 1.2]} rotation={[0, 0, 0]}>
-          <boxGeometry args={[0.3, 0.1, 0.1]} />
-          <meshStandardMaterial color="white" emissive="white" />
-       </mesh>
+
+       {/* Side Mirrors */}
+       <group position={[0.5, 1.0, 1.1]} rotation={[0, -0.3, 0]}>
+           <mesh position={[0.1, 0, 0]}>
+              <boxGeometry args={[0.05, 0.2, 0.1]} />
+              <meshStandardMaterial color="#111" />
+           </mesh>
+       </group>
+       <group position={[-0.5, 1.0, 1.1]} rotation={[0, 0.3, 0]}>
+           <mesh position={[-0.1, 0, 0]}>
+              <boxGeometry args={[0.05, 0.2, 0.1]} />
+              <meshStandardMaterial color="#111" />
+           </mesh>
+       </group>
+
+       {/* Rider Position */}
+       <group position={[0, 0.5, 0.3]}>
+          <Rider />
+       </group>
     </group>
   );
 };
