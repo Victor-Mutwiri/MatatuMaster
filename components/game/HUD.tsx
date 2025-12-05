@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause } from 'lucide-react';
 import { useGameStore, VEHICLE_SPECS } from '../../store/gameStore';
@@ -175,7 +176,7 @@ export const HUD: React.FC = () => {
             <div className={`backdrop-blur-md px-3 py-2 rounded-lg border shadow-lg flex items-center gap-2 transition-colors ${isOverloaded ? 'bg-red-900/90 border-red-500' : 'bg-slate-900/80 border-slate-700'}`}>
               {isOverloaded ? (<AlertOctagon className="text-white animate-pulse" size={16} />) : (<Users className="text-slate-300" size={16} />)}
               <div className="leading-none">
-                <span className={`block text-[8px] uppercase font-bold mb-0.5 ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>Pax {isOverloaded && '!'}</span>
+                <span className={`block text-[8px] uppercase font-bold mb-0.5 ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>Pass. {isOverloaded && '!'}</span>
                 <span className="font-display text-sm font-bold text-white">{currentPassengers}/{maxPassengers}</span>
               </div>
             </div>

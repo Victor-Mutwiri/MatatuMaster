@@ -1,8 +1,9 @@
 
+
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Button } from '../ui/Button';
-import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle, X, Clock } from 'lucide-react';
+import { Users, UserMinus, UserPlus, ArrowRight, AlertTriangle, X, Clock, Banknote } from 'lucide-react';
 
 export const StageModal: React.FC = () => {
   const { stageData, handleStageAction, currentPassengers, maxPassengers, gameTimeRemaining } = useGameStore();
@@ -19,8 +20,8 @@ export const StageModal: React.FC = () => {
   const overloadCount = Math.max(0, passengersIfOverload - maxPassengers);
   const isOverloadingPossible = overloadCount > 0;
 
-  // Earnings calculation
-  const FARE = 50;
+  // Earnings calculation uses dynamic ticket price
+  const FARE = stageData.ticketPrice;
   const legalEarnings = Math.min(availableSeats, totalWaiting) * FARE;
   const overloadEarnings = totalWaiting * FARE;
 
@@ -44,7 +45,7 @@ export const StageModal: React.FC = () => {
           </div>
           <h3 className="text-xl font-bold text-white mb-2 uppercase">Carry Excess Passengers?</h3>
           <p className="text-slate-400 text-sm mb-6">
-            You are about to exceed your vehicle capacity by <span className="text-red-400 font-bold">{overloadCount} pax</span>.
+            You are about to exceed your vehicle capacity by <span className="text-red-400 font-bold">{overloadCount} people</span>.
             <br/><br/>
             <span className="text-green-400 block">Benefit: Earn KES {overloadEarnings} (Max)</span>
             <span className="text-red-400 block">Risk: High chance of police trouble.</span>
@@ -78,6 +79,13 @@ export const StageModal: React.FC = () => {
              <Clock size={16} />
              <span className="font-mono font-bold">{formatTime(gameTimeRemaining)}</span>
           </div>
+        </div>
+
+        {/* Current Fare Indicator */}
+        <div className="bg-slate-900 border-b border-slate-700 px-4 py-2 flex items-center justify-center gap-2">
+            <Banknote size={16} className="text-green-400" />
+            <span className="text-slate-400 text-xs uppercase font-bold">Current Fare:</span>
+            <span className="text-green-400 font-bold font-mono">KES {stageData.ticketPrice}</span>
         </div>
 
         <div className="p-6 space-y-6">
@@ -140,7 +148,7 @@ export const StageModal: React.FC = () => {
               >
                 <div className="flex justify-between items-center w-full">
                   <span className="text-xs font-bold uppercase flex items-center gap-1">
-                    <AlertTriangle size={14} /> Overload (+{overloadCount})
+                    <AlertTriangle size={14} /> Excess ({overloadCount})
                   </span>
                   <span className="bg-black/20 px-2 py-0.5 rounded text-xs">KES {overloadEarnings}</span>
                 </div>

@@ -5,7 +5,7 @@ import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, Gam
 import { playSfx } from '../utils/audio';
 
 const INITIAL_STATS: PlayerStats = {
-  cash: 500,
+  cash: 0, // Starts at 0 as requested
   reputation: 50,
   time: "08:00 AM",
   energy: 100
@@ -40,22 +40,52 @@ const TANK_CAPACITY = {
 
 // Vehicle Capacities (Legal vs Max Physical Overload)
 const VEHICLE_CAPACITY = {
-  'boda': { legal: 1, max: 3 },
-  'tuktuk': { legal: 3, max: 5 },
+  'boda': { legal: 1, max: 2 },
+  'tuktuk': { legal: 3, max: 4 },
   'personal-car': { legal: 4, max: 5 },
   '14-seater': { legal: 14, max: 18 },
   '32-seater': { legal: 32, max: 40 },
   '52-seater': { legal: 52, max: 70 }
 };
 
-// Vehicle Performance Specs
-export const VEHICLE_SPECS: Record<VehicleType, { maxSpeedKmh: number; timeMultiplier: number }> = {
-  'boda': { maxSpeedKmh: 140, timeMultiplier: 1.0 },
-  'tuktuk': { maxSpeedKmh: 90, timeMultiplier: 1.4 }, // Slower, gets 40% more time
-  'personal-car': { maxSpeedKmh: 190, timeMultiplier: 0.85 }, // Fast, gets less time
-  '14-seater': { maxSpeedKmh: 175, timeMultiplier: 1.0 },
-  '32-seater': { maxSpeedKmh: 130, timeMultiplier: 1.2 },
-  '52-seater': { maxSpeedKmh: 120, timeMultiplier: 1.3 }
+interface VehicleSpec {
+  maxSpeedKmh: number;
+  timeMultiplier: number;
+  fareRange: { min: number; max: number };
+}
+
+// Vehicle Performance & Pricing Specs
+export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
+  'personal-car': { 
+    maxSpeedKmh: 190, 
+    timeMultiplier: 0.85,
+    fareRange: { min: 150, max: 500 } // Premium, Most Expensive
+  },
+  'boda': { 
+    maxSpeedKmh: 140, 
+    timeMultiplier: 1.0,
+    fareRange: { min: 50, max: 150 } // Fast, 2nd most expensive per head
+  },
+  '14-seater': { 
+    maxSpeedKmh: 175, 
+    timeMultiplier: 1.0,
+    fareRange: { min: 20, max: 100 } // Standard Matatu
+  },
+  'tuktuk': { 
+    maxSpeedKmh: 90, 
+    timeMultiplier: 1.4,
+    fareRange: { min: 30, max: 70 } // Short distance helper
+  },
+  '32-seater': { 
+    maxSpeedKmh: 130, 
+    timeMultiplier: 1.2,
+    fareRange: { min: 20, max: 80 } // Cheaper bus
+  },
+  '52-seater': { 
+    maxSpeedKmh: 120, 
+    timeMultiplier: 1.3,
+    fareRange: { min: 20, max: 60 } // Cheapest, mass transit
+  }
 };
 
 interface GameStore extends GameState {
@@ -226,18 +256,36 @@ export const useGameStore = create<GameStore>()(
       },
       
       triggerStage: () => {
-        const { currentPassengers, nextStagePassengerCount } = get();
+        const { currentPassengers, nextStagePassengerCount, vehicleType, distanceTraveled, totalRouteDistance } = get();
         
         const waiting = nextStagePassengerCount; 
         const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
         
+        // --- Dynamic Pricing Calculation ---
+        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
+        const { min, max } = spec.fareRange;
+        
+        // Calculate Distance Remaining ratio (1.0 at start, 0.0 at end)
+        const distanceRemainingRatio = Math.max(0, (totalRouteDistance - distanceTraveled) / totalRouteDistance);
+        
+        // Price interpolates: Closer to destination = Cheaper fare.
+        // E.g. Start of trip (Kiambu) = Max Price. Near end (Muthaiga) = Min Price.
+        let calculatedFare = min + ((max - min) * distanceRemainingRatio);
+        
+        // Round to nearest 10 for realism
+        calculatedFare = Math.ceil(calculatedFare / 10) * 10;
+        
+        // Clamp to ensure it doesn't go below absolute min defined in specs
+        calculatedFare = Math.max(calculatedFare, min);
+
         set({
           currentSpeed: 0,
           activeModal: 'STAGE',
           stageData: {
             name: `Stage ${Math.floor(Math.random() * 100)}`,
             waitingPassengers: waiting,
-            alightingPassengers: alighting
+            alightingPassengers: alighting,
+            ticketPrice: calculatedFare
           }
         });
       },
@@ -249,7 +297,9 @@ export const useGameStore = create<GameStore>()(
         let newPassengerCount = currentPassengers;
         let cashEarned = 0;
         let boarding = 0;
-        const FARE_PER_PAX = 50;
+        
+        // Use the dynamically calculated ticket price
+        const FARE_PER_PAX = stageData.ticketPrice;
 
         // Limits
         const limits = vehicleType ? VEHICLE_CAPACITY[vehicleType] : { legal: 14, max: 18 };
@@ -389,7 +439,7 @@ export const useGameStore = create<GameStore>()(
         }
 
         // Apply Vehicle Multiplier for fairness
-        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : { timeMultiplier: 1.0 };
+        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : { timeMultiplier: 1.0, maxSpeedKmh: 100, fareRange: { min: 20, max: 100 } };
         seconds = Math.ceil(seconds * spec.timeMultiplier);
 
         const totalDist = selectedRoute.distance * 1000;
@@ -433,7 +483,8 @@ export const useGameStore = create<GameStore>()(
           happiness: 100,
           isStereoOn: false,
           timeOfDay,
-          stats: { ...stats, time: gameTime }
+          // Reset Cash to 0 for the start of the trip
+          stats: { ...stats, cash: 0, time: gameTime }
         });
       },
 

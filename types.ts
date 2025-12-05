@@ -40,6 +40,7 @@ export interface StageData {
   name: string;
   waitingPassengers: number;
   alightingPassengers: number;
+  ticketPrice: number; // The calculated fare for this specific stop
 }
 
 export interface PoliceData {

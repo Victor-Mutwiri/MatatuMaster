@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
@@ -197,7 +199,7 @@ export const PlayerSetupScreen: React.FC = () => {
                   </div>
                   
                   <div className="lg:border-t lg:border-white/5 lg:pt-2 lg:mt-2 text-right lg:text-center shrink-0">
-                     <span className="font-mono text-matatu-yellow font-bold text-sm">{v.capacity} PAX</span>
+                     <span className="font-mono text-matatu-yellow font-bold text-sm">{v.capacity} Seats</span>
                   </div>
                 </div>
               );
