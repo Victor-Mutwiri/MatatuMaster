@@ -49,10 +49,22 @@ export const PlayerTuktuk = () => {
        </mesh>
 
        {/* Roof Pillars */}
-       <mesh position={[-0.6, 1.1, 1.2]}> <cylinderGeometry args={[0.03, 0.03, 1.1]} /> <meshStandardMaterial color={rustyMetal} /> </mesh>
-       <mesh position={[0.6, 1.1, 1.2]}> <cylinderGeometry args={[0.03, 0.03, 1.1]} /> <meshStandardMaterial color={rustyMetal} /> </mesh>
-       <mesh position={[-0.4, 1.1, -1.2]}> <cylinderGeometry args={[0.03, 0.03, 1.1]} /> <meshStandardMaterial color={rustyMetal} /> </mesh>
-       <mesh position={[0.4, 1.1, -1.2]}> <cylinderGeometry args={[0.03, 0.03, 1.1]} /> <meshStandardMaterial color={rustyMetal} /> </mesh>
+       <mesh position={[-0.6, 1.1, 1.2]}>
+          <cylinderGeometry args={[0.03, 0.03, 1.1]} />
+          <meshStandardMaterial color={rustyMetal} />
+       </mesh>
+       <mesh position={[0.6, 1.1, 1.2]}>
+          <cylinderGeometry args={[0.03, 0.03, 1.1]} />
+          <meshStandardMaterial color={rustyMetal} />
+       </mesh>
+       <mesh position={[-0.4, 1.1, -1.2]}>
+          <cylinderGeometry args={[0.03, 0.03, 1.1]} />
+          <meshStandardMaterial color={rustyMetal} />
+       </mesh>
+       <mesh position={[0.4, 1.1, -1.2]}>
+          <cylinderGeometry args={[0.03, 0.03, 1.1]} />
+          <meshStandardMaterial color={rustyMetal} />
+       </mesh>
 
        {/* Rear Canvas Flap & Tiny Window */}
        <mesh position={[0, 1.2, 1.25]}>
