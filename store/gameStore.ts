@@ -63,6 +63,9 @@ interface GameStore extends GameState {
 
   // Game Loop Actions
   startGameLoop: () => void;
+  pauseGame: () => void;
+  resumeGame: () => void;
+  setQuitConfirmation: (show: boolean) => void;
   exitToMapSelection: () => void;
   tickTimer: () => void;
   endGame: (reason: GameOverReason) => void;
@@ -418,6 +421,22 @@ export const useGameStore = create<GameStore>()(
           timeOfDay,
           stats: { ...stats, time: gameTime }
         });
+      },
+
+      pauseGame: () => {
+        set({ gameStatus: 'PAUSED' });
+      },
+
+      resumeGame: () => {
+        set({ gameStatus: 'PLAYING' });
+      },
+
+      setQuitConfirmation: (show) => {
+        if (show) {
+          set({ activeModal: 'QUIT_CONFIRM' });
+        } else {
+          set({ activeModal: 'NONE' });
+        }
       },
 
       exitToMapSelection: () => set({

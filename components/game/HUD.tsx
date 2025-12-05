@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 
@@ -55,7 +55,8 @@ export const HUD: React.FC = () => {
     distanceTraveled,
     totalRouteDistance,
     setControl,
-    fuel
+    fuel,
+    pauseGame
   } = useGameStore();
 
   const formatTime = (seconds: number) => {
@@ -83,7 +84,16 @@ export const HUD: React.FC = () => {
       
       {/* Top Bar Area */}
       <div className="flex justify-between items-start gap-2">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 pointer-events-auto">
+            {/* Pause Button */}
+            <button 
+                onClick={pauseGame}
+                className="bg-slate-900/80 backdrop-blur-md border border-slate-600 hover:border-white hover:bg-slate-800 text-white w-10 h-10 rounded-lg shadow-lg flex items-center justify-center transition-all active:scale-95 mb-1 group"
+                title="Pause Game"
+            >
+                <Pause size={20} fill="currentColor" className="group-hover:scale-110 transition-transform"/>
+            </button>
+
             <div className={`backdrop-blur-md border-l-4 px-3 py-2 rounded-r-lg shadow-lg flex items-center gap-3 transition-colors duration-300 min-w-[130px] ${isLowTime ? 'bg-red-900/80 border-red-500 animate-pulse' : 'bg-slate-900/80 border-matatu-yellow'}`}>
             <Clock className={isLowTime ? 'text-red-200' : 'text-white'} size={18} />
             <div className="flex flex-col leading-none">

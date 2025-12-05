@@ -1,13 +1,13 @@
 
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Button } from '../components/ui/Button';
 import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
-import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins } from 'lucide-react';
+import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause } from 'lucide-react';
 
 export const GameLoopScreen: React.FC = () => {
   const { 
@@ -27,8 +27,12 @@ export const GameLoopScreen: React.FC = () => {
     totalPassengersCarried,
     bribesPaid,
     happiness,
-    selectedRoute
+    selectedRoute,
+    resumeGame,
+    setQuitConfirmation
   } = useGameStore();
+
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   // Timer Effect
   useEffect(() => {
@@ -51,6 +55,35 @@ export const GameLoopScreen: React.FC = () => {
       return () => clearTimeout(crashTimer);
     }
   }, [gameStatus, endGame]);
+
+  // Countdown Logic
+  useEffect(() => {
+    if (countdown === null) return;
+
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // Countdown finished
+      setCountdown(null);
+      resumeGame();
+    }
+  }, [countdown, resumeGame]);
+
+  const handleStartResume = () => {
+    setCountdown(3);
+  };
+
+  const handleConfirmQuit = () => {
+    setQuitConfirmation(false);
+    exitToMapSelection();
+  };
+
+  const handleCancelQuit = () => {
+    setQuitConfirmation(false);
+  };
 
   // Scoring Calculation
   const fuelPricePerLiter = 182;
@@ -158,17 +191,67 @@ export const GameLoopScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Pause/Abort Menu Button (Top Right absolute) */}
-      {!isCrashing && activeModal !== 'GAME_OVER' && (
-        <div className="absolute top-4 right-4 z-50">
-          <Button 
-            variant="danger" 
-            size="sm" 
-            onClick={exitToMapSelection}
-            className="bg-red-600/80 backdrop-blur hover:bg-red-600 shadow-lg !p-2 rounded-full"
-          >
-            <X size={20} />
-          </Button>
+      {/* Countdown Overlay */}
+      {countdown !== null && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+           <h1 className="font-display font-black text-9xl text-white animate-pulse drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">
+             {countdown === 0 ? "GO!" : countdown}
+           </h1>
+        </div>
+      )}
+
+      {/* Pause Menu Overlay */}
+      {gameStatus === 'PAUSED' && activeModal === 'NONE' && countdown === null && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-6 animate-fade-in">
+           <div className="flex flex-col items-center max-w-md w-full space-y-8">
+              <div className="flex flex-col items-center">
+                 <div className="w-20 h-20 rounded-full border-4 border-white/20 flex items-center justify-center mb-4">
+                    <Pause size={40} className="text-white" fill="currentColor" />
+                 </div>
+                 <h2 className="font-display font-black text-4xl text-white uppercase tracking-widest">Paused</h2>
+                 <p className="text-slate-400 text-sm uppercase tracking-wide mt-2">Take a breather</p>
+              </div>
+
+              <div className="w-full space-y-4">
+                 <Button variant="primary" fullWidth size="lg" onClick={handleStartResume}>
+                    <span className="flex items-center justify-center gap-3">
+                       <Play size={24} fill="currentColor" /> Resume Shift
+                    </span>
+                 </Button>
+                 <Button variant="danger" fullWidth size="lg" onClick={() => setQuitConfirmation(true)}>
+                    <span className="flex items-center justify-center gap-3">
+                       <LogOut size={24} /> Quit Game
+                    </span>
+                 </Button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Quit Confirmation Modal */}
+      {activeModal === 'QUIT_CONFIRM' && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+           <div className="bg-slate-800 border-2 border-red-500 w-full max-w-sm rounded-xl p-6 text-center shadow-2xl">
+              <div className="flex justify-center mb-4">
+                 <div className="bg-red-500/20 p-4 rounded-full animate-pulse">
+                    <AlertOctagon size={48} className="text-red-500" />
+                 </div>
+              </div>
+              <h3 className="font-display text-2xl font-bold text-white uppercase mb-2">End Shift?</h3>
+              <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                 Are you sure you want to quit? <br/>
+                 <span className="text-red-400 font-bold">All progress for this trip will be lost.</span>
+              </p>
+              
+              <div className="space-y-3">
+                 <Button variant="danger" fullWidth onClick={handleConfirmQuit}>
+                    Yes, Quit Game
+                 </Button>
+                 <Button variant="secondary" fullWidth onClick={handleCancelQuit}>
+                    Cancel
+                 </Button>
+              </div>
+           </div>
         </div>
       )}
 

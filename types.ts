@@ -8,7 +8,7 @@ export type GameStatus = 'IDLE' | 'PLAYING' | 'PAUSED' | 'CRASHING' | 'GAME_OVER
 
 export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | 'ARRESTED' | null;
 
-export type ActiveModal = 'NONE' | 'STAGE' | 'GAME_OVER' | 'POLICE';
+export type ActiveModal = 'NONE' | 'STAGE' | 'GAME_OVER' | 'POLICE' | 'QUIT_CONFIRM';
 
 export interface PlayerStats {
   cash: number;
