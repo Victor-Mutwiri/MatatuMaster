@@ -1,5 +1,7 @@
+
+
 import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 
@@ -47,6 +49,8 @@ export const HUD: React.FC = () => {
     toggleStereo, 
     isSoundOn, 
     toggleSound, 
+    isEngineSoundOn,
+    toggleEngineSound,
     currentSpeed,
     distanceTraveled,
     totalRouteDistance,
@@ -121,6 +125,9 @@ export const HUD: React.FC = () => {
           </div>
 
           <div className="flex gap-2">
+            <button onClick={toggleEngineSound} className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-lg ${isEngineSoundOn ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`} title="Toggle Engine Sound">
+                <Car size={14} />
+            </button>
             <button onClick={toggleSound} className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-lg ${isSoundOn ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`} title="Toggle Sound Effects">
                 {isSoundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
             </button>

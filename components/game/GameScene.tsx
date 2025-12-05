@@ -1,3 +1,5 @@
+
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VehicleType } from '../../types';
@@ -32,7 +34,8 @@ const PhysicsController = () => {
     setCurrentSpeed, 
     updateDistance, 
     activeModal,
-    setControl
+    setControl,
+    isEngineSoundOn
   } = useGameStore();
 
   const engineRef = useRef<EngineSynthesizer | null>(null);
@@ -66,10 +69,19 @@ const PhysicsController = () => {
   // Audio Engine Lifecycle
   useEffect(() => {
     if (gameStatus === 'PLAYING') {
-      const vehicleType = useGameStore.getState().vehicleType || '14-seater';
-      engineRef.current = new EngineSynthesizer();
-      engineRef.current.setVehicleType(vehicleType);
-      engineRef.current.start();
+      if (isEngineSoundOn) {
+        if (!engineRef.current) {
+            const vehicleType = useGameStore.getState().vehicleType || '14-seater';
+            engineRef.current = new EngineSynthesizer();
+            engineRef.current.setVehicleType(vehicleType);
+            engineRef.current.start();
+        }
+      } else {
+        if (engineRef.current) {
+            engineRef.current.stop();
+            engineRef.current = null;
+        }
+      }
     } else {
       engineRef.current?.stop();
       engineRef.current = null;
@@ -77,8 +89,9 @@ const PhysicsController = () => {
 
     return () => {
       engineRef.current?.stop();
+      engineRef.current = null;
     };
-  }, [gameStatus]);
+  }, [gameStatus, isEngineSoundOn]);
 
   useFrame((state, delta) => {
     if (gameStatus !== 'PLAYING' || activeModal !== 'NONE') {

@@ -99,6 +99,7 @@ export interface GameState {
   
   // Settings
   isSoundOn: boolean;
+  isEngineSoundOn: boolean;
   
   // Environment
   timeOfDay: 'DAY' | 'NIGHT';

@@ -1,3 +1,5 @@
+
+
 import { useGameStore } from '../store/gameStore';
 
 // Simple synth audio context singleton
@@ -18,6 +20,7 @@ export class EngineSynthesizer {
   private osc: OscillatorNode | null = null;
   private lfo: OscillatorNode | null = null;
   private gain: GainNode | null = null;
+  private filter: BiquadFilterNode | null = null;
   private noiseNode: AudioBufferSourceNode | null = null;
   private noiseGain: GainNode | null = null;
   private isRunning: boolean = false;
@@ -26,8 +29,8 @@ export class EngineSynthesizer {
   constructor() {}
 
   start() {
-    const { isSoundOn } = useGameStore.getState();
-    if (!isSoundOn || this.isRunning) return;
+    const { isSoundOn, isEngineSoundOn } = useGameStore.getState();
+    if (!isSoundOn || !isEngineSoundOn || this.isRunning) return;
 
     const ctx = getCtx();
     if (!ctx) return;
@@ -38,21 +41,28 @@ export class EngineSynthesizer {
     this.osc = ctx.createOscillator();
     this.lfo = ctx.createOscillator();
     this.gain = ctx.createGain();
+    this.filter = ctx.createBiquadFilter();
 
     this.osc.type = 'sawtooth';
     this.osc.frequency.value = this.baseFreq;
 
     this.lfo.type = 'sine';
-    this.lfo.frequency.value = 15; // Idle rumble speed
+    this.lfo.frequency.value = 10; // Slightly slower idle rumble
 
     // FM Synthesis for growl
     const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 20; // Modulation depth
+    lfoGain.gain.value = 5; // Reduced from 20 to stop "screeching" vibration
     
     this.lfo.connect(lfoGain);
     lfoGain.connect(this.osc.frequency);
     
-    this.osc.connect(this.gain);
+    // Low Pass Filter to smooth out harsh sawtooth edges
+    this.filter.type = 'lowpass';
+    this.filter.frequency.value = 200; // Start muffled (idle)
+
+    this.osc.connect(this.filter);
+    this.filter.connect(this.gain);
+    
     this.osc.start();
     this.lfo.start();
     
@@ -95,7 +105,7 @@ export class EngineSynthesizer {
   }
 
   setSpeed(speed: number) {
-    if (!this.isRunning || !this.osc || !this.lfo || !this.gain || !this.noiseGain) return;
+    if (!this.isRunning || !this.osc || !this.lfo || !this.gain || !this.noiseGain || !this.filter) return;
 
     // Normalize speed (0 - 120)
     const normalized = Math.min(speed, 120) / 120;
@@ -105,11 +115,15 @@ export class EngineSynthesizer {
     const now = ctx.currentTime;
 
     // Pitch rises with speed
-    const targetFreq = this.baseFreq + (normalized * 120);
+    const targetFreq = this.baseFreq + (normalized * 100);
     this.osc.frequency.setTargetAtTime(targetFreq, now, 0.1);
     
+    // Filter opens up (engine roars) - Simulate throttle opening
+    const filterFreq = 200 + (normalized * 2000); 
+    this.filter.frequency.setTargetAtTime(filterFreq, now, 0.1);
+
     // LFO rate increases (faster vibration)
-    const targetLfo = 15 + (normalized * 40);
+    const targetLfo = 10 + (normalized * 30);
     this.lfo.frequency.setTargetAtTime(targetLfo, now, 0.1);
 
     // Road noise volume increases significantly with speed
@@ -134,10 +148,12 @@ export class EngineSynthesizer {
         this.lfo?.disconnect();
         this.noiseNode?.disconnect();
         this.gain?.disconnect();
+        this.filter?.disconnect();
         
         this.osc = null;
         this.lfo = null;
         this.gain = null;
+        this.filter = null;
         this.noiseNode = null;
         this.noiseGain = null;
         this.isRunning = false;

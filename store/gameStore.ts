@@ -65,6 +65,7 @@ interface GameStore extends GameState {
   toggleStereo: () => void;
   reportLaneChange: () => void;
   toggleSound: () => void;
+  toggleEngineSound: () => void;
 }
 
 export const useGameStore = create<GameStore>()(
@@ -109,6 +110,7 @@ export const useGameStore = create<GameStore>()(
       happiness: 100,
       isStereoOn: false,
       isSoundOn: true,
+      isEngineSoundOn: true,
       
       timeOfDay: 'DAY',
 
@@ -509,6 +511,8 @@ export const useGameStore = create<GameStore>()(
       })),
 
       toggleSound: () => set((state) => ({ isSoundOn: !state.isSoundOn })),
+
+      toggleEngineSound: () => set((state) => ({ isEngineSoundOn: !state.isEngineSoundOn })),
     }),
     {
       name: 'matatu-master-storage',
@@ -517,7 +521,8 @@ export const useGameStore = create<GameStore>()(
         playerName: state.playerName,
         saccoName: state.saccoName,
         lifetimeStats: state.lifetimeStats,
-        isSoundOn: state.isSoundOn
+        isSoundOn: state.isSoundOn,
+        isEngineSoundOn: state.isEngineSoundOn
       }),
     }
   )
