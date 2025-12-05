@@ -8,8 +8,8 @@ export const PlayerTuktuk = () => {
   const rustyMetal = "#4b5563";
 
   return (
-    <group position={[0, 0.35, 0]}>
-       {/* 3 Wheel Layout: 1 Front (Forward is -Z), 2 Rear (+Z) */}
+    <group position={[0, 0.35, 0]} rotation={[0, Math.PI, 0]}>
+       {/* 3 Wheel Layout: 1 Front (Forward is now +Z relative to world after rotation), 2 Rear */}
        <Wheel position={[0, 0, -1.3]} radius={0.3} /> 
        <Wheel position={[-0.65, 0, 0.9]} radius={0.3} /> 
        <Wheel position={[0.65, 0, 0.9]} radius={0.3} />
