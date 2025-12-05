@@ -1,5 +1,4 @@
 
-
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats } from '../types';
@@ -546,8 +545,25 @@ export const useGameStore = create<GameStore>()(
         saccoName: state.saccoName,
         lifetimeStats: state.lifetimeStats,
         isSoundOn: state.isSoundOn,
-        isEngineSoundOn: state.isEngineSoundOn
+        isEngineSoundOn: state.isEngineSoundOn,
+        // Added Screen Persistence
+        currentScreen: state.currentScreen,
+        vehicleType: state.vehicleType,
+        selectedRoute: state.selectedRoute,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // If the user refreshes while playing, we reset the active game state
+          // but keep them in the flow (e.g., Map Select) rather than Landing.
+          if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
+            state.currentScreen = 'MAP_SELECT';
+            state.gameStatus = 'IDLE';
+            state.activeModal = 'NONE';
+            state.currentSpeed = 0;
+            state.isCrashing = false;
+          }
+        }
+      }
     }
   )
 );
