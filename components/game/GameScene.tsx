@@ -27,6 +27,200 @@ const CAMERA_POS = new THREE.Vector3(0, 8, 15);
 
 // --- Components ---
 
+const Helmet = ({ color = "#fb923c" }: { color?: string }) => {
+  return (
+    <group>
+      {/* Helmet Shell */}
+      <mesh position={[0, 0.1, 0]}>
+        <sphereGeometry args={[0.22, 16, 16]} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} />
+      </mesh>
+      {/* Visor */}
+      <mesh position={[0, 0.1, 0.15]} rotation={[0.5, 0, 0]}>
+         <boxGeometry args={[0.3, 0.15, 0.1]} />
+         <meshStandardMaterial color="#111" transparent opacity={0.8} />
+      </mesh>
+    </group>
+  );
+};
+
+const Rider = ({ isPassenger = false }: { isPassenger?: boolean }) => {
+  const shirtColor = isPassenger ? "#3b82f6" : "#fb923c"; // Orange for rider (reflector), Blue for passenger
+  
+  return (
+    <group>
+       {/* Body */}
+       <mesh position={[0, 0.6, 0]}>
+         <boxGeometry args={[0.4, 0.5, 0.2]} />
+         <meshStandardMaterial color={shirtColor} emissive={isPassenger ? undefined : "#fb923c"} emissiveIntensity={isPassenger ? 0 : 0.5} />
+       </mesh>
+       {/* Head */}
+       <mesh position={[0, 1.0, 0]}>
+         <sphereGeometry args={[0.15]} />
+         <meshStandardMaterial color="#8d5524" />
+       </mesh>
+       {/* Helmet */}
+       <group position={[0, 1.0, 0]}>
+          <Helmet color={isPassenger ? "#fff" : "#fb923c"} />
+       </group>
+       {/* Legs */}
+       <mesh position={[-0.15, 0.3, 0]} rotation={[-0.2, 0, -0.1]}>
+         <cylinderGeometry args={[0.07, 0.07, 0.5]} />
+         <meshStandardMaterial color="#1f2937" />
+       </mesh>
+       <mesh position={[0.15, 0.3, 0]} rotation={[-0.2, 0, 0.1]}>
+         <cylinderGeometry args={[0.07, 0.07, 0.5]} />
+         <meshStandardMaterial color="#1f2937" />
+       </mesh>
+       {/* Arms (reaching for handles) */}
+       {!isPassenger && (
+         <>
+           <mesh position={[-0.2, 0.7, 0.2]} rotation={[1.5, 0, -0.2]}>
+              <cylinderGeometry args={[0.05, 0.05, 0.4]} />
+              <meshStandardMaterial color={shirtColor} />
+           </mesh>
+           <mesh position={[0.2, 0.7, 0.2]} rotation={[1.5, 0, 0.2]}>
+              <cylinderGeometry args={[0.05, 0.05, 0.4]} />
+              <meshStandardMaterial color={shirtColor} />
+           </mesh>
+         </>
+       )}
+    </group>
+  );
+};
+
+const PlayerBoda = ({ passengerCount }: { passengerCount: number }) => {
+  return (
+    <group position={[0, 0.35, 0]}>
+       {/* Wheels */}
+       <Wheel position={[0, 0, 0.7]} radius={0.35} />
+       <Wheel position={[0, 0, -0.7]} radius={0.35} />
+       
+       {/* Frame */}
+       <mesh position={[0, 0.4, 0]}>
+          <boxGeometry args={[0.15, 0.3, 1.4]} />
+          <meshStandardMaterial color="#ef4444" metalness={0.6} roughness={0.2} />
+       </mesh>
+       
+       {/* Engine Block */}
+       <mesh position={[0, 0.2, 0]}>
+          <boxGeometry args={[0.25, 0.25, 0.3]} />
+          <meshStandardMaterial color="#333" />
+       </mesh>
+       
+       {/* Handlebars */}
+       <mesh position={[0, 0.85, 0.5]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.8]} />
+          <meshStandardMaterial color="#111" />
+       </mesh>
+       
+       {/* Seat */}
+       <mesh position={[0, 0.6, -0.1]}>
+          <boxGeometry args={[0.3, 0.1, 0.8]} />
+          <meshStandardMaterial color="#1e293b" />
+       </mesh>
+       
+       {/* Headlight */}
+       <mesh position={[0, 0.7, 0.75]}>
+          <boxGeometry args={[0.2, 0.2, 0.1]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" />
+       </mesh>
+
+       {/* Rider */}
+       <group position={[0, 0.1, 0.3]}>
+          <Rider />
+       </group>
+
+       {/* Passenger (Render if any) */}
+       {passengerCount > 0 && (
+         <group position={[0, 0.2, -0.3]}>
+            <Rider isPassenger={true} />
+         </group>
+       )}
+    </group>
+  );
+};
+
+const PlayerTuktuk = () => {
+  return (
+    <group position={[0, 0.3, 0]}>
+       {/* Wheels */}
+       <Wheel position={[0, 0, 1.2]} radius={0.3} />
+       <Wheel position={[-0.5, 0, -0.5]} radius={0.3} />
+       <Wheel position={[0.5, 0, -0.5]} radius={0.3} />
+
+       {/* Body */}
+       <mesh position={[0, 0.6, 0.2]}>
+          <boxGeometry args={[1.2, 1.2, 2.0]} />
+          <meshStandardMaterial color="#facc15" />
+       </mesh>
+       
+       {/* Roof */}
+       <mesh position={[0, 1.25, 0.2]}>
+          <boxGeometry args={[1.3, 0.1, 2.1]} />
+          <meshStandardMaterial color="#111" />
+       </mesh>
+
+       {/* Front Window Frame */}
+       <mesh position={[0, 0.9, 1.1]}>
+          <boxGeometry args={[1.1, 0.6, 0.1]} />
+          <meshStandardMaterial color="#facc15" />
+       </mesh>
+       
+       {/* Windshield */}
+       <mesh position={[0, 0.9, 1.11]}>
+          <planeGeometry args={[1.0, 0.5]} />
+          <meshStandardMaterial color="#3b82f6" transparent opacity={0.4} />
+       </mesh>
+       
+       <mesh position={[0, 0.4, 1.2]} rotation={[0, 0, 0]}>
+          <boxGeometry args={[0.3, 0.1, 0.1]} />
+          <meshStandardMaterial color="white" emissive="white" />
+       </mesh>
+    </group>
+  );
+};
+
+const PlayerPersonalCar = () => {
+  return (
+     <group position={[0, 0.3, 0]}>
+       {/* Main Body */}
+       <mesh position={[0, 0.35, 0]}>
+          <boxGeometry args={[1.6, 0.6, 3.4]} />
+          <meshStandardMaterial color="#3b82f6" metalness={0.6} roughness={0.2} />
+       </mesh>
+       {/* Cabin */}
+       <mesh position={[0, 0.8, -0.2]}>
+          <boxGeometry args={[1.4, 0.5, 2.0]} />
+          <meshStandardMaterial color="#1e3a8a" metalness={0.7} roughness={0.2} />
+       </mesh>
+       {/* Wheels */}
+       <Wheel position={[0.7, 0, 1.0]} radius={0.32} />
+       <Wheel position={[-0.7, 0, 1.0]} radius={0.32} />
+       <Wheel position={[0.7, 0, -1.0]} radius={0.32} />
+       <Wheel position={[-0.7, 0, -1.0]} radius={0.32} />
+       
+       {/* Lights */}
+       <mesh position={[0.5, 0.4, 1.7]}>
+         <boxGeometry args={[0.3, 0.15, 0.1]} />
+         <meshStandardMaterial color="white" emissive="white" emissiveIntensity={2} />
+       </mesh>
+       <mesh position={[-0.5, 0.4, 1.7]}>
+         <boxGeometry args={[0.3, 0.15, 0.1]} />
+         <meshStandardMaterial color="white" emissive="white" emissiveIntensity={2} />
+       </mesh>
+       <mesh position={[0.5, 0.4, -1.7]}>
+         <boxGeometry args={[0.3, 0.15, 0.1]} />
+         <meshStandardMaterial color="red" emissive="red" emissiveIntensity={1} />
+       </mesh>
+       <mesh position={[-0.5, 0.4, -1.7]}>
+         <boxGeometry args={[0.3, 0.15, 0.1]} />
+         <meshStandardMaterial color="red" emissive="red" emissiveIntensity={1} />
+       </mesh>
+    </group>
+  );
+};
+
 // Physics Engine Component
 const PhysicsController = () => {
   const { 
@@ -988,6 +1182,7 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
   const timeOfDay = useGameStore(state => state.timeOfDay);
   const gameStatus = useGameStore(state => state.gameStatus);
   const isCrashing = useGameStore(state => state.isCrashing);
+  const currentPassengers = useGameStore(state => state.currentPassengers); // Get passengers for rendering visual overload
   const [lane, setLane] = useState<-1 | 1>(-1); 
   const LERP_SPEED = 8;
   const TILT_ANGLE = 0.1;
@@ -1098,6 +1293,10 @@ const Player = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCa
   return (
     <group ref={meshRef} position={[-LANE_OFFSET, 0, 0]}>
        <group rotation={[0, Math.PI, 0]}>
+         {type === 'boda' && <PlayerBoda passengerCount={currentPassengers} />}
+         {type === 'tuktuk' && <PlayerTuktuk />}
+         {type === 'personal-car' && <PlayerPersonalCar />}
+         
          {type === '14-seater' && <Matatu14Seater />}
          {type === '32-seater' && <Matatu32Seater />}
          {type === '52-seater' && <Matatu52Seater />}

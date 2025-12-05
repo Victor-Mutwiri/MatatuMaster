@@ -101,7 +101,10 @@ export class EngineSynthesizer {
     if (type === '14-seater') this.baseFreq = 70; // High pitched van
     else if (type === '32-seater') this.baseFreq = 50; // Mid rumble
     else if (type === '52-seater') this.baseFreq = 40; // Deep bus diesel
-    else this.baseFreq = 100; // Motorbike
+    else if (type === 'boda') this.baseFreq = 120; // High pitch bike
+    else if (type === 'tuktuk') this.baseFreq = 90; // Putt putt
+    else if (type === 'personal-car') this.baseFreq = 65; // Quietish
+    else this.baseFreq = 100; // Default Motorbike
   }
 
   setSpeed(speed: number) {

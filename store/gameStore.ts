@@ -21,6 +21,9 @@ const INITIAL_LIFETIME: LifetimeStats = {
 
 // Consumption in KM per Liter
 const FUEL_EFFICIENCY = {
+  'boda': 35,
+  'tuktuk': 25,
+  'personal-car': 12,
   '14-seater': 9,
   '32-seater': 7,
   '52-seater': 5
@@ -28,9 +31,22 @@ const FUEL_EFFICIENCY = {
 
 // Assumed Tank Capacities in Liters for gauge calculation
 const TANK_CAPACITY = {
+  'boda': 12,
+  'tuktuk': 10,
+  'personal-car': 45,
   '14-seater': 70,
   '32-seater': 100,
   '52-seater': 150
+};
+
+// Vehicle Capacities (Legal vs Max Physical Overload)
+const VEHICLE_CAPACITY = {
+  'boda': { legal: 1, max: 3 },
+  'tuktuk': { legal: 3, max: 5 },
+  'personal-car': { legal: 4, max: 5 },
+  '14-seater': { legal: 14, max: 18 },
+  '32-seater': { legal: 32, max: 40 },
+  '52-seater': { legal: 52, max: 70 }
 };
 
 interface GameStore extends GameState {
@@ -215,13 +231,17 @@ export const useGameStore = create<GameStore>()(
       },
       
       handleStageAction: (action) => {
-        const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness, totalPassengersCarried } = get();
+        const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness, totalPassengersCarried, vehicleType } = get();
         if (!stageData) return;
 
         let newPassengerCount = currentPassengers;
         let cashEarned = 0;
         let boarding = 0;
         const FARE_PER_PAX = 50;
+
+        // Limits
+        const limits = vehicleType ? VEHICLE_CAPACITY[vehicleType] : { legal: 14, max: 18 };
+        const absoluteMax = limits.max;
 
         // 1. Process Alighting
         newPassengerCount -= stageData.alightingPassengers;
@@ -233,7 +253,9 @@ export const useGameStore = create<GameStore>()(
           boarding = Math.min(availableSeats, stageData.waitingPassengers);
         } 
         else if (action === 'PICKUP_OVERLOAD') {
-          boarding = stageData.waitingPassengers; 
+          // Cap at physical maximum of vehicle
+          const spaceLeft = absoluteMax - newPassengerCount;
+          boarding = Math.min(spaceLeft, stageData.waitingPassengers);
         }
         
         newPassengerCount += boarding;
@@ -356,9 +378,11 @@ export const useGameStore = create<GameStore>()(
 
         const totalDist = selectedRoute.distance * 1000;
         
+        // Set Max Passengers based on legal limit
         let maxPax = 14;
-        if (vehicleType === '32-seater') maxPax = 32;
-        if (vehicleType === '52-seater') maxPax = 52;
+        if (vehicleType) {
+           maxPax = VEHICLE_CAPACITY[vehicleType].legal;
+        }
 
         const isNight = Math.random() > 0.5;
         const timeOfDay = isNight ? 'NIGHT' : 'DAY';

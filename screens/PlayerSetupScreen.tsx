@@ -5,7 +5,7 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore } from '../store/gameStore';
-import { User, Users, Bus, Zap, Shield, TrendingUp, ArrowLeft, CheckCircle2, Settings, AlertTriangle } from 'lucide-react';
+import { User, Users, Bus, Zap, Shield, TrendingUp, ArrowLeft, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart } from 'lucide-react';
 
 export const PlayerSetupScreen: React.FC = () => {
   const { setVehicleType, setScreen, playerName, saccoName } = useGameStore();
@@ -32,12 +32,39 @@ export const PlayerSetupScreen: React.FC = () => {
 
   const vehicleOptions = [
     { 
+      type: 'boda' as VehicleType, 
+      name: 'The Boxer', 
+      capacity: 1, 
+      icon: <Bike size={32} className="text-orange-400" />,
+      desc: 'High risk, high speed. Lane splitting master.',
+      stats: { speed: 95, capacity: 10, cost: 'Low' },
+      color: 'border-orange-500'
+    },
+    { 
+      type: 'tuktuk' as VehicleType, 
+      name: 'Keke Napep', 
+      capacity: 3, 
+      icon: <ShoppingCart size={32} className="text-yellow-400" />,
+      desc: 'Three-wheeled chaos. Slow but steady.',
+      stats: { speed: 45, capacity: 20, cost: 'Low' },
+      color: 'border-yellow-500'
+    },
+    { 
+      type: 'personal-car' as VehicleType, 
+      name: 'Uber ChapChap', 
+      capacity: 4, 
+      icon: <Car size={32} className="text-blue-400" />, 
+      desc: 'Comfortable cruising. High efficiency.',
+      stats: { speed: 85, capacity: 25, cost: 'Med' },
+      color: 'border-blue-500'
+    },
+    { 
       type: '14-seater' as VehicleType, 
       name: 'The Shark', 
       capacity: 14, 
       icon: <Zap size={32} className="text-yellow-400" />,
       desc: 'Speed demon of the streets.',
-      stats: { speed: 90, capacity: 30, cost: 'Low' },
+      stats: { speed: 90, capacity: 45, cost: 'Low' },
       color: 'border-yellow-500'
     },
     { 
@@ -46,7 +73,7 @@ export const PlayerSetupScreen: React.FC = () => {
       capacity: 32, 
       icon: <Shield size={32} className="text-blue-400" />,
       desc: 'Balanced reliability.',
-      stats: { speed: 60, capacity: 60, cost: 'Med' },
+      stats: { speed: 60, capacity: 70, cost: 'Med' },
       color: 'border-blue-500'
     },
     { 
@@ -84,7 +111,7 @@ export const PlayerSetupScreen: React.FC = () => {
                 </div>
              </div>
              
-             {/* Settings Button Moved Here */}
+             {/* Settings Button */}
              <button 
                onClick={goToSettings}
                className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 group"
