@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
-import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats } from '../types';
+import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode } from '../types';
 import { playSfx } from '../utils/audio';
 
 // --- Secure Storage Wrapper (Simple Obfuscation with UTF-8 Support) ---
@@ -79,39 +79,46 @@ interface VehicleSpec {
   maxSpeedKmh: number;
   timeMultiplier: number;
   fareRange: { min: number; max: number };
+  price: number; // Cost to unlock
 }
 
 // Vehicle Performance & Pricing Specs
 export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
-  'personal-car': { 
-    maxSpeedKmh: 190, 
-    timeMultiplier: 0.85,
-    fareRange: { min: 150, max: 500 }
-  },
   'boda': { 
     maxSpeedKmh: 140, 
     timeMultiplier: 1.0,
-    fareRange: { min: 50, max: 150 }
-  },
-  '14-seater': { 
-    maxSpeedKmh: 175, 
-    timeMultiplier: 1.0,
-    fareRange: { min: 20, max: 100 }
+    fareRange: { min: 50, max: 150 },
+    price: 0 // Free
   },
   'tuktuk': { 
     maxSpeedKmh: 90, 
     timeMultiplier: 1.4,
-    fareRange: { min: 30, max: 70 }
+    fareRange: { min: 30, max: 70 },
+    price: 10000
+  },
+  'personal-car': { 
+    maxSpeedKmh: 190, 
+    timeMultiplier: 0.85,
+    fareRange: { min: 150, max: 500 },
+    price: 40000
+  },
+  '14-seater': { 
+    maxSpeedKmh: 175, 
+    timeMultiplier: 1.0,
+    fareRange: { min: 20, max: 100 },
+    price: 120000
   },
   '32-seater': { 
     maxSpeedKmh: 130, 
     timeMultiplier: 1.2,
-    fareRange: { min: 20, max: 80 }
+    fareRange: { min: 20, max: 80 },
+    price: 200000
   },
   '52-seater': { 
     maxSpeedKmh: 120, 
     timeMultiplier: 1.3,
-    fareRange: { min: 20, max: 60 }
+    fareRange: { min: 20, max: 60 },
+    price: 350000
   }
 };
 
@@ -125,6 +132,10 @@ interface GameStore extends GameState {
   updateDistance: (delta: number) => void;
   setCurrentSpeed: (speed: number) => void;
   
+  // Progression
+  registerUser: () => void;
+  unlockVehicle: (type: VehicleType) => void;
+
   // Controls
   setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
 
@@ -157,12 +168,14 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
       currentScreen: 'LANDING',
+      userMode: 'GUEST',
       stats: INITIAL_STATS,
       bankBalance: 0,
       selectedRoute: null,
       playerName: '',
       saccoName: '',
       vehicleType: null,
+      unlockedVehicles: ['boda'],
       currentSpeed: 0,
       distanceTraveled: 0,
       totalRouteDistance: 0,
@@ -209,6 +222,21 @@ export const useGameStore = create<GameStore>()(
       selectRoute: (route) => set({ selectedRoute: route }),
 
       setCurrentSpeed: (speed) => set({ currentSpeed: speed }),
+
+      registerUser: () => set({ userMode: 'REGISTERED' }),
+
+      unlockVehicle: (type) => {
+        const { bankBalance, unlockedVehicles } = get();
+        const price = VEHICLE_SPECS[type].price;
+        
+        if (bankBalance >= price && !unlockedVehicles.includes(type)) {
+          playSfx('COIN');
+          set({
+            bankBalance: bankBalance - price,
+            unlockedVehicles: [...unlockedVehicles, type]
+          });
+        }
+      },
 
       setControl: (control, active) => {
         if (control === 'GAS') set({ isAccelerating: active });
@@ -456,7 +484,7 @@ export const useGameStore = create<GameStore>()(
         }
 
         // Apply Vehicle Time Multiplier (Slower vehicles get more time)
-        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : { timeMultiplier: 1.0, maxSpeedKmh: 100, fareRange: { min: 20, max: 100 } };
+        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
         seconds = Math.ceil(seconds * spec.timeMultiplier);
 
         const totalDist = selectedRoute.distance * 1000;
@@ -596,9 +624,9 @@ export const useGameStore = create<GameStore>()(
           totalTripsCompleted: state.lifetimeStats.totalTripsCompleted + (reason === 'COMPLETED' ? 1 : 0)
         };
 
-        // Bank the money if successful completion
+        // Bank the money if successful completion AND REGISTERED
         let newBankBalance = state.bankBalance;
-        if (reason === 'COMPLETED') {
+        if (reason === 'COMPLETED' && state.userMode === 'REGISTERED') {
             newBankBalance += profit;
         }
 
@@ -642,6 +670,8 @@ export const useGameStore = create<GameStore>()(
       resetCareer: () => set({
         lifetimeStats: INITIAL_LIFETIME,
         bankBalance: 0, // Reset Wealth
+        userMode: 'GUEST',
+        unlockedVehicles: ['boda'],
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
@@ -672,6 +702,8 @@ export const useGameStore = create<GameStore>()(
       partialize: (state) => ({
         playerName: state.playerName,
         saccoName: state.saccoName,
+        userMode: state.userMode,
+        unlockedVehicles: state.unlockedVehicles,
         lifetimeStats: state.lifetimeStats,
         bankBalance: state.bankBalance, // Persist Bank Balance
         isSoundOn: state.isSoundOn,
@@ -682,8 +714,15 @@ export const useGameStore = create<GameStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         // Hydration callback
-        // Check if we need to sync audio settings to the audio util singleton immediately
         if (state) {
+            // Ensure backwards compatibility or missing fields init
+            if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {
+              state.unlockedVehicles = ['boda'];
+            }
+            if (!state.userMode) {
+              state.userMode = 'GUEST';
+            }
+
             // Also ensure we aren't stuck in a weird game state
             if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
                 state.currentScreen = 'MAP_SELECT';

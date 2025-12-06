@@ -1,19 +1,19 @@
 
-
 import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
-import { useGameStore } from '../store/gameStore';
-import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft, Wallet } from 'lucide-react';
+import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
+import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft, Wallet, Lock, UserPlus } from 'lucide-react';
 
 export const PlayerSetupScreen: React.FC = () => {
-  const { setVehicleType, setScreen, playerName, saccoName, bankBalance } = useGameStore();
+  const { setVehicleType, setScreen, playerName, saccoName, bankBalance, userMode, unlockedVehicles, unlockVehicle, registerUser } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
 
   const isProfileValid = playerName.trim().length > 0 && saccoName.trim().length > 0;
-  const isFormValid = isProfileValid && selectedVehicle !== null;
+  // Valid if profile is set AND vehicle selected AND vehicle is unlocked
+  const isFormValid = isProfileValid && selectedVehicle !== null && unlockedVehicles.includes(selectedVehicle);
 
   const handleContinue = () => {
     if (isFormValid) {
@@ -28,6 +28,14 @@ export const PlayerSetupScreen: React.FC = () => {
 
   const goToSettings = () => {
     setScreen('SETTINGS');
+  };
+
+  const handleUnlockAttempt = (type: VehicleType) => {
+    if (userMode === 'GUEST') {
+      alert("You must Register an Account to buy vehicles!");
+      return;
+    }
+    unlockVehicle(type);
   };
 
   const vehicleOptions = [
@@ -120,10 +128,18 @@ export const PlayerSetupScreen: React.FC = () => {
           <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-xl p-4 shadow-xl space-y-4">
              {isProfileValid ? (
                <div className="space-y-3">
-                  <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Driver</label>
-                    <div className="text-white font-display text-lg font-bold truncate">{playerName}</div>
+                  <div className="flex justify-between items-start">
+                     <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 flex-1 mr-2">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Driver</label>
+                       <div className="text-white font-display text-lg font-bold truncate">{playerName}</div>
+                     </div>
+                     <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 w-16 flex items-center justify-center">
+                        <span className={`text-2xl font-bold ${userMode === 'REGISTERED' ? 'text-green-500' : 'text-slate-500'}`}>
+                           {userMode === 'REGISTERED' ? '✓' : '?'}
+                        </span>
+                     </div>
                   </div>
+                  
                   <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">SACCO</label>
                     <div className="text-matatu-yellow font-display text-lg font-bold truncate">{saccoName}</div>
@@ -138,7 +154,27 @@ export const PlayerSetupScreen: React.FC = () => {
                      <div className="text-white font-mono text-xl font-bold truncate">
                         KES {bankBalance.toLocaleString()}
                      </div>
+                     {userMode === 'GUEST' && (
+                        <div className="text-[10px] text-red-400 mt-1 font-bold">
+                           * Not saving to cloud (Guest)
+                        </div>
+                     )}
                   </div>
+                  
+                  {/* Register Button for Guests */}
+                  {userMode === 'GUEST' && (
+                     <Button 
+                        variant="primary" 
+                        fullWidth 
+                        size="sm" 
+                        onClick={registerUser}
+                        className="animate-pulse"
+                     >
+                        <span className="flex items-center justify-center gap-2">
+                           <UserPlus size={16} /> Register Account
+                        </span>
+                     </Button>
+                  )}
 
                </div>
              ) : (
@@ -154,7 +190,7 @@ export const PlayerSetupScreen: React.FC = () => {
              )}
           </div>
           
-          {/* Desktop Button */}
+          {/* Desktop Start Button */}
           <div className="hidden lg:block mt-6">
              <Button 
                 size="lg" 
@@ -179,39 +215,89 @@ export const PlayerSetupScreen: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
             {vehicleOptions.map((v) => {
               const isSelected = selectedVehicle === v.type;
+              const isUnlocked = unlockedVehicles.includes(v.type);
+              const price = VEHICLE_SPECS[v.type].price;
+              const canAfford = bankBalance >= price;
+
               return (
                 <div 
                   key={v.type}
                   onClick={() => setSelectedVehicle(v.type)}
                   className={`
-                    relative cursor-pointer rounded-xl border-2 transition-all duration-200 overflow-hidden flex flex-row lg:flex-col items-center lg:items-stretch p-3 gap-4 lg:gap-2
+                    relative cursor-pointer rounded-xl border-2 transition-all duration-200 overflow-hidden flex flex-col p-3 gap-2 group
                     ${isSelected 
                       ? `bg-slate-800 ${v.color} shadow-lg ring-1 ring-white/10` 
                       : 'bg-slate-900/40 border-slate-800 hover:bg-slate-800'
                     }
+                    ${!isUnlocked && !isSelected ? 'opacity-70 grayscale hover:grayscale-0' : ''}
                   `}
                 >
-                  {isSelected && (
-                    <div className="absolute top-2 right-2 lg:top-2 lg:right-2">
-                      <CheckCircle2 size={16} className="text-green-500" />
-                    </div>
-                  )}
+                  {/* Status Badges */}
+                  <div className="flex justify-between items-start">
+                     {isUnlocked ? (
+                        isSelected && (
+                           <div className="bg-green-500/20 text-green-400 p-1 rounded-full">
+                              <CheckCircle2 size={16} />
+                           </div>
+                        )
+                     ) : (
+                        <div className="bg-slate-900/80 p-1.5 rounded-md flex items-center gap-1 text-slate-400 border border-slate-700">
+                           <Lock size={12} />
+                           <span className="text-[10px] font-bold uppercase">Locked</span>
+                        </div>
+                     )}
+                     <div className="text-right ml-auto">
+                        <span className="font-mono text-matatu-yellow font-bold text-xs bg-black/20 px-2 py-0.5 rounded">
+                           {v.capacity} Seats
+                        </span>
+                     </div>
+                  </div>
 
-                  <div className={`
-                    w-12 h-12 rounded-full flex items-center justify-center border bg-slate-900/50 shrink-0
-                    ${isSelected ? 'border-white/20' : 'border-slate-700'}
-                  `}>
-                    {v.icon}
+                  {/* Icon & Details */}
+                  <div className="flex items-center gap-3 mt-1">
+                     <div className={`
+                        w-12 h-12 rounded-full flex items-center justify-center border bg-slate-900/50 shrink-0
+                        ${isSelected ? 'border-white/20' : 'border-slate-700'}
+                     `}>
+                        {v.icon}
+                     </div>
+                     <div className="min-w-0">
+                        <h4 className="font-display font-bold text-base text-white truncate">{v.name}</h4>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{v.type}</p>
+                     </div>
                   </div>
                   
-                  <div className="flex-1 min-w-0 lg:text-center">
-                    <h4 className="font-display font-bold text-base text-white truncate">{v.name}</h4>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">{v.type}</p>
-                    <p className="text-xs text-slate-300 mt-1 lg:line-clamp-2">{v.desc}</p>
-                  </div>
+                  <p className="text-xs text-slate-300 line-clamp-2 min-h-[2.5em]">{v.desc}</p>
                   
-                  <div className="lg:border-t lg:border-white/5 lg:pt-2 lg:mt-2 text-right lg:text-center shrink-0">
-                     <span className="font-mono text-matatu-yellow font-bold text-sm">{v.capacity} Seats</span>
+                  {/* Footer Action */}
+                  <div className="mt-auto pt-2 border-t border-white/5">
+                     {isUnlocked ? (
+                        <div className="text-xs text-green-400 font-bold uppercase flex items-center gap-1">
+                           <CheckCircle2 size={12} /> Owned
+                        </div>
+                     ) : (
+                        <div className="flex flex-col gap-2">
+                           <div className="flex justify-between items-center text-xs">
+                              <span className="text-slate-500">Price</span>
+                              <span className="text-white font-bold font-mono">KES {price.toLocaleString()}</span>
+                           </div>
+                           
+                           {isSelected && (
+                              <Button 
+                                 size="sm" 
+                                 fullWidth 
+                                 variant={userMode === 'GUEST' ? 'secondary' : canAfford ? 'primary' : 'outline'}
+                                 disabled={userMode !== 'GUEST' && !canAfford}
+                                 onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnlockAttempt(v.type);
+                                 }}
+                              >
+                                 {userMode === 'GUEST' ? 'Login to Buy' : canAfford ? 'Buy Vehicle' : 'Insufficient Funds'}
+                              </Button>
+                           )}
+                        </div>
+                     )}
                   </div>
                 </div>
               );

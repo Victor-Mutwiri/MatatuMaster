@@ -4,6 +4,8 @@ export type ScreenName = 'LANDING' | 'SETUP' | 'MAP_SELECT' | 'DASHBOARD' | 'GAM
 
 export type VehicleType = 'boda' | 'tuktuk' | 'personal-car' | '14-seater' | '32-seater' | '52-seater';
 
+export type UserMode = 'GUEST' | 'REGISTERED';
+
 export type GameStatus = 'IDLE' | 'PLAYING' | 'PAUSED' | 'CRASHING' | 'GAME_OVER';
 
 export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | 'ARRESTED' | null;
@@ -51,12 +53,14 @@ export interface PoliceData {
 
 export interface GameState {
   currentScreen: ScreenName;
+  userMode: UserMode; // Guest or Registered
   bankBalance: number; // Persistent accumulated wealth
   stats: PlayerStats;
   selectedRoute: Route | null;
   playerName: string;
   saccoName: string;
   vehicleType: VehicleType | null;
+  unlockedVehicles: VehicleType[]; // List of owned vehicles
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
   totalRouteDistance: number; // Total length of route in Game units
@@ -139,6 +143,43 @@ declare global {
       meshBasicMaterial: any;
 
       // Catch-all to prevent other R3F errors
+      [elemName: string]: any;
+    }
+  }
+}
+
+// Augmentation for 'react' module specifically to ensure it overrides module types
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      // Core
+      group: any;
+      mesh: any;
+      primitive: any;
+      
+      // Lights
+      ambientLight: any;
+      pointLight: any;
+      directionalLight: any;
+      spotLight: any;
+      
+      // Cameras / Effects
+      fog: any;
+      
+      // Geometries
+      boxGeometry: any;
+      planeGeometry: any;
+      sphereGeometry: any;
+      cylinderGeometry: any;
+      circleGeometry: any;
+      coneGeometry: any;
+      dodecahedronGeometry: any;
+      
+      // Materials
+      meshStandardMaterial: any;
+      meshBasicMaterial: any;
+
+      // Catch-all
       [elemName: string]: any;
     }
   }
