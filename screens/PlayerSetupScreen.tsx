@@ -4,12 +4,14 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft, Wallet, Lock, UserPlus } from 'lucide-react';
+import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft, Wallet, Lock, UserPlus, Eye } from 'lucide-react';
+import { VehicleShowroomModal } from '../components/game/VehicleShowroomModal';
 
 export const PlayerSetupScreen: React.FC = () => {
   const { setVehicleType, setScreen, playerName, saccoName, bankBalance, userMode, unlockedVehicles, unlockVehicle, registerUser } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
+  const [previewVehicle, setPreviewVehicle] = useState<VehicleType | null>(null);
 
   const isProfileValid = playerName.trim().length > 0 && saccoName.trim().length > 0;
   // Valid if profile is set AND vehicle selected AND vehicle is unlocked
@@ -97,6 +99,13 @@ export const PlayerSetupScreen: React.FC = () => {
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
+      {previewVehicle && (
+        <VehicleShowroomModal 
+          vehicleType={previewVehicle} 
+          onClose={() => setPreviewVehicle(null)} 
+        />
+      )}
+
       <div className="flex flex-col lg:flex-row h-full w-full max-w-7xl mx-auto md:p-6 lg:gap-8 relative">
         
         {/* --- LEFT PANEL: ID / PROFILE --- */}
@@ -235,22 +244,36 @@ export const PlayerSetupScreen: React.FC = () => {
                   {/* Status Badges */}
                   <div className="flex justify-between items-start">
                      {isUnlocked ? (
-                        isSelected && (
-                           <div className="bg-green-500/20 text-green-400 p-1 rounded-full">
-                              <CheckCircle2 size={16} />
-                           </div>
-                        )
+                        <div className="flex gap-2 w-full justify-between">
+                            {isSelected && (
+                                <div className="bg-green-500/20 text-green-400 p-1 rounded-full">
+                                    <CheckCircle2 size={16} />
+                                </div>
+                            )}
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewVehicle(v.type);
+                                }}
+                                className="ml-auto p-1.5 bg-slate-900/80 rounded-full text-slate-300 hover:text-white hover:bg-blue-600 transition-all z-10 border border-slate-700"
+                                title="Preview Vehicle"
+                            >
+                                <Eye size={14} />
+                            </button>
+                        </div>
                      ) : (
                         <div className="bg-slate-900/80 p-1.5 rounded-md flex items-center gap-1 text-slate-400 border border-slate-700">
                            <Lock size={12} />
                            <span className="text-[10px] font-bold uppercase">Locked</span>
                         </div>
                      )}
-                     <div className="text-right ml-auto">
-                        <span className="font-mono text-matatu-yellow font-bold text-xs bg-black/20 px-2 py-0.5 rounded">
-                           {v.capacity} Seats
-                        </span>
-                     </div>
+                     {!isUnlocked && (
+                         <div className="text-right ml-auto">
+                            <span className="font-mono text-matatu-yellow font-bold text-xs bg-black/20 px-2 py-0.5 rounded">
+                                {v.capacity} Seats
+                            </span>
+                         </div>
+                     )}
                   </div>
 
                   {/* Icon & Details */}
