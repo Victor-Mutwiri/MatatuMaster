@@ -1,7 +1,6 @@
 
-
-import React from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause, Maximize, Minimize } from 'lucide-react';
 import { useGameStore, VEHICLE_SPECS } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 
@@ -60,6 +59,29 @@ export const HUD: React.FC = () => {
     vehicleType
   } = useGameStore();
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -89,14 +111,30 @@ export const HUD: React.FC = () => {
       {/* Top Bar Area */}
       <div className="flex justify-between items-start gap-2">
         <div className="flex flex-col gap-2 pointer-events-auto">
-            {/* Pause Button */}
-            <button 
-                onClick={pauseGame}
-                className="bg-slate-900/80 backdrop-blur-md border border-slate-600 hover:border-white hover:bg-slate-800 text-white w-10 h-10 rounded-lg shadow-lg flex items-center justify-center transition-all active:scale-95 mb-1 group"
-                title="Pause Game"
-            >
-                <Pause size={20} fill="currentColor" className="group-hover:scale-110 transition-transform"/>
-            </button>
+            {/* Control Buttons Group */}
+            <div className="flex items-center gap-2 mb-1">
+                {/* Pause Button */}
+                <button 
+                    onClick={pauseGame}
+                    className="bg-slate-900/80 backdrop-blur-md border border-slate-600 hover:border-white hover:bg-slate-800 text-white w-10 h-10 rounded-lg shadow-lg flex items-center justify-center transition-all active:scale-95 group"
+                    title="Pause Game"
+                >
+                    <Pause size={20} fill="currentColor" className="group-hover:scale-110 transition-transform"/>
+                </button>
+
+                {/* Fullscreen Button */}
+                <button 
+                    onClick={toggleFullscreen}
+                    className="bg-slate-900/80 backdrop-blur-md border border-slate-600 hover:border-matatu-yellow hover:text-matatu-yellow hover:bg-slate-800 text-slate-300 w-10 h-10 rounded-lg shadow-lg flex items-center justify-center transition-all active:scale-95 group"
+                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                    {isFullscreen ? (
+                        <Minimize size={20} className="group-hover:scale-110 transition-transform"/>
+                    ) : (
+                        <Maximize size={20} className="group-hover:scale-110 transition-transform"/>
+                    )}
+                </button>
+            </div>
 
             <div className={`backdrop-blur-md border-l-4 px-3 py-2 rounded-r-lg shadow-lg flex items-center gap-3 transition-colors duration-300 min-w-[130px] ${isLowTime ? 'bg-red-900/80 border-red-500 animate-pulse' : 'bg-slate-900/80 border-matatu-yellow'}`}>
             <Clock className={isLowTime ? 'text-red-200' : 'text-white'} size={18} />

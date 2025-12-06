@@ -11,15 +11,6 @@ import { NairobiMap } from './maps/NairobiMap';
 import { PlayerController } from './PlayerController';
 import { OncomingTraffic } from './logic/TrafficSystem';
 
-// Fix for TypeScript not recognizing React Three Fiber intrinsic elements and standard HTML elements
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      [elemName: string]: any;
-    }
-  }
-}
-
 interface GameSceneProps {
   vehicleType: VehicleType | null;
 }

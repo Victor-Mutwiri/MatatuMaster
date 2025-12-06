@@ -1,5 +1,6 @@
 
 
+
 export type ScreenName = 'LANDING' | 'SETUP' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD' | 'SETTINGS';
 
 export type VehicleType = 'boda' | 'tuktuk' | 'personal-car' | '14-seater' | '32-seater' | '52-seater';
@@ -105,4 +106,13 @@ export interface GameState {
   
   // Environment
   timeOfDay: 'DAY' | 'NIGHT';
+}
+
+// Global augmentation for React Three Fiber elements to prevent TS errors
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
 }
