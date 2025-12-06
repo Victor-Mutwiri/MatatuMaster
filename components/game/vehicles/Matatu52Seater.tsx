@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Wheel, Bumper, LicensePlate } from './VehicleParts';
+import { Wheel, Bumper, LicensePlate, VehicleHeadlight } from './VehicleParts';
 
 export const Matatu52Seater = () => {
   const bodyColor = "#b91c1c"; // Hot Rod Red
@@ -111,14 +112,8 @@ export const Matatu52Seater = () => {
        <Wheel position={[-0.95, -0.15, -3.4]} radius={0.45} />
 
        {/* Headlights (Vertical Bus Style) */}
-       <mesh position={[0.85, 0.4, 4.26]}>
-         <boxGeometry args={[0.2, 0.5, 0.1]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
-       <mesh position={[-0.85, 0.4, 4.26]}>
-         <boxGeometry args={[0.2, 0.5, 0.1]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
+       <VehicleHeadlight position={[0.85, 0.4, 4.26]} />
+       <VehicleHeadlight position={[-0.85, 0.4, 4.26]} />
 
        {/* Top Marker Lights */}
        <mesh position={[0.6, 1.9, 4.7]}>

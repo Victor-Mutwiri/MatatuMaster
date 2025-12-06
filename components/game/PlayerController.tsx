@@ -135,13 +135,6 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
          {type === '14-seater' && <Matatu14Seater />}
          {type === '32-seater' && <Matatu32Seater />}
          {type === '52-seater' && <Matatu52Seater />}
-         
-         {timeOfDay === 'NIGHT' && (
-            <>
-              <spotLight position={[0.6, 0.5, 2.2]} angle={0.5} penumbra={0.5} intensity={5} color="#fff" target-position={[0.6, 0, 10]} />
-              <spotLight position={[-0.6, 0.5, 2.2]} angle={0.5} penumbra={0.5} intensity={5} color="#fff" target-position={[-0.6, 0, 10]} />
-            </>
-         )}
        </group>
     </group>
   );

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wheel } from './VehicleParts';
+import { Wheel, VehicleHeadlight } from './VehicleParts';
 
 export const PlayerPersonalCar = () => {
   return (
@@ -18,14 +18,11 @@ export const PlayerPersonalCar = () => {
        <Wheel position={[0.7, 0, -1.0]} radius={0.32} />
        <Wheel position={[-0.7, 0, -1.0]} radius={0.32} />
        
-       <mesh position={[0.5, 0.4, 1.7]}>
-         <boxGeometry args={[0.3, 0.15, 0.1]} />
-         <meshStandardMaterial color="white" emissive="white" emissiveIntensity={2} />
-       </mesh>
-       <mesh position={[-0.5, 0.4, 1.7]}>
-         <boxGeometry args={[0.3, 0.15, 0.1]} />
-         <meshStandardMaterial color="white" emissive="white" emissiveIntensity={2} />
-       </mesh>
+       {/* Headlights */}
+       <VehicleHeadlight position={[0.5, 0.4, 1.71]} />
+       <VehicleHeadlight position={[-0.5, 0.4, 1.71]} />
+
+       {/* Tail Lights */}
        <mesh position={[0.5, 0.4, -1.7]}>
          <boxGeometry args={[0.3, 0.15, 0.1]} />
          <meshStandardMaterial color="red" emissive="red" emissiveIntensity={1} />

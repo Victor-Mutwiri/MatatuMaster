@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wheel, Rider } from './VehicleParts';
+import { Wheel, Rider, VehicleHeadlight } from './VehicleParts';
 
 export const PlayerBoda = ({ passengerCount }: { passengerCount: number }) => {
   return (
@@ -20,6 +20,9 @@ export const PlayerBoda = ({ passengerCount }: { passengerCount: number }) => {
           <cylinderGeometry args={[0.02, 0.02, 0.8]} />
           <meshStandardMaterial color="#111" />
        </mesh>
+
+       {/* Headlight */}
+       <VehicleHeadlight position={[0, 0.7, 0.7]} />
 
        <group position={[0, 0.1, 0.3]}>
           <Rider />

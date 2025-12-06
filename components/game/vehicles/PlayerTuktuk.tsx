@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wheel, LicensePlate, Rider } from './VehicleParts';
+import { Wheel, LicensePlate, Rider, VehicleHeadlight } from './VehicleParts';
 
 export const PlayerTuktuk = () => {
   const rusticYellow = "#eab308";
@@ -89,11 +89,8 @@ export const PlayerTuktuk = () => {
        {/* Number Plate (Rear) */}
        <LicensePlate position={[0, 0.4, 1.31]} isRear />
 
-       {/* Headlight */}
-       <mesh position={[0, 0.6, -1.31]} rotation={[Math.PI/2, 0, 0]}>
-         <cylinderGeometry args={[0.15, 0.1, 0.1, 16]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
+       {/* Headlight - Tuktuk faces -Z locally, so reverse headlight */}
+       <VehicleHeadlight position={[0, 0.6, -1.31]} isReversed />
 
        {/* Driver (Hidden mostly) */}
        <group position={[0, 0.4, -0.6]}>

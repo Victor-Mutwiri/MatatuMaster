@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wheel, Bumper, LicensePlate, SideMirror } from './VehicleParts';
+import { Wheel, Bumper, LicensePlate, SideMirror, VehicleHeadlight } from './VehicleParts';
 
 export const Matatu14Seater = () => {
   const bodyColor = "#1e40af"; // Cobalt Blue
@@ -143,14 +143,8 @@ export const Matatu14Seater = () => {
 
        {/* --- LIGHTS --- */}
        {/* Headlights */}
-       <mesh position={[0.6, 0.4, 2.12]}>
-         <boxGeometry args={[0.3, 0.15, 0.05]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
-       <mesh position={[-0.6, 0.4, 2.12]}>
-         <boxGeometry args={[0.3, 0.15, 0.05]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
+       <VehicleHeadlight position={[0.6, 0.4, 2.12]} />
+       <VehicleHeadlight position={[-0.6, 0.4, 2.12]} />
        
        {/* Fog Lights (Neon) */}
        <mesh position={[0.5, 0.05, 2.12]}>

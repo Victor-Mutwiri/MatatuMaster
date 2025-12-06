@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
@@ -117,5 +117,31 @@ export const GraffitiStrip = ({ position, width, length, color }: { position: [n
       <planeGeometry args={[length, width]} />
       <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} />
     </mesh>
+  );
+};
+
+export const VehicleHeadlight = ({ position, isReversed = false }: { position: [number, number, number], isReversed?: boolean }) => {
+  const timeOfDay = useGameStore(state => state.timeOfDay);
+  const isNight = timeOfDay === 'NIGHT';
+
+  return (
+    <group position={position}>
+       {/* Physical Lamp Mesh only - No projection */}
+       <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.12, 0.12, 0.05, 16]} />
+          <meshStandardMaterial 
+            color="#e2e8f0" 
+            emissive={isNight ? "#ffffff" : "#000000"} 
+            emissiveIntensity={isNight ? 0.5 : 0} 
+          />
+       </mesh>
+       {/* Small glow sprite to make it look 'on' but not projecting */}
+       {isNight && (
+          <mesh position={[0, 0, isReversed ? -0.06 : 0.06]} rotation={[isReversed ? Math.PI : 0, 0, 0]}>
+             <circleGeometry args={[0.1, 8]} />
+             <meshBasicMaterial color="#ffffff" transparent opacity={0.6} />
+          </mesh>
+       )}
+    </group>
   );
 };

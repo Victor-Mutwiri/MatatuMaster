@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wheel, Bumper, LicensePlate } from './VehicleParts';
+import { Wheel, Bumper, LicensePlate, VehicleHeadlight } from './VehicleParts';
 
 export const Matatu32Seater = () => {
   const bodyColor = "#7e22ce"; // Electric Purple
@@ -107,14 +107,9 @@ export const Matatu32Seater = () => {
        <Wheel position={[-0.85, 0, -1.8]} radius={0.4} />
 
        {/* Lights */}
-       <mesh position={[0.7, 0.4, 2.91]}>
-         <boxGeometry args={[0.3, 0.2, 0.1]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
-       <mesh position={[-0.7, 0.4, 2.91]}>
-         <boxGeometry args={[0.3, 0.2, 0.1]} />
-         <meshStandardMaterial color="#fff" emissive="#fff" emissiveIntensity={2} />
-       </mesh>
+       <VehicleHeadlight position={[0.7, 0.4, 2.91]} />
+       <VehicleHeadlight position={[-0.7, 0.4, 2.91]} />
+
        <mesh position={[0, 1.6, 2.3]}>
          <boxGeometry args={[0.8, 0.1, 0.1]} />
          <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={2} />
