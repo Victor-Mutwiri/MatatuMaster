@@ -51,6 +51,7 @@ export interface PoliceData {
 
 export interface GameState {
   currentScreen: ScreenName;
+  bankBalance: number; // Persistent accumulated wealth
   stats: PlayerStats;
   selectedRoute: Route | null;
   playerName: string;

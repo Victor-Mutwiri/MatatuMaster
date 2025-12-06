@@ -1,11 +1,38 @@
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats } from '../types';
 import { playSfx } from '../utils/audio';
 
+// --- Secure Storage Wrapper (Simple Obfuscation with UTF-8 Support) ---
+const secureStorage: StateStorage = {
+  getItem: (name: string): string | null => {
+    const value = localStorage.getItem(name);
+    if (!value) return null;
+    try {
+      // Decode Base64 with UTF-8 handling
+      return decodeURIComponent(escape(atob(value)));
+    } catch (e) {
+      console.error("Failed to decode save data. It may be corrupted or format changed.", e);
+      return null;
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    try {
+      // Encode Base64 with UTF-8 handling (Fixes crash on "→" or emojis)
+      const encoded = btoa(unescape(encodeURIComponent(value)));
+      localStorage.setItem(name, encoded);
+    } catch (e) {
+      console.error("Failed to save data to local storage", e);
+    }
+  },
+  removeItem: (name: string): void => {
+    localStorage.removeItem(name);
+  },
+};
+
 const INITIAL_STATS: PlayerStats = {
-  cash: 0, // Starts at 0 as requested
+  cash: 0, // Session cash starts at 0
   reputation: 50,
   time: "08:00 AM",
   energy: 100
@@ -59,32 +86,32 @@ export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
   'personal-car': { 
     maxSpeedKmh: 190, 
     timeMultiplier: 0.85,
-    fareRange: { min: 150, max: 500 } // Premium, Most Expensive
+    fareRange: { min: 150, max: 500 }
   },
   'boda': { 
     maxSpeedKmh: 140, 
     timeMultiplier: 1.0,
-    fareRange: { min: 50, max: 150 } // Fast, 2nd most expensive per head
+    fareRange: { min: 50, max: 150 }
   },
   '14-seater': { 
     maxSpeedKmh: 175, 
     timeMultiplier: 1.0,
-    fareRange: { min: 20, max: 100 } // Standard Matatu
+    fareRange: { min: 20, max: 100 }
   },
   'tuktuk': { 
     maxSpeedKmh: 90, 
     timeMultiplier: 1.4,
-    fareRange: { min: 30, max: 70 } // Short distance helper
+    fareRange: { min: 30, max: 70 }
   },
   '32-seater': { 
     maxSpeedKmh: 130, 
     timeMultiplier: 1.2,
-    fareRange: { min: 20, max: 80 } // Cheaper bus
+    fareRange: { min: 20, max: 80 }
   },
   '52-seater': { 
     maxSpeedKmh: 120, 
     timeMultiplier: 1.3,
-    fareRange: { min: 20, max: 60 } // Cheapest, mass transit
+    fareRange: { min: 20, max: 60 }
   }
 };
 
@@ -94,7 +121,7 @@ interface GameStore extends GameState {
   setVehicleType: (type: VehicleType) => void;
   selectRoute: (route: Route) => void;
   resetGame: () => void;
-  resetCareer: () => void; // New action to wipe save
+  resetCareer: () => void; 
   updateDistance: (delta: number) => void;
   setCurrentSpeed: (speed: number) => void;
   
@@ -131,6 +158,7 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       currentScreen: 'LANDING',
       stats: INITIAL_STATS,
+      bankBalance: 0,
       selectedRoute: null,
       playerName: '',
       saccoName: '',
@@ -261,21 +289,14 @@ export const useGameStore = create<GameStore>()(
         const waiting = nextStagePassengerCount; 
         const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
         
-        // --- Dynamic Pricing Calculation ---
         const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
         const { min, max } = spec.fareRange;
         
-        // Calculate Distance Remaining ratio (1.0 at start, 0.0 at end)
         const distanceRemainingRatio = Math.max(0, (totalRouteDistance - distanceTraveled) / totalRouteDistance);
         
-        // Price interpolates: Closer to destination = Cheaper fare.
-        // E.g. Start of trip (Kiambu) = Max Price. Near end (Muthaiga) = Min Price.
+        // As you get closer (ratio -> 0), price -> min. At start (ratio -> 1), price -> max
         let calculatedFare = min + ((max - min) * distanceRemainingRatio);
-        
-        // Round to nearest 10 for realism
         calculatedFare = Math.ceil(calculatedFare / 10) * 10;
-        
-        // Clamp to ensure it doesn't go below absolute min defined in specs
         calculatedFare = Math.max(calculatedFare, min);
 
         set({
@@ -298,24 +319,19 @@ export const useGameStore = create<GameStore>()(
         let cashEarned = 0;
         let boarding = 0;
         
-        // Use the dynamically calculated ticket price
         const FARE_PER_PAX = stageData.ticketPrice;
 
-        // Limits
         const limits = vehicleType ? VEHICLE_CAPACITY[vehicleType] : { legal: 14, max: 18 };
         const absoluteMax = limits.max;
 
-        // 1. Process Alighting
         newPassengerCount -= stageData.alightingPassengers;
         if (newPassengerCount < 0) newPassengerCount = 0;
 
-        // 2. Process Boarding
         if (action === 'PICKUP_LEGAL') {
           const availableSeats = maxPassengers - newPassengerCount;
           boarding = Math.min(availableSeats, stageData.waitingPassengers);
         } 
         else if (action === 'PICKUP_OVERLOAD') {
-          // Cap at physical maximum of vehicle
           const spaceLeft = absoluteMax - newPassengerCount;
           boarding = Math.min(spaceLeft, stageData.waitingPassengers);
         }
@@ -323,7 +339,6 @@ export const useGameStore = create<GameStore>()(
         newPassengerCount += boarding;
         cashEarned = boarding * FARE_PER_PAX;
 
-        // 3. Update State
         const currentStagePos = nextStageDistance;
         const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
         
@@ -420,7 +435,8 @@ export const useGameStore = create<GameStore>()(
         const { selectedRoute, vehicleType, stats } = get();
         if (!selectedRoute) return;
 
-        let seconds = 420; 
+        // Calculate time based on vehicle capability and route length/difficulty
+        let seconds = 420; // Base time (7 mins)
         if (selectedRoute.timeLimit) {
           const timeStr = selectedRoute.timeLimit.toLowerCase();
           let loreMinutes = 0;
@@ -434,17 +450,17 @@ export const useGameStore = create<GameStore>()(
             loreMinutes = parseInt(timeStr);
           }
           if (loreMinutes > 0) {
+            // Adjust game seconds: roughly 10 game seconds per lore minute
             seconds = Math.ceil(loreMinutes * 9.3); 
           }
         }
 
-        // Apply Vehicle Multiplier for fairness
+        // Apply Vehicle Time Multiplier (Slower vehicles get more time)
         const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : { timeMultiplier: 1.0, maxSpeedKmh: 100, fareRange: { min: 20, max: 100 } };
         seconds = Math.ceil(seconds * spec.timeMultiplier);
 
         const totalDist = selectedRoute.distance * 1000;
         
-        // Set Max Passengers based on legal limit
         let maxPax = 14;
         if (vehicleType) {
            maxPax = VEHICLE_CAPACITY[vehicleType].legal;
@@ -483,8 +499,7 @@ export const useGameStore = create<GameStore>()(
           happiness: 100,
           isStereoOn: false,
           timeOfDay,
-          // Reset Cash to 0 for the start of the trip
-          stats: { ...stats, cash: 0, time: gameTime }
+          stats: { ...stats, cash: 0, time: gameTime } // Reset session cash to 0
         });
       },
 
@@ -534,17 +549,18 @@ export const useGameStore = create<GameStore>()(
         
         const newTime = state.gameTimeRemaining - 1;
         
+        // Happiness Logic
         let newHappiness = state.happiness;
         if (state.isStereoOn) {
           newHappiness = Math.min(100, state.happiness + 0.5);
         }
 
-        // Speed Penalty Logic
+        // Penalty for high speed (Driving recklessly)
         if (state.vehicleType && state.currentSpeed > 0) {
             const spec = VEHICLE_SPECS[state.vehicleType];
             const currentKmh = state.currentSpeed * 1.6;
             
-            // If driving at > 90% of vehicle max speed, passengers get scared
+            // If driving > 90% max speed, passengers get scared
             if (currentKmh > spec.maxSpeedKmh * 0.9) {
                 newHappiness = Math.max(0, newHappiness - 0.5);
             }
@@ -566,7 +582,11 @@ export const useGameStore = create<GameStore>()(
       endGame: (reason) => set((state) => {
         const fuelPricePerLiter = 182;
         const fuelCost = Math.floor(state.fuelUsedLiters * fuelPricePerLiter);
-        const profit = Math.max(0, state.stats.cash - fuelCost);
+        
+        // Calculate Net Profit
+        const sessionEarnings = state.stats.cash;
+        const profit = Math.max(0, sessionEarnings - fuelCost);
+        
         const distanceKm = state.distanceTraveled / 1000;
 
         const newLifetime = {
@@ -576,12 +596,19 @@ export const useGameStore = create<GameStore>()(
           totalTripsCompleted: state.lifetimeStats.totalTripsCompleted + (reason === 'COMPLETED' ? 1 : 0)
         };
 
+        // Bank the money if successful completion
+        let newBankBalance = state.bankBalance;
+        if (reason === 'COMPLETED') {
+            newBankBalance += profit;
+        }
+
         return { 
           gameStatus: 'GAME_OVER', 
           gameOverReason: reason,
           activeModal: 'GAME_OVER',
           isCrashing: false,
-          lifetimeStats: newLifetime
+          lifetimeStats: newLifetime,
+          bankBalance: newBankBalance // Update global wealth
         };
       }),
       
@@ -589,7 +616,6 @@ export const useGameStore = create<GameStore>()(
         currentScreen: 'LANDING',
         stats: INITIAL_STATS,
         selectedRoute: null,
-        // We do NOT reset player info here anymore, handled in resetCareer
         vehicleType: null,
         currentSpeed: 0,
         distanceTraveled: 0,
@@ -608,7 +634,6 @@ export const useGameStore = create<GameStore>()(
         gameTimeRemaining: 0,
         happiness: 100,
         isStereoOn: false,
-        // isSoundOn: true, // Persisted now
         timeOfDay: 'DAY',
         isAccelerating: false,
         isBraking: false
@@ -616,6 +641,7 @@ export const useGameStore = create<GameStore>()(
 
       resetCareer: () => set({
         lifetimeStats: INITIAL_LIFETIME,
+        bankBalance: 0, // Reset Wealth
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
@@ -628,35 +654,44 @@ export const useGameStore = create<GameStore>()(
         happiness: Math.max(0, state.happiness - 2)
       })),
 
-      toggleSound: () => set((state) => ({ isSoundOn: !state.isSoundOn })),
+      toggleSound: () => {
+        const newState = !get().isSoundOn;
+        set({ isSoundOn: newState });
+        // Sync with audio util
+        import('../utils/audio').then(mod => {
+            // We can add a function to audio.ts to sync state if needed, 
+            // but audio.ts pulls from store directly in playSfx so it's fine.
+        });
+      },
 
       toggleEngineSound: () => set((state) => ({ isEngineSoundOn: !state.isEngineSoundOn })),
     }),
     {
       name: 'matatu-master-storage',
-      // Only persist specific fields
+      storage: createJSONStorage(() => secureStorage), // Use our secure storage
       partialize: (state) => ({
         playerName: state.playerName,
         saccoName: state.saccoName,
         lifetimeStats: state.lifetimeStats,
+        bankBalance: state.bankBalance, // Persist Bank Balance
         isSoundOn: state.isSoundOn,
         isEngineSoundOn: state.isEngineSoundOn,
-        // Added Screen Persistence
         currentScreen: state.currentScreen,
         vehicleType: state.vehicleType,
         selectedRoute: state.selectedRoute,
       }),
       onRehydrateStorage: () => (state) => {
+        // Hydration callback
+        // Check if we need to sync audio settings to the audio util singleton immediately
         if (state) {
-          // If the user refreshes while playing, we reset the active game state
-          // but keep them in the flow (e.g., Map Select) rather than Landing.
-          if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
-            state.currentScreen = 'MAP_SELECT';
-            state.gameStatus = 'IDLE';
-            state.activeModal = 'NONE';
-            state.currentSpeed = 0;
-            state.isCrashing = false;
-          }
+            // Also ensure we aren't stuck in a weird game state
+            if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
+                state.currentScreen = 'MAP_SELECT';
+                state.gameStatus = 'IDLE';
+                state.activeModal = 'NONE';
+                state.currentSpeed = 0;
+                state.isCrashing = false;
+            }
         }
       }
     }

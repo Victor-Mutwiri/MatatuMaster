@@ -5,10 +5,10 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore } from '../store/gameStore';
-import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft } from 'lucide-react';
+import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft, Wallet } from 'lucide-react';
 
 export const PlayerSetupScreen: React.FC = () => {
-  const { setVehicleType, setScreen, playerName, saccoName } = useGameStore();
+  const { setVehicleType, setScreen, playerName, saccoName, bankBalance } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
 
@@ -128,6 +128,18 @@ export const PlayerSetupScreen: React.FC = () => {
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">SACCO</label>
                     <div className="text-matatu-yellow font-display text-lg font-bold truncate">{saccoName}</div>
                   </div>
+                  
+                  {/* Total Wealth Card */}
+                  <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-3 rounded-lg border border-green-500/30 relative overflow-hidden group">
+                     <div className="absolute right-[-10px] top-[-10px] bg-green-500/10 w-20 h-20 rounded-full blur-xl group-hover:bg-green-500/20 transition-all"></div>
+                     <label className="text-[10px] font-bold text-green-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                        <Wallet size={12} /> Cash
+                     </label>
+                     <div className="text-white font-mono text-xl font-bold truncate">
+                        KES {bankBalance.toLocaleString()}
+                     </div>
+                  </div>
+
                </div>
              ) : (
                <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg text-center space-y-2">
