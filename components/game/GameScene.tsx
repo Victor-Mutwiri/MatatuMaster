@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { VehicleType } from '../../types';
@@ -49,7 +48,9 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
             ? '#cbd5e1'
             : '#e0f2fe';
 
-  const fogDensity = isLimuru ? 50 : (isHighway ? 150 : 100);
+  // Fog "Far" Distance: 
+  // Limuru increased from 50 to 75 to slightly improve visibility while keeping it dangerous.
+  const fogDensity = isLimuru ? 75 : (isHighway ? 150 : 100);
 
   return (
     <div className={`w-full h-full ${bgClass}`}>
