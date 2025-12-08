@@ -9,8 +9,9 @@ import * as THREE from 'three';
 import { PhysicsController, CameraRig } from './logic/GameMechanics';
 import { NairobiMap } from './maps/NairobiMap';
 import { DirtRoadMap } from './maps/DirtRoadMap';
+import { ThikaRoadMap } from './maps/ThikaRoadMap';
 import { PlayerController } from './PlayerController';
-import { OncomingTraffic } from './logic/TrafficSystem';
+import { OncomingTraffic, HighwayTraffic } from './logic/TrafficSystem';
 
 interface GameSceneProps {
   vehicleType: VehicleType | null;
@@ -24,18 +25,23 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   const selectedRoute = useGameStore(state => state.selectedRoute);
   
   const isOffroad = selectedRoute?.id === 'rural-dirt';
+  const isHighway = selectedRoute?.id === 'thika-highway';
 
   const bgClass = timeOfDay === 'NIGHT' 
     ? 'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-950'
     : isOffroad 
       ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-orange-100 to-amber-50' // Dusty Look
-      : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-400 via-blue-300 to-blue-200';
+      : isHighway
+        ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400 via-indigo-300 to-slate-200' // Clear Sky
+        : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-400 via-blue-300 to-blue-200';
 
   const fogColor = timeOfDay === 'NIGHT' 
     ? '#1e293b' 
     : isOffroad 
-      ? '#e7d4c0' // Dust color
-      : '#e0f2fe';
+      ? '#e7d4c0' 
+      : isHighway
+        ? '#cbd5e1' // Smoggy/Hazy city distance
+        : '#e0f2fe';
 
   return (
     <div className={`w-full h-full ${bgClass}`}>
@@ -55,13 +61,19 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <CameraRig />
 
         {/* Map Selection */}
-        {isOffroad ? <DirtRoadMap /> : <NairobiMap />}
+        {isOffroad ? <DirtRoadMap /> : isHighway ? <ThikaRoadMap /> : <NairobiMap />}
 
         {/* Player & Traffic */}
         <PlayerController type={vehicleType || '14-seater'} setLaneCallback={setPlayerLane} />
-        <OncomingTraffic playerLane={playerLane} />
         
-        <fog attach="fog" args={[fogColor, 20, 100]} />
+        {/* Traffic System Selection */}
+        {isHighway ? (
+            <HighwayTraffic playerLane={playerLane} />
+        ) : (
+            <OncomingTraffic playerLane={playerLane} />
+        )}
+        
+        <fog attach="fog" args={[fogColor, 20, isHighway ? 150 : 100]} />
       </Canvas>
       <div className="absolute bottom-28 inset-x-0 flex justify-center pointer-events-none opacity-50">
         <p className={`text-xs animate-pulse ${isOffroad ? 'text-orange-900/50' : 'text-white/50'}`}>

@@ -38,7 +38,8 @@ const MAPS: Route[] = [
     trafficLevel: 'Gridlock',
     dangerLevel: 'Sketchy',
     timeLimit: '1h 15m',
-    isLocked: true
+    description: 'A massive 3-lane superhighway. Overtake traffic moving in your direction. Watch your speed!',
+    isLocked: false
   },
   {
     id: 'rongai-extreme',
@@ -62,8 +63,8 @@ export const MapSelectionScreen: React.FC = () => {
   }, []);
 
   const handleRouteSelect = (map: Route) => {
-    // Guest check logic - allow first two maps (City + Dirt)
-    const freeMaps = ['kiambu-route', 'rural-dirt'];
+    // Guest check logic - allow first two maps (City + Dirt) and now Thika for trial
+    const freeMaps = ['kiambu-route', 'rural-dirt', 'thika-highway'];
     
     if (userMode === 'GUEST' && !freeMaps.includes(map.id)) {
         setShowAuthGate(true);

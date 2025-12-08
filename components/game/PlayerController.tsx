@@ -20,14 +20,15 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   const selectedRoute = useGameStore(state => state.selectedRoute);
   const currentSpeed = useGameStore(state => state.currentSpeed);
   const currentPassengers = useGameStore(state => state.currentPassengers);
-  const [lane, setLane] = useState<-1 | 1>(-1); 
+  const [lane, setLane] = useState<number>(-1); 
   const LERP_SPEED = 8;
   const TILT_ANGLE = 0.1;
 
   const reportLaneChange = useGameStore(state => state.reportLaneChange);
 
-  // Check if current route is the Dirt Road
+  // Map Checks
   const isOffroad = selectedRoute?.id === 'rural-dirt';
+  const isHighway = selectedRoute?.id === 'thika-highway';
 
   useEffect(() => {
     setLaneCallback(lane);
@@ -37,39 +38,58 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
     if (gameStatus === 'PLAYING' && !isCrashing && meshRef.current) {
       meshRef.current.rotation.set(0, 0, 0);
       meshRef.current.position.y = 0;
-      meshRef.current.position.x = -LANE_OFFSET; 
-      setLane(-1); 
+      
+      // Starting position depends on map type
+      if (isHighway) {
+        setLane(0); // Start in middle for highway
+        meshRef.current.position.x = 0;
+      } else {
+        setLane(-1); // Start Left for normal/city
+        meshRef.current.position.x = -LANE_OFFSET;
+      }
     }
-  }, [gameStatus, isCrashing]);
+  }, [gameStatus, isCrashing, isHighway]);
 
   useEffect(() => {
     if (isCrashing) return; 
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
-        setLane(prev => {
-           if (prev === 1) {
-             reportLaneChange();
-             playSfx('SWOOSH');
-             return -1;
-           }
-           return prev;
-        });
+        changeLane(-1);
       }
       if (e.key === 'ArrowRight') {
-        setLane(prev => {
-           if (prev === -1) {
-             reportLaneChange();
-             playSfx('SWOOSH');
-             return 1;
-           }
-           return prev;
-        });
+        changeLane(1);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [reportLaneChange, isCrashing]);
+  }, [reportLaneChange, isCrashing, isHighway]);
+
+  const changeLane = (direction: -1 | 1) => {
+    setLane(prev => {
+        let next = prev;
+        
+        if (isHighway) {
+            // 3 Lanes: -1, 0, 1. Move sequentially.
+            next = prev + direction;
+            // Clamp
+            if (next < -1) next = -1;
+            if (next > 1) next = 1;
+        } else {
+            // 2 Lanes: -1, 1. Toggle or Jump.
+            // Standard behavior: Left(-1) <-> Right(1)
+            if (direction === 1 && prev === -1) next = 1;
+            if (direction === -1 && prev === 1) next = -1;
+        }
+
+        if (next !== prev) {
+            reportLaneChange();
+            playSfx('SWOOSH');
+            return next;
+        }
+        return prev;
+    });
+  };
 
   const touchStartX = useRef<number | null>(null);
   useEffect(() => {
@@ -83,24 +103,10 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
       const diff = e.changedTouches[0].clientX - touchStartX.current;
       if (Math.abs(diff) > 30) {
         if (diff > 0) {
-             setLane(prev => {
-                if(prev === -1) {
-                    reportLaneChange();
-                    playSfx('SWOOSH');
-                    return 1;
-                }
-                return prev;
-             });
+            changeLane(1);
         }
         else {
-             setLane(prev => {
-                if(prev === 1) {
-                    reportLaneChange();
-                    playSfx('SWOOSH');
-                    return -1;
-                }
-                return prev;
-             });
+            changeLane(-1);
         }
       }
       touchStartX.current = null;
@@ -111,7 +117,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [reportLaneChange, isCrashing]);
+  }, [reportLaneChange, isCrashing, isHighway]);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
@@ -129,21 +135,25 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
          // Standard idle bob
          let yPos = Math.sin(state.clock.elapsedTime * 15) * 0.02;
 
-         // Offroad Bouncing Mechanic
-         if (isOffroad && currentSpeed > 5) {
-            // Intense, chaotic bouncing based on speed
-            const bounceFreq = 30 + (currentSpeed * 0.5); // Faster bumps at speed
-            const bounceAmp = 0.05 + (currentSpeed / 200) * 0.15; // Higher bumps at speed
-            
-            // Perlin-noise like effect using combined sines
-            const noise = Math.sin(state.clock.elapsedTime * bounceFreq) * 
-                          Math.cos(state.clock.elapsedTime * (bounceFreq * 0.7));
-            
-            yPos += noise * bounceAmp;
-
-            // Add slight random roll/pitch for rough terrain feel
-            meshRef.current.rotation.z += (Math.random() - 0.5) * 0.02 * (currentSpeed/50);
-            meshRef.current.rotation.x += (Math.random() - 0.5) * 0.01 * (currentSpeed/50);
+         // Bounce Mechanics
+         if (currentSpeed > 5) {
+             if (isOffroad) {
+                // Intense, chaotic bouncing
+                const bounceFreq = 30 + (currentSpeed * 0.5); 
+                const bounceAmp = 0.05 + (currentSpeed / 200) * 0.15; 
+                const noise = Math.sin(state.clock.elapsedTime * bounceFreq) * Math.cos(state.clock.elapsedTime * (bounceFreq * 0.7));
+                yPos += noise * bounceAmp;
+                meshRef.current.rotation.z += (Math.random() - 0.5) * 0.02 * (currentSpeed/50);
+                meshRef.current.rotation.x += (Math.random() - 0.5) * 0.01 * (currentSpeed/50);
+             } else if (isHighway) {
+                // Thika Road: Tarmac but high speed vibration ("Good but not too smooth")
+                const vibration = Math.sin(state.clock.elapsedTime * 50) * 0.015 * (currentSpeed / 100);
+                yPos += vibration;
+                // Occasional slight dip (expansion joint)
+                if (Math.random() > 0.98) {
+                    yPos -= 0.03;
+                }
+             }
          }
 
          meshRef.current.position.y = yPos;

@@ -5,6 +5,7 @@ import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
 
 const ROAD_WIDTH = 8;
+const HIGHWAY_WIDTH = 12;
 
 // --- Buildings & Landmarks ---
 
@@ -111,6 +112,22 @@ export const Rock = ({ scale = 1 }: { scale?: number }) => {
   );
 };
 
+export const HighwayBarrier = () => {
+    return (
+        <group>
+            {/* Concrete Jersey Barrier */}
+            <mesh position={[0, 0.4, 0]}>
+                <boxGeometry args={[0.3, 0.8, 4]} />
+                <meshStandardMaterial color="#9ca3af" roughness={0.6} />
+            </mesh>
+            <mesh position={[0, 0.81, 0]}>
+                <boxGeometry args={[0.35, 0.1, 4]} />
+                <meshStandardMaterial color="#d1d5db" roughness={0.6} />
+            </mesh>
+        </group>
+    );
+};
+
 export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotation: [number, number, number]; }> = ({ position, rotation }) => {
   const shirtColor = useMemo(() => ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)], []);
   const pantsColor = useMemo(() => ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)], []);
@@ -140,17 +157,21 @@ export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotati
 
 // --- Infrastructure ---
 
-export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) => {
+export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHWAY' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const STRIP_COUNT = 20;
   const STRIP_GAP = 10; 
-  const GRASS_OFFSET = ROAD_WIDTH / 2 + 5; 
   const timeOfDay = useGameStore(state => state.timeOfDay);
   
   const isRural = variant === 'RURAL';
+  const isHighway = variant === 'HIGHWAY';
+  
+  const width = isHighway ? HIGHWAY_WIDTH : ROAD_WIDTH;
+  const GRASS_OFFSET = width / 2 + 5;
+
   const roadColor = isRural ? "#5D4037" : (timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a");
   const sideColor = isRural ? "#795548" : (timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b");
-  const stripColor = isRural ? "#8d6e63" : "#fbbf24";
+  const stripColor = isRural ? "#8d6e63" : "#fbbf24"; // Yellow for Rural/City, White for Highway lines usually but let's stick to yellow/white mix
 
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
@@ -164,19 +185,48 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) => {
 
   return (
     <group>
+      {/* Main Road Surface */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-        <planeGeometry args={[ROAD_WIDTH, 300]} />
-        <meshStandardMaterial color={roadColor} roughness={1.0} />
+        <planeGeometry args={[width, 300]} />
+        <meshStandardMaterial color={roadColor} roughness={isHighway ? 0.4 : 1.0} />
       </mesh>
-      {/* Road Strips / Texture */}
+      
+      {/* Moving Markings */}
       <group ref={groupRef}>
         {Array.from({ length: STRIP_COUNT }).map((_, i) => (
-          <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -i * STRIP_GAP]}>
-            <planeGeometry args={[isRural ? 0.4 : 0.15, isRural ? 2 : 4]} />
-            <meshStandardMaterial color={stripColor} opacity={isRural ? 0.3 : 1} transparent={isRural} />
-          </mesh>
+          <group key={i} position={[0, 0, -i * STRIP_GAP]}>
+             {/* Center Lines */}
+             {isHighway ? (
+                <>
+                   {/* 3 Lane Separation (2 lines) at roughly -2.5 and +2.5 */}
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-2.2, 0.01, 0]}>
+                      <planeGeometry args={[0.15, 4]} />
+                      <meshStandardMaterial color="#ffffff" />
+                   </mesh>
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2.2, 0.01, 0]}>
+                      <planeGeometry args={[0.15, 4]} />
+                      <meshStandardMaterial color="#ffffff" />
+                   </mesh>
+                   {/* Shoulder Lines (Yellow Solid) */}
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-5, 0.01, 0]}>
+                      <planeGeometry args={[0.2, 10]} />
+                      <meshStandardMaterial color={stripColor} />
+                   </mesh>
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[5, 0.01, 0]}>
+                      <planeGeometry args={[0.2, 10]} />
+                      <meshStandardMaterial color={stripColor} />
+                   </mesh>
+                </>
+             ) : (
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+                    <planeGeometry args={[isRural ? 0.4 : 0.15, isRural ? 2 : 4]} />
+                    <meshStandardMaterial color={stripColor} opacity={isRural ? 0.3 : 1} transparent={isRural} />
+                </mesh>
+             )}
+          </group>
         ))}
       </group>
+
       {/* Sides */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
@@ -196,6 +246,7 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
   
   const OBJECT_COUNT = 24;
   const GAP = 15;
+  // Offset depends on standard road width, might need adjustment for Highway but assuming scenery is far enough
   const OFFSET_FROM_ROAD = ROAD_WIDTH / 2 + 3; 
   const distRemaining = totalRouteDistance - distanceTraveled;
   const isCityApproaching = distRemaining < 800;
