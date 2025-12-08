@@ -12,8 +12,6 @@ const OppositeTrafficVisual = () => {
     // Simple low poly cars moving in opposite direction (very fast relative speed)
     useFrame((state, delta) => {
         if (groupRef.current) {
-            // These move "towards" camera (standard oncoming)
-            // But since they are on the "other side", they should just zoom past
             const moveSpeed = speed + 80; // Relative speed
             groupRef.current.children.forEach((child, i) => {
                 child.position.z += moveSpeed * delta;
@@ -62,15 +60,15 @@ export const ThikaRoadMap = () => {
     <group>
       <Road variant="HIGHWAY" />
       
-      {/* Central Barrier */}
+      {/* Central Barrier - Pushed further out due to road width 15 */}
       <group>
           {Array.from({ length: 15 }).map((_, i) => (
                <group key={i} position={[0, 0, -i * 20]}>
-                   <group position={[6, 0, 0]}>
+                   <group position={[8, 0, 0]}>
                        <HighwayBarrier />
                    </group>
                    {/* Street Lights */}
-                   <group position={[6, 0, 0]}>
+                   <group position={[8, 0, 0]}>
                         <mesh position={[0, 3, 0]}>
                             <cylinderGeometry args={[0.1, 0.15, 6]} />
                             <meshStandardMaterial color="#475569" />
@@ -88,8 +86,8 @@ export const ThikaRoadMap = () => {
           ))}
       </group>
 
-      {/* Opposite Lane (Visual Only) */}
-      <group position={[18, -0.05, 0]}>
+      {/* Opposite Lane (Visual Only) - Pushed out */}
+      <group position={[22, -0.05, 0]}>
            <mesh rotation={[-Math.PI / 2, 0, 0]}>
                 <planeGeometry args={[12, 300]} />
                 <meshStandardMaterial color="#1a1a1a" />

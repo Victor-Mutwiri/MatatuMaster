@@ -5,7 +5,7 @@ import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
 
 const ROAD_WIDTH = 8;
-const HIGHWAY_WIDTH = 12;
+const HIGHWAY_WIDTH = 15; // Increased from 12 to accommodate wider lanes (3.5 * 3 + margins)
 
 // --- Buildings & Landmarks ---
 
@@ -171,7 +171,7 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
 
   const roadColor = isRural ? "#5D4037" : (timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a");
   const sideColor = isRural ? "#795548" : (timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b");
-  const stripColor = isRural ? "#8d6e63" : "#fbbf24"; // Yellow for Rural/City, White for Highway lines usually but let's stick to yellow/white mix
+  const stripColor = isRural ? "#8d6e63" : "#fbbf24"; 
 
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
@@ -198,21 +198,26 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
              {/* Center Lines */}
              {isHighway ? (
                 <>
-                   {/* 3 Lane Separation (2 lines) at roughly -2.5 and +2.5 */}
-                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-2.2, 0.01, 0]}>
+                   {/* 
+                     Lane Markings Logic:
+                     Highway Offset is 3.5. 
+                     Lanes are at -3.5, 0, 3.5.
+                     Markings should be midpoints: (-3.5+0)/2 = -1.75 and (0+3.5)/2 = 1.75.
+                   */}
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-1.75, 0.01, 0]}>
                       <planeGeometry args={[0.15, 4]} />
                       <meshStandardMaterial color="#ffffff" />
                    </mesh>
-                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2.2, 0.01, 0]}>
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.75, 0.01, 0]}>
                       <planeGeometry args={[0.15, 4]} />
                       <meshStandardMaterial color="#ffffff" />
                    </mesh>
-                   {/* Shoulder Lines (Yellow Solid) */}
-                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-5, 0.01, 0]}>
+                   {/* Shoulder Lines (Yellow Solid) - Far edges (Width 15 / 2 = 7.5) */}
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-6.5, 0.01, 0]}>
                       <planeGeometry args={[0.2, 10]} />
                       <meshStandardMaterial color={stripColor} />
                    </mesh>
-                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[5, 0.01, 0]}>
+                   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[6.5, 0.01, 0]}>
                       <planeGeometry args={[0.2, 10]} />
                       <meshStandardMaterial color={stripColor} />
                    </mesh>
@@ -242,12 +247,14 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
 
 export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const { timeOfDay, totalRouteDistance, distanceTraveled } = useGameStore();
+  const { timeOfDay, totalRouteDistance, distanceTraveled, selectedRoute } = useGameStore();
   
   const OBJECT_COUNT = 24;
   const GAP = 15;
-  // Offset depends on standard road width, might need adjustment for Highway but assuming scenery is far enough
-  const OFFSET_FROM_ROAD = ROAD_WIDTH / 2 + 3; 
+  const isHighway = selectedRoute?.id === 'thika-highway';
+  // If Highway, push scenery further out because road is wider
+  const BASE_OFFSET = isHighway ? 9 : ROAD_WIDTH / 2 + 3; 
+
   const distRemaining = totalRouteDistance - distanceTraveled;
   const isCityApproaching = distRemaining < 800;
 
@@ -256,22 +263,20 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
   const sceneryItems = useMemo(() => {
     return Array.from({ length: OBJECT_COUNT }).map((_, i) => {
       const side = i % 2 === 0 ? 1 : -1;
-      const x = (OFFSET_FROM_ROAD + Math.random() * 4) * side;
+      const x = (BASE_OFFSET + Math.random() * 4) * side;
       const z = -i * GAP;
       
       let type = 'TREE';
       if (isRural) {
-         // Rural: Mix of Rocks and Trees, no Signs
          type = Math.random() > 0.6 ? 'ROCK' : 'TREE';
       } else {
-         // City: Mix of Trees, Bushes, Signs
          type = i % 6 === 0 ? 'SIGN' : i % 3 === 0 ? 'BUSH' : 'TREE';
       }
       
       const scale = 0.8 + Math.random() * 0.4;
       return { x, z, type, side, scale };
     });
-  }, [isRural]);
+  }, [isRural, BASE_OFFSET]);
 
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
@@ -329,7 +334,11 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
 
 export const StageModel = ({ distance, passengerCount, isDeparting }: { distance: number, passengerCount: number, isDeparting: boolean }) => {
   const markerRef = useRef<THREE.Group>(null);
-  const MARKER_X = -(ROAD_WIDTH / 2 + 2.5);
+  const { selectedRoute } = useGameStore();
+  const isHighway = selectedRoute?.id === 'thika-highway';
+  
+  // Position marker further out on highway
+  const MARKER_X = isHighway ? -9 : -(ROAD_WIDTH / 2 + 2.5);
   
   const crowd = useMemo(() => {
     if (isDeparting || passengerCount <= 0) return [];
@@ -375,13 +384,15 @@ export const StageMarker = () => {
 };
 
 export const PoliceMarker = () => {
-  const { nextPoliceDistance, distanceTraveled } = useGameStore();
+  const { nextPoliceDistance, distanceTraveled, selectedRoute } = useGameStore();
   const markerRef = useRef<THREE.Group>(null);
   const blueLightRef = useRef<THREE.Mesh>(null);
   const redLightRef = useRef<THREE.Mesh>(null);
   const distanceToPolice = nextPoliceDistance - distanceTraveled;
   const isVisible = distanceToPolice < 300 && distanceToPolice > -20;
-  const MARKER_X = (ROAD_WIDTH / 2 + 1);
+  
+  const isHighway = selectedRoute?.id === 'thika-highway';
+  const MARKER_X = isHighway ? 8 : (ROAD_WIDTH / 2 + 1);
 
   useFrame((state) => {
     if (markerRef.current) {

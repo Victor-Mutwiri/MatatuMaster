@@ -5,14 +5,15 @@ import { useGameStore } from '../../../store/gameStore';
 import { playSfx } from '../../../utils/audio';
 import { Motorbike, SmallCar, Matatu14Seater, Matatu52Seater } from '../vehicles/VehicleModels';
 
-const LANE_OFFSET = 2.2; 
+const CITY_LANE_OFFSET = 2.2;
+const HIGHWAY_LANE_OFFSET = 3.5;
 
 export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   const { triggerCrash, gameStatus, isCrashing } = useGameStore();
   const [vehicles, setVehicles] = useState<{ id: number, z: number, type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS', speed: number }[]>([]);
   const nextSpawnRef = useRef(0);
 
-  const TRAFFIC_LANE_X = LANE_OFFSET; 
+  const TRAFFIC_LANE_X = CITY_LANE_OFFSET; 
   const SPAWN_DISTANCE = -150; 
   const DESPAWN_DISTANCE = 20;
 
@@ -105,11 +106,6 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
         const next = [];
         for (const v of prev) {
           // Relative speed: If player is faster (100) and traffic is (80), traffic moves towards player (positive Z direction in our world where -Z is forward)
-          // Wait, world moves +Z to simulate forward motion. 
-          // If we place car at -200. Player is at 0. 
-          // If Player Speed > Traffic Speed. The car should get closer (Z increases towards 0).
-          // Delta Distance = (PlayerSpeed - TrafficSpeed) * delta.
-          
           const relativeSpeed = currentSpeed - v.speed; 
           const newZ = v.z + relativeSpeed * delta;
           
@@ -124,7 +120,7 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
           // Only if in same lane and touching
           if (!isCrashing) {
              const dist = Math.abs(newZ - 0); 
-             if (dist < 3.5 && v.lane === playerLane) { // Slightly larger hitbox for highway speed
+             if (dist < 3.5 && v.lane === playerLane) { 
                triggerCrash();
              }
           }
@@ -144,9 +140,7 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
         const lanes = [-1, 0, 1];
         const spawnLane = lanes[Math.floor(Math.random() * lanes.length)];
         
-        // Speed variance: 
-        // Some slow (60% player speed), some fast (110% player speed)
-        // Ensure they aren't static
+        // Speed variance
         const baseSpeed = Math.max(40, currentSpeed);
         const trafficSpeed = baseSpeed * (0.6 + Math.random() * 0.5); 
 
@@ -158,8 +152,11 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
           speed: trafficSpeed
         }]);
         
-        // Spawn rate increases with speed
-        const interval = (200 / (currentSpeed + 1)) * (0.5 + Math.random());
+        // --- IMPROVED TRAFFIC DENSITY LOGIC ---
+        // Spawn rate increases with speed, but cap min interval to create "busy" feel
+        // Previous: (200 / speed) -> at 100 speed = 2s gap.
+        // New: (80 / speed) -> at 100 speed = 0.8s gap. 
+        const interval = (80 / (currentSpeed + 1)) * (0.3 + Math.random() * 0.7);
         nextSpawnRef.current = state.clock.elapsedTime + interval;
       }
     });
@@ -167,14 +164,12 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     return (
       <group>
         {vehicles.map(v => (
-          <group key={v.id} position={[v.lane * LANE_OFFSET, 0, v.z]} rotation={[0, Math.PI, 0]}>
+          <group key={v.id} position={[v.lane * HIGHWAY_LANE_OFFSET, 0, v.z]} rotation={[0, Math.PI, 0]}>
              {/* Note: Rotation PI because they are moving same direction as player (facing away from camera) */}
              {v.type === 'BIKE' && <Motorbike />}
              {v.type === 'CAR' && <SmallCar />}
              {v.type === 'MATATU' && <Matatu14Seater />}
              {v.type === 'BUS' && <Matatu52Seater />}
-             
-             {/* Add Brake Lights glow if they are slowing down or player approaching fast? Optional detail */}
           </group>
         ))}
       </group>

@@ -10,7 +10,8 @@ import {
   Matatu14Seater, Matatu32Seater, Matatu52Seater 
 } from './vehicles/VehicleModels';
 
-const LANE_OFFSET = 2.2;
+const CITY_LANE_OFFSET = 2.2;
+const HIGHWAY_LANE_OFFSET = 3.5;
 
 export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCallback: (l: number) => void }) => {
   const meshRef = useRef<THREE.Group>(null);
@@ -30,6 +31,9 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   const isOffroad = selectedRoute?.id === 'rural-dirt';
   const isHighway = selectedRoute?.id === 'thika-highway';
 
+  // Dynamic Lane Offset
+  const currentLaneOffset = isHighway ? HIGHWAY_LANE_OFFSET : CITY_LANE_OFFSET;
+
   useEffect(() => {
     setLaneCallback(lane);
   }, [lane, setLaneCallback]);
@@ -45,7 +49,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
         meshRef.current.position.x = 0;
       } else {
         setLane(-1); // Start Left for normal/city
-        meshRef.current.position.x = -LANE_OFFSET;
+        meshRef.current.position.x = -CITY_LANE_OFFSET;
       }
     }
   }, [gameStatus, isCrashing, isHighway]);
@@ -127,7 +131,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
          meshRef.current.rotation.z += delta * 3;
          meshRef.current.position.y += delta * 1;
       } else {
-         const targetX = lane * LANE_OFFSET;
+         const targetX = lane * currentLaneOffset;
          meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, delta * LERP_SPEED);
          const xDiff = targetX - meshRef.current.position.x;
          meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, -xDiff * TILT_ANGLE, delta * LERP_SPEED);
@@ -162,7 +166,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   });
 
   return (
-    <group ref={meshRef} position={[-LANE_OFFSET, 0, 0]}>
+    <group ref={meshRef} position={[-currentLaneOffset, 0, 0]}>
        <group rotation={[0, Math.PI, 0]}>
          {type === 'boda' && <PlayerBoda passengerCount={currentPassengers} />}
          {type === 'tuktuk' && <PlayerTuktuk />}
