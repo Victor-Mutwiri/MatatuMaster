@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
@@ -24,8 +25,10 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onStart }) => {
 
       <div className="relative z-10 flex flex-col items-center min-h-full w-full max-w-6xl mx-auto px-4 py-8 lg:py-12">
         
-        {/* Top Right Actions - Shifted left to accommodate Profile Button */}
-        <div className="w-full flex justify-end mb-8 md:absolute md:top-6 md:right-24 md:mb-0 z-40">
+        {/* Top Actions Bar */}
+        {/* Mobile: Justify Start (Left) to avoid Profile Button on Right */}
+        {/* Desktop: Justify End (Right) but padded to sit next to Profile Button */}
+        <div className="w-full flex justify-start md:justify-end mb-8 md:absolute md:top-6 md:right-24 md:mb-0 z-40">
            <button 
              onClick={() => setScreen('LEADERBOARD')}
              className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 border border-slate-700 rounded-full text-white font-bold text-xs uppercase hover:bg-slate-800 hover:scale-105 transition-all shadow-lg group backdrop-blur-md"
@@ -58,7 +61,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onStart }) => {
             The Ultimate <span className="text-white font-bold border-b-2 border-matatu-yellow">Nairobi</span> Conductor Experience
           </p>
 
-          <div className="w-full max-w-md pt-6 md:pt-8">
+          <div className="w-full max-w-md pt-4 md:pt-8">
              <Button 
                variant="primary" 
                size="lg" 
