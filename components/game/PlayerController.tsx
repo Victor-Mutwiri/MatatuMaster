@@ -62,6 +62,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   const currentSpeed = useGameStore(state => state.currentSpeed);
   const currentPassengers = useGameStore(state => state.currentPassengers);
   const brakeTemp = useGameStore(state => state.brakeTemp);
+  const endGame = useGameStore(state => state.endGame);
   
   const [lane, setLane] = useState<number>(-1); 
   const LERP_SPEED = 8;
@@ -72,6 +73,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   // Map Checks
   const isOffroad = selectedRoute?.id === 'rural-dirt';
   const isHighway = selectedRoute?.id === 'thika-highway';
+  const isRiverRoad = selectedRoute?.id === 'river-road';
 
   // Dynamic Lane Offset
   const currentLaneOffset = isHighway ? HIGHWAY_LANE_OFFSET : CITY_LANE_OFFSET;
@@ -88,12 +90,12 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
       meshRef.current.rotation.set(0, 0, 0);
       meshRef.current.position.y = 0;
       
-      // Starting position depends on map type
+      // Starting position
       if (isHighway) {
-        setLane(0); // Start in middle for highway
+        setLane(0); 
         meshRef.current.position.x = 0;
       } else {
-        setLane(-1); // Start Left for normal/city
+        setLane(-1); 
         meshRef.current.position.x = -CITY_LANE_OFFSET;
       }
     }
@@ -112,21 +114,30 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [reportLaneChange, isCrashing, isHighway]);
+  }, [reportLaneChange, isCrashing, isHighway, isRiverRoad, lane]); // Added lane dep for RiverRoad check
 
   const changeLane = (direction: -1 | 1) => {
     setLane(prev => {
         let next = prev;
         
         if (isHighway) {
-            // 3 Lanes: -1, 0, 1. Move sequentially.
+            // 3 Lanes: -1, 0, 1.
             next = prev + direction;
-            // Clamp
             if (next < -1) next = -1;
             if (next > 1) next = 1;
+        } else if (isRiverRoad) {
+            // 4 Lanes: -2(SW), -1, 1, 2(SW). No 0.
+            // Move seq: -2 <-> -1 <-> 1 <-> 2
+            // Since we use prev + dir, standard 0 skip needed
+            let potential = prev + direction;
+            if (potential === 0) potential = direction; // Skip 0
+            
+            // Limit
+            if (potential < -2) potential = -2;
+            if (potential > 2) potential = 2;
+            next = potential;
         } else {
-            // 2 Lanes: -1, 1. Toggle or Jump.
-            // Standard behavior: Left(-1) <-> Right(1)
+            // 2 Lanes: -1, 1.
             if (direction === 1 && prev === -1) next = 1;
             if (direction === -1 && prev === 1) next = -1;
         }
@@ -166,7 +177,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [reportLaneChange, isCrashing, isHighway]);
+  }, [reportLaneChange, isCrashing, isHighway, isRiverRoad, lane]);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
@@ -187,7 +198,6 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
          // Bounce Mechanics
          if (currentSpeed > 5) {
              if (isOffroad) {
-                // Intense, chaotic bouncing
                 const bounceFreq = 30 + (currentSpeed * 0.5); 
                 const bounceAmp = 0.05 + (currentSpeed / 200) * 0.15; 
                 const noise = Math.sin(state.clock.elapsedTime * bounceFreq) * Math.cos(state.clock.elapsedTime * (bounceFreq * 0.7));
@@ -195,17 +205,38 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
                 meshRef.current.rotation.z += (Math.random() - 0.5) * 0.02 * (currentSpeed/50);
                 meshRef.current.rotation.x += (Math.random() - 0.5) * 0.01 * (currentSpeed/50);
              } else if (isHighway) {
-                // Thika Road: Tarmac but high speed vibration ("Good but not too smooth")
                 const vibration = Math.sin(state.clock.elapsedTime * 50) * 0.015 * (currentSpeed / 100);
                 yPos += vibration;
-                // Occasional slight dip (expansion joint)
                 if (Math.random() > 0.98) {
                     yPos -= 0.03;
                 }
              }
          }
 
-         meshRef.current.position.y = yPos;
+         // River Road Curb Physics
+         if (isRiverRoad) {
+             // If driving on sidewalk (abs(lane) == 2), tilt and lift
+             const isOnSidewalk = Math.abs(lane) === 2;
+             
+             // Check distance to center of lane to smooth transition
+             const distToLaneCenter = Math.abs(meshRef.current.position.x - targetX);
+             
+             if (isOnSidewalk) {
+                 // Lift car up (Curb height 0.2)
+                 yPos += 0.2;
+                 // Tilt away from road slightly (uneven pavement)
+                 meshRef.current.rotation.z += (lane === 2 ? -0.05 : 0.05);
+                 
+                 // Check for Foot Cop Arrest (Simple distance check from global cops if implemented, 
+                 // but for now relying on Map logic or Traffic logic)
+                 
+                 // However, we can also check standard cop collision if CopOnFoot logic was centralized.
+                 // The CopOnFoot inside RiverRoadMap has visual logic.
+                 // We will add logic in RiverRoadMap's useFrame for Cop Collision.
+             }
+         }
+
+         meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, yPos, delta * 5);
       }
     }
   });

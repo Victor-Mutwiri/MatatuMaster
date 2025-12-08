@@ -21,21 +21,20 @@ interface TrafficVehicleProps {
   type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS' | 'SUV' | 'HEAVY_TRUCK';
   direction: 'SAME' | 'OPPOSITE';
   playerLane: number;
+  driftX?: boolean; // Lateral movement (squeeze)
   onRemove: (id: number) => void;
 }
 
-const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, direction, playerLane, onRemove }: TrafficVehicleProps) => {
+const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, direction, playerLane, driftX = false, onRemove }: TrafficVehicleProps) => {
   const groupRef = useRef<THREE.Group>(null);
   const passedPlayerRef = useRef(false);
   const { currentSpeed, triggerCrash, isCrashing } = useGameStore();
+  const initialX = lane * laneOffset;
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
     // --- Movement Logic ---
-    // If direction is SAME (Highway/Overtaking): Relative Speed = PlayerSpeed - TrafficSpeed
-    // If direction is OPPOSITE (City/Incoming): Relative Speed = PlayerSpeed + TrafficSpeed
-    
     let moveDelta = 0;
     if (direction === 'SAME') {
         const relativeSpeed = currentSpeed - speed;
@@ -48,10 +47,24 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
     groupRef.current.position.z += moveDelta;
     const currentZ = groupRef.current.position.z;
 
+    // --- Lateral Drift (Gridlock Squeeze) ---
+    if (driftX) {
+        const t = state.clock.elapsedTime + id;
+        // Drift up to 0.5 units left/right to open/close gaps
+        groupRef.current.position.x = initialX + Math.sin(t * 1.5) * 0.5;
+    }
+
     // --- Collision Logic ---
     if (!isCrashing && Math.abs(currentZ) < 3.0) {
-        // Collision box is roughly 3 units long
-        // Check Lane
+        // Collision box
+        // For gridlock, collisions happen if lateral distance is small too
+        const vehX = groupRef.current.position.x;
+        // Player is roughly at playerLane * laneOffset
+        // Since player moves smoothly, we need accurate Player X?
+        // Approx: Player is at playerLane * laneOffset
+        const playerX = playerLane * laneOffset;
+        
+        // Simple Lane Check: If vehicle is in player's lane ID
         if (lane === playerLane) {
             triggerCrash();
         }
@@ -59,15 +72,12 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
 
     // --- Sound Logic (Whoosh when passing) ---
     if (!passedPlayerRef.current) {
-        // Simple whoosh check when crossing Z=0
         if (direction === 'SAME') {
-             // Overtake (We pass them OR they pass us)
              if ((initialZ < 0 && currentZ >= 0) || (initialZ > 0 && currentZ <= 0)) {
                  if (Math.abs(lane - playerLane) <= 1) playSfx('SWOOSH');
                  passedPlayerRef.current = true;
              }
         } else {
-             // Oncoming
              if (currentZ >= 0) {
                  if (Math.abs(lane - playerLane) <= 1) playSfx('SWOOSH');
                  passedPlayerRef.current = true;
@@ -76,14 +86,13 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
     }
 
     // --- Despawn Logic ---
-    // Behind camera (positive Z) or too far ahead (negative Z)
     if (currentZ > 30 || currentZ < -400) {
         onRemove(id);
     }
   });
 
   return (
-    <group ref={groupRef} position={[lane * laneOffset, 0, initialZ]} rotation={[0, direction === 'SAME' ? Math.PI : 0, 0]}>
+    <group ref={groupRef} position={[initialX, 0, initialZ]} rotation={[0, direction === 'SAME' ? Math.PI : 0, 0]}>
         {type === 'BIKE' && <Motorbike />}
         {type === 'CAR' && <SmallCar />}
         {type === 'SUV' && <PlayerPersonalCar />}
@@ -111,20 +120,19 @@ export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   useFrame((state) => {
     if (gameStatus !== 'PLAYING' || isCrashing) return;
     
-    // Spawn Logic
     if (state.clock.elapsedTime > nextSpawnRef.current) {
         const types: any[] = ['BIKE', 'CAR', 'CAR', 'MATATU', 'BUS'];
         const type = types[Math.floor(Math.random() * types.length)];
         
         const newVehicle: TrafficVehicleProps = {
             id: Math.random(),
-            initialZ: -150, // Spawn ahead
-            lane: 1, // Oncoming is always in the other lane (visually right lane, conceptually lane 1)
+            initialZ: -150,
+            lane: 1, 
             laneOffset: CITY_LANE_OFFSET,
             speed: 30 + Math.random() * 20,
             type,
             direction: 'OPPOSITE',
-            playerLane, // Passed for collision check inside component
+            playerLane,
             onRemove: removeVehicle
         };
 
@@ -147,11 +155,9 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
     const { gameStatus, isCrashing, currentSpeed } = useGameStore();
     const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
     
-    // Two timers: one for incoming, one for same direction
     const nextOncomingSpawnRef = useRef(0);
     const nextSameDirSpawnRef = useRef(0);
 
-    // Reset traffic on restart
     useEffect(() => {
         if (gameStatus === 'IDLE') {
             setVehicleList([]);
@@ -167,19 +173,16 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
     useFrame((state) => {
         if (gameStatus !== 'PLAYING' || isCrashing) return;
         
-        // 1. Spawn SAME DIRECTION cars (Obstacles to overtake)
-        // Only spawn if player is moving
         if (currentSpeed > 10 && state.clock.elapsedTime > nextSameDirSpawnRef.current) {
-            const types: any[] = ['BUS', 'MATATU', 'CAR']; // Heavy slow traffic
+            const types: any[] = ['BUS', 'MATATU', 'CAR']; 
             const type = types[Math.floor(Math.random() * types.length)];
             
-            // Slower than player usually to force overtake
             const trafficSpeed = Math.max(30, currentSpeed * (0.6 + Math.random() * 0.2)); 
 
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
-                lane: -1, // Player's lane (Left)
+                lane: -1, 
                 laneOffset: CITY_LANE_OFFSET,
                 speed: trafficSpeed,
                 type,
@@ -190,11 +193,9 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
     
             setVehicleList(prev => [...prev, newVehicle]);
             
-            // Spawn Rate: Frequent enough to be annoying
             nextSameDirSpawnRef.current = state.clock.elapsedTime + (3 + Math.random() * 4);
         }
 
-        // 2. Spawn OPPOSITE DIRECTION cars (Danger)
         if (state.clock.elapsedTime > nextOncomingSpawnRef.current) {
             const types: any[] = ['CAR', 'SUV', 'MATATU'];
             const type = types[Math.floor(Math.random() * types.length)];
@@ -202,9 +203,9 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
-                lane: 1, // Opposite lane (Right)
+                lane: 1, 
                 laneOffset: CITY_LANE_OFFSET,
-                speed: 60 + Math.random() * 30, // Incoming is fast
+                speed: 60 + Math.random() * 30, 
                 type,
                 direction: 'OPPOSITE',
                 playerLane,
@@ -212,8 +213,6 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
             };
     
             setVehicleList(prev => [...prev, newVehicle]);
-            
-            // Spawn Rate: Gaps are critical for overtaking
             nextOncomingSpawnRef.current = state.clock.elapsedTime + (2 + Math.random() * 3);
         }
     });
@@ -249,25 +248,22 @@ export const EscarpmentTraffic = ({ playerLane }: { playerLane: number }) => {
     useFrame((state) => {
         if (gameStatus !== 'PLAYING' || isCrashing) return;
         
-        // 1. Heavy Trucks (Crawling down the hill in Left Lane)
         if (state.clock.elapsedTime > nextHeavySpawnRef.current) {
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
-                lane: -1, // Player's default lane (Left)
+                lane: -1, 
                 laneOffset: CITY_LANE_OFFSET,
-                speed: 15, // CRAWLING SPEED (The Challenge)
+                speed: 15, 
                 type: 'HEAVY_TRUCK',
                 direction: 'SAME',
                 playerLane,
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            // Spawn frequently to force constant lane switching
             nextHeavySpawnRef.current = state.clock.elapsedTime + (3 + Math.random() * 3);
         }
 
-        // 2. Oncoming Traffic (Right Lane - Fast)
         if (state.clock.elapsedTime > nextOncomingSpawnRef.current) {
              const types: any[] = ['CAR', 'SUV', 'MATATU'];
              const type = types[Math.floor(Math.random() * types.length)];
@@ -275,9 +271,9 @@ export const EscarpmentTraffic = ({ playerLane }: { playerLane: number }) => {
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
-                lane: 1, // Opposite Lane
+                lane: 1, 
                 laneOffset: CITY_LANE_OFFSET,
-                speed: 70 + Math.random() * 30, // Fast Uphill
+                speed: 70 + Math.random() * 30, 
                 type,
                 direction: 'OPPOSITE',
                 playerLane,
@@ -285,6 +281,66 @@ export const EscarpmentTraffic = ({ playerLane }: { playerLane: number }) => {
             };
             setVehicleList(prev => [...prev, newVehicle]);
             nextOncomingSpawnRef.current = state.clock.elapsedTime + (1.5 + Math.random() * 2);
+        }
+    });
+
+    return (
+        <>
+        {vehicleList.map(v => (
+            <TrafficVehicle key={v.id} {...v} playerLane={playerLane} onRemove={removeVehicle} />
+        ))}
+        </>
+    );
+}
+
+// --- Gridlock Traffic (River Road) ---
+export const GridlockTraffic = ({ playerLane }: { playerLane: number }) => {
+    const { gameStatus, isCrashing } = useGameStore();
+    const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
+    const nextSpawnRef = useRef(0);
+
+    useEffect(() => {
+        if (gameStatus === 'IDLE') {
+            setVehicleList([]);
+            nextSpawnRef.current = 0;
+        }
+    }, [gameStatus]);
+
+    const removeVehicle = (id: number) => {
+        setVehicleList(prev => prev.filter(v => v.id !== id));
+    };
+
+    useFrame((state) => {
+        if (gameStatus !== 'PLAYING' || isCrashing) return;
+        
+        // Spawn congested traffic in lanes -1 and 1
+        if (state.clock.elapsedTime > nextSpawnRef.current) {
+            
+            // Randomly choose lane -1 or 1
+            const lane = Math.random() > 0.5 ? 1 : -1;
+            
+            const types: any[] = ['MATATU', 'BUS', 'CAR', 'SUV'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            // Very slow speeds: 0 to 20 km/h
+            const speed = Math.random() * 20;
+
+            const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -200, 
+                lane, 
+                laneOffset: CITY_LANE_OFFSET,
+                speed, 
+                type,
+                direction: 'SAME',
+                playerLane,
+                driftX: true, // Enable Squeeze Mechanic
+                onRemove: removeVehicle
+            };
+    
+            setVehicleList(prev => [...prev, newVehicle]);
+            // Dense spawn rate
+            nextSpawnRef.current = state.clock.elapsedTime + (1 + Math.random() * 1.5);
         }
     });
 
@@ -319,13 +375,10 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     useFrame((state) => {
         if (gameStatus !== 'PLAYING' || isCrashing) return;
         
-        // Only spawn if moving fast enough
         if (currentSpeed > 20 && state.clock.elapsedTime > nextSpawnRef.current) {
             
-            // Lanes: -1 (Left/Slow), 0 (Mid), 1 (Right/Fast)
             const lanes = [-1, 0, 1];
             
-            // Try not to pick the same lane twice in a row
             let validLanes = lanes.filter(l => l !== lastSpawnLaneRef.current);
             if (validLanes.length === 0) validLanes = lanes;
             const spawnLane = validLanes[Math.floor(Math.random() * validLanes.length)];

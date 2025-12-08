@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { Wheel, VehicleHeadlight, LicensePlate } from '../vehicles/VehicleParts';
 
 const ROAD_WIDTH = 8;
-const HIGHWAY_WIDTH = 15; // Increased from 12 to accommodate wider lanes (3.5 * 3 + margins)
+const HIGHWAY_WIDTH = 15; 
+const RIVER_ROAD_WIDTH = 7; // Narrower
 
 // --- Buildings & Landmarks ---
 
@@ -78,6 +79,25 @@ export const ModernBuilding = ({ height, color, position }: { height: number, co
     </group>
   );
 };
+
+export const Billboard = ({ position, rotation = [0,0,0] }: { position: [number, number, number], rotation?: [number, number, number] }) => {
+    return (
+        <group position={position} rotation={rotation as any}>
+            <mesh position={[0, 3, 0]}>
+                <cylinderGeometry args={[0.1, 0.1, 6]} />
+                <meshStandardMaterial color="#333" />
+            </mesh>
+            <mesh position={[0, 5, 0.1]}>
+                <boxGeometry args={[4, 2, 0.2]} />
+                <meshStandardMaterial color="#fff" />
+            </mesh>
+            <mesh position={[0, 5, 0.21]}>
+                <planeGeometry args={[3.8, 1.8]} />
+                <meshStandardMaterial color="#2563eb" emissive="#1d4ed8" emissiveIntensity={0.2} />
+            </mesh>
+        </group>
+    )
+}
 
 export const BusStopShelter = () => {
   return (
@@ -186,13 +206,22 @@ export const HighwayLightPole = ({ isLeft = false }: { isLeft?: boolean }) => {
   );
 };
 
-export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotation: [number, number, number]; }> = ({ position, rotation }) => {
+export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotation: [number, number, number]; isWalking?: boolean }> = ({ position, rotation, isWalking = false }) => {
   const shirtColor = useMemo(() => ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)], []);
   const pantsColor = useMemo(() => ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)], []);
   const skinColor = '#8d5524';
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame((state) => {
+      if (isWalking && groupRef.current) {
+          const t = state.clock.elapsedTime * 10;
+          groupRef.current.position.y = position[1] + Math.abs(Math.sin(t)) * 0.1;
+          groupRef.current.rotation.z = Math.sin(t) * 0.05;
+      }
+  })
 
   return (
-    <group position={position} rotation={rotation} scale={[0.7, 0.7, 0.7]}>
+    <group ref={groupRef} position={position} rotation={rotation} scale={[0.7, 0.7, 0.7]}>
       <mesh position={[0, 1.6, 0]}>
         <sphereGeometry args={[0.2, 8, 8]} />
         <meshStandardMaterial color={skinColor} />
@@ -213,9 +242,65 @@ export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotati
   );
 };
 
+export const CopOnFoot: React.FC<{ position: [number, number, number]; side: 'LEFT' | 'RIGHT'; playerLane: number }> = ({ position, side, playerLane }) => {
+    const { endGame, distanceTraveled } = useGameStore();
+    const groupRef = useRef<THREE.Group>(null);
+
+    useFrame(() => {
+        if (!groupRef.current) return;
+        
+        // Simple collision check
+        // The cop moves towards player (which is at z=0 approx)
+        // If cop Z is ~0 and player is in the cop's lane (Sidewalk), arrest.
+        
+        const copZ = groupRef.current.position.z;
+        
+        // Cop z is relative to parent container usually, but let's assume world coords if scrolling in map.
+        // Actually, props like scrolling decorations have local Z relative to their container which moves.
+        // BUT, if we assume this component is placed in a scrolling group:
+        // We need world position.
+        // For simplicity, let's assume collision logic happens based on the passed prop if managed by parent
+        // OR rely on traffic system style checks.
+        
+        // Here we just render. Logic handled in RiverRoadMap via distance check if possible, or here if we trust Z.
+    });
+
+    return (
+        <group ref={groupRef} position={position} rotation={[0, side === 'LEFT' ? Math.PI/2 : -Math.PI/2, 0]} scale={[0.8, 0.8, 0.8]}>
+            <mesh position={[0, 1.6, 0]}>
+                <sphereGeometry args={[0.2, 8, 8]} />
+                <meshStandardMaterial color="#8d5524" />
+            </mesh>
+            {/* Police Hat */}
+            <mesh position={[0, 1.85, 0]}>
+                <cylinderGeometry args={[0.22, 0.22, 0.1]} />
+                <meshStandardMaterial color="#1e3a8a" />
+            </mesh>
+             {/* Uniform */}
+            <mesh position={[0, 1.0, 0]}>
+                <boxGeometry args={[0.4, 0.8, 0.25]} />
+                <meshStandardMaterial color="#1e40af" />
+            </mesh>
+            {/* Reflective Vest */}
+            <mesh position={[0, 1.1, 0.05]}>
+                <boxGeometry args={[0.42, 0.5, 0.26]} />
+                <meshStandardMaterial color="#fbbf24" />
+            </mesh>
+            <mesh position={[-0.12, 0.3, 0]}>
+                <cylinderGeometry args={[0.08, 0.07, 0.6]} />
+                <meshStandardMaterial color="#111827" />
+            </mesh>
+            <mesh position={[0.12, 0.3, 0]}>
+                <cylinderGeometry args={[0.08, 0.07, 0.6]} />
+                <meshStandardMaterial color="#111827" />
+            </mesh>
+        </group>
+    )
+}
+
 // --- Infrastructure ---
 
-export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHWAY' }) => {
+export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHWAY' | 'RIVER_ROAD' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const STRIP_COUNT = 20;
   const STRIP_GAP = 10; 
@@ -223,8 +308,12 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
   
   const isRural = variant === 'RURAL';
   const isHighway = variant === 'HIGHWAY';
+  const isRiverRoad = variant === 'RIVER_ROAD';
   
-  const width = isHighway ? HIGHWAY_WIDTH : ROAD_WIDTH;
+  let width = ROAD_WIDTH;
+  if (isHighway) width = HIGHWAY_WIDTH;
+  if (isRiverRoad) width = RIVER_ROAD_WIDTH;
+
   const GRASS_OFFSET = width / 2 + 5;
 
   const roadColor = isRural ? "#5D4037" : (timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a");
@@ -256,12 +345,6 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
              {/* Center Lines */}
              {isHighway ? (
                 <>
-                   {/* 
-                     Lane Markings Logic:
-                     Highway Offset is 3.5. 
-                     Lanes are at -3.5, 0, 3.5.
-                     Markings should be midpoints: (-3.5+0)/2 = -1.75 and (0+3.5)/2 = 1.75.
-                   */}
                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-1.75, 0.01, 0]}>
                       <planeGeometry args={[0.15, 4]} />
                       <meshStandardMaterial color="#ffffff" />
@@ -270,7 +353,6 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
                       <planeGeometry args={[0.15, 4]} />
                       <meshStandardMaterial color="#ffffff" />
                    </mesh>
-                   {/* Shoulder Lines (Yellow Solid) - Far edges (Width 15 / 2 = 7.5) */}
                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-6.5, 0.01, 0]}>
                       <planeGeometry args={[0.2, 10]} />
                       <meshStandardMaterial color={stripColor} />
@@ -291,14 +373,39 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
       </group>
 
       {/* Sides */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
-        <planeGeometry args={[10, 300]} />
-        <meshStandardMaterial color={sideColor} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRASS_OFFSET, -0.1, 0]}>
-        <planeGeometry args={[10, 300]} />
-        <meshStandardMaterial color={sideColor} />
-      </mesh>
+      {isRiverRoad ? (
+          // River Road Pavements
+          <>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-(width/2 + 2), 0.15, 0]}>
+                <planeGeometry args={[4, 300]} />
+                <meshStandardMaterial color="#64748b" roughness={0.8} />
+            </mesh>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(width/2 + 2), 0.15, 0]}>
+                <planeGeometry args={[4, 300]} />
+                <meshStandardMaterial color="#64748b" roughness={0.8} />
+            </mesh>
+            {/* Curbs */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-(width/2), 0.15, 0]}>
+                <boxGeometry args={[0.2, 300, 0.3]} />
+                <meshStandardMaterial color="#94a3b8" />
+            </mesh>
+             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(width/2), 0.15, 0]}>
+                <boxGeometry args={[0.2, 300, 0.3]} />
+                <meshStandardMaterial color="#94a3b8" />
+            </mesh>
+          </>
+      ) : (
+        <>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
+                <planeGeometry args={[10, 300]} />
+                <meshStandardMaterial color={sideColor} />
+            </mesh>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRASS_OFFSET, -0.1, 0]}>
+                <planeGeometry args={[10, 300]} />
+                <meshStandardMaterial color={sideColor} />
+            </mesh>
+        </>
+      )}
     </group>
   );
 };

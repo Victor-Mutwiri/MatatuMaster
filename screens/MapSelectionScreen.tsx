@@ -20,6 +20,17 @@ const MAPS: Route[] = [
     isLocked: false
   },
   {
+    id: 'river-road',
+    name: 'River Road Gridlock',
+    distance: 6.5,
+    potentialEarnings: 15000,
+    trafficLevel: 'Gridlock',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '40 mins',
+    description: 'The Chaos Capital. Traffic is stuck. Drive on the pavement to pass, squeeze through gaps, but avoid the foot patrol!',
+    isLocked: false
+  },
+  {
     id: 'rural-dirt',
     name: 'Upcountry Dirt Road',
     distance: 17.0,
@@ -86,7 +97,7 @@ export const MapSelectionScreen: React.FC = () => {
 
   const handleRouteSelect = (map: Route) => {
     // Guest check logic - allow first few maps
-    const freeMaps = ['kiambu-route', 'rural-dirt', 'thika-highway', 'limuru-drive', 'maimahiu-escarpment'];
+    const freeMaps = ['kiambu-route', 'rural-dirt', 'river-road', 'thika-highway', 'limuru-drive', 'maimahiu-escarpment'];
     
     if (userMode === 'GUEST' && !freeMaps.includes(map.id)) {
         setShowAuthGate(true);

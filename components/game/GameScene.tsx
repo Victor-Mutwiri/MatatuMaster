@@ -12,8 +12,9 @@ import { DirtRoadMap } from './maps/DirtRoadMap';
 import { ThikaRoadMap } from './maps/ThikaRoadMap';
 import { LimuruRoadMap } from './maps/LimuruRoadMap';
 import { MaiMahiuMap } from './maps/MaiMahiuMap';
+import { RiverRoadMap } from './maps/RiverRoadMap';
 import { PlayerController } from './PlayerController';
-import { OncomingTraffic, HighwayTraffic, TwoWayTraffic, EscarpmentTraffic } from './logic/TrafficSystem';
+import { OncomingTraffic, HighwayTraffic, TwoWayTraffic, EscarpmentTraffic, GridlockTraffic } from './logic/TrafficSystem';
 
 interface GameSceneProps {
   vehicleType: VehicleType | null;
@@ -30,17 +31,20 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   const isHighway = selectedRoute?.id === 'thika-highway';
   const isLimuru = selectedRoute?.id === 'limuru-drive';
   const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
+  const isRiverRoad = selectedRoute?.id === 'river-road';
 
   const bgClass = timeOfDay === 'NIGHT' 
     ? 'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-950'
     : isOffroad 
-      ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-orange-100 to-amber-50' // Dusty
+      ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-orange-100 to-amber-50' 
       : isLimuru
-        ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-300 via-slate-400 to-slate-200' // Misty/Overcast
+        ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-300 via-slate-400 to-slate-200' 
         : isEscarpment
-            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-300 via-sky-200 to-amber-50' // Hot/Dry Valley Sky
+            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-300 via-sky-200 to-amber-50' 
         : isHighway
-            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400 via-indigo-300 to-slate-200' // Clear Sky
+            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400 via-indigo-300 to-slate-200' 
+        : isRiverRoad
+            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-200 via-slate-300 to-slate-400' // Smoggy City
             : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-400 via-blue-300 to-blue-200';
 
   const fogColor = timeOfDay === 'NIGHT' 
@@ -48,15 +52,17 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
     : isOffroad 
       ? '#e7d4c0' 
       : isLimuru 
-        ? '#cbd5e1' // Heavy Fog
+        ? '#cbd5e1' 
         : isEscarpment
-            ? '#e0f2fe' // Very light fog for distant view
+            ? '#e0f2fe' 
             : isHighway
             ? '#cbd5e1'
+            : isRiverRoad
+            ? '#e2e8f0'
             : '#e0f2fe';
 
   // Fog "Far" Distance
-  const fogDensity = isLimuru ? 75 : (isHighway || isEscarpment ? 150 : 100);
+  const fogDensity = isLimuru ? 75 : (isHighway || isEscarpment ? 150 : (isRiverRoad ? 80 : 100));
 
   return (
     <div className={`w-full h-full ${bgClass}`}>
@@ -65,7 +71,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <ambientLight intensity={isLimuru ? 0.4 : (timeOfDay === 'NIGHT' ? 0.5 : 0.6)} />
         <directionalLight 
           position={timeOfDay === 'NIGHT' ? [-20, 30, -10] : [20, 30, 10]} 
-          intensity={timeOfDay === 'NIGHT' ? 0.8 : (isLimuru ? 0.8 : (isEscarpment ? 1.8 : 1.5))} // Bright sun for escarpment
+          intensity={timeOfDay === 'NIGHT' ? 0.8 : (isLimuru ? 0.8 : (isEscarpment ? 1.8 : 1.5))} 
           castShadow 
           shadow-mapSize={[1024, 1024]} 
           color={timeOfDay === 'NIGHT' ? "#cbd5e1" : (isOffroad ? "#ffedd5" : "#ffffff")} 
@@ -80,6 +86,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
          isHighway ? <ThikaRoadMap /> : 
          isLimuru ? <LimuruRoadMap /> : 
          isEscarpment ? <MaiMahiuMap /> :
+         isRiverRoad ? <RiverRoadMap playerLane={playerLane} /> :
          <NairobiMap />}
 
         {/* Player & Traffic */}
@@ -92,6 +99,8 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
             <TwoWayTraffic playerLane={playerLane} />
         ) : isEscarpment ? (
             <EscarpmentTraffic playerLane={playerLane} />
+        ) : isRiverRoad ? (
+            <GridlockTraffic playerLane={playerLane} />
         ) : (
             <OncomingTraffic playerLane={playerLane} />
         )}
