@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, User, Settings as SettingsIcon, Volume2, VolumeX, Save, Trash2, Lock, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, User, Settings as SettingsIcon, Volume2, VolumeX, Save, Trash2, Lock, ShieldCheck, UserPlus } from 'lucide-react';
 
 export const SettingsScreen: React.FC = () => {
   const { setScreen, playerName, saccoName, setPlayerInfo, isSoundOn, toggleSound, resetCareer, userMode } = useGameStore();
@@ -12,24 +12,29 @@ export const SettingsScreen: React.FC = () => {
   const [sacco, setSacco] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // If registered, these fields are immutable
-  const isProfileLocked = userMode === 'REGISTERED';
+  const isGuest = userMode === 'GUEST';
 
   useEffect(() => {
-    setName(playerName);
-    setSacco(saccoName);
-  }, [playerName, saccoName]);
+    if (!isGuest) {
+      setName(playerName);
+      setSacco(saccoName);
+    }
+  }, [playerName, saccoName, isGuest]);
 
   const handleSave = () => {
-    // Only allow saving if not locked
-    if (!isProfileLocked) {
+    // Should not be reachable by guests or locked profiles, but safety check
+    if (!isGuest && userMode !== 'REGISTERED') {
         setPlayerInfo(name, sacco);
     }
     setScreen('SETUP');
   };
 
   const handleBack = () => {
-    setScreen('SETUP'); // Note: Setup will redirect to choice/GameMode based on auth status
+    setScreen('SETUP'); 
+  };
+
+  const handleCreateProfile = () => {
+    setScreen('SETUP'); // Redirect to Auth
   };
 
   const handleReset = () => {
@@ -63,7 +68,7 @@ export const SettingsScreen: React.FC = () => {
             
             {/* Profile Section */}
             <section className="bg-slate-900/50 border border-slate-700 rounded-2xl p-6 relative overflow-hidden">
-                {isProfileLocked && (
+                {!isGuest && (
                     <div className="absolute top-0 right-0 bg-green-900/30 border-l border-b border-green-500/30 rounded-bl-xl px-3 py-1 flex items-center gap-2">
                         <ShieldCheck size={14} className="text-green-400" />
                         <span className="text-[10px] uppercase font-bold text-green-400">Verified Profile</span>
@@ -75,60 +80,56 @@ export const SettingsScreen: React.FC = () => {
                     <h3 className="font-display text-lg font-bold text-white">Driver Profile</h3>
                 </div>
                 
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                            Conductor Name / Alias
-                            {isProfileLocked && <Lock size={12} className="text-slate-500" />}
-                        </label>
-                        <input 
-                            type="text" 
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            disabled={isProfileLocked}
-                            placeholder="Enter your name"
-                            className={`w-full border-2 rounded-lg p-3 text-white transition-all
-                                ${isProfileLocked 
-                                    ? 'bg-slate-950 border-slate-800 text-slate-500 cursor-not-allowed' 
-                                    : 'bg-slate-800 border-slate-700 focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/80'}
-                            `}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                            Sacco Name
-                            {isProfileLocked && <Lock size={12} className="text-slate-500" />}
-                        </label>
-                        <input 
-                            type="text" 
-                            value={sacco}
-                            onChange={(e) => setSacco(e.target.value)}
-                            disabled={isProfileLocked}
-                            placeholder="Enter your SACCO"
-                             className={`w-full border-2 rounded-lg p-3 text-white transition-all
-                                ${isProfileLocked 
-                                    ? 'bg-slate-950 border-slate-800 text-slate-500 cursor-not-allowed' 
-                                    : 'bg-slate-800 border-slate-700 focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/80'}
-                            `}
-                        />
-                    </div>
-
-                    {!isProfileLocked ? (
-                        <div className="pt-2">
-                            <Button fullWidth onClick={handleSave} disabled={!name || !sacco}>
-                                <span className="flex items-center justify-center gap-2">
-                                    <Save size={16} /> Save Profile
-                                </span>
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="pt-2">
-                            <p className="text-xs text-slate-500 text-center italic">
-                                Identity details are permanent for registered conductors.
-                            </p>
-                        </div>
-                    )}
-                </div>
+                {isGuest ? (
+                  // GUEST VIEW - BLOCKED
+                  <div className="text-center py-6">
+                      <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-600">
+                          <User size={32} className="text-slate-500" />
+                      </div>
+                      <h4 className="text-white font-bold text-lg mb-2">Guest Mode Active</h4>
+                      <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
+                        You are playing anonymously. Create an account to set your Conductor Name, Sacco, and save your career progress.
+                      </p>
+                      <Button fullWidth onClick={handleCreateProfile}>
+                          <span className="flex items-center justify-center gap-2">
+                              <UserPlus size={18} /> Create Conductor Profile
+                          </span>
+                      </Button>
+                  </div>
+                ) : (
+                  // REGISTERED VIEW - READ ONLY
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                              Conductor Name / Alias
+                              <Lock size={12} className="text-slate-500" />
+                          </label>
+                          <input 
+                              type="text" 
+                              value={name}
+                              disabled={true}
+                              className="w-full border-2 rounded-lg p-3 text-slate-500 bg-slate-950 border-slate-800 cursor-not-allowed"
+                          />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                              Sacco Name
+                              <Lock size={12} className="text-slate-500" />
+                          </label>
+                          <input 
+                              type="text" 
+                              value={sacco}
+                              disabled={true}
+                              className="w-full border-2 rounded-lg p-3 text-slate-500 bg-slate-950 border-slate-800 cursor-not-allowed"
+                          />
+                      </div>
+                      <div className="pt-2">
+                          <p className="text-xs text-slate-500 text-center italic">
+                              Identity details are permanent for registered conductors.
+                          </p>
+                      </div>
+                  </div>
+                )}
             </section>
 
             {/* Game Config Section */}

@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { X, User, MapPin, Wallet, ShieldAlert, Briefcase, Settings, Trophy, Award } from 'lucide-react';
+import { X, User, MapPin, Wallet, ShieldAlert, Briefcase, Settings, Trophy, Award, UserPlus } from 'lucide-react';
 import { Button } from './Button';
 
 interface ProfileModalProps {
@@ -17,9 +18,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
     setScreen 
   } = useGameStore();
 
+  const isGuest = userMode === 'GUEST';
+
   const handleEditProfile = () => {
     onClose();
-    setScreen('SETTINGS');
+    if (isGuest) {
+      setScreen('SETUP'); // Go to Auth/Onboarding
+    } else {
+      setScreen('SETTINGS'); // Go to Settings (Read-only)
+    }
   };
 
   // Determine Rank Title based on Distance
@@ -54,7 +61,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                  <div className="bg-matatu-yellow text-black text-xs font-black px-2 py-0.5 rounded uppercase tracking-widest">
                     PSV License
                  </div>
-                 {userMode === 'REGISTERED' && (
+                 {!isGuest && (
                     <div className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
                         <Award size={10} /> Verified
                     </div>
@@ -69,16 +76,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
            <div className="mt-6 flex items-center gap-5">
               <div className="w-20 h-20 bg-slate-700 rounded-xl border-2 border-slate-500 flex items-center justify-center shadow-lg relative shrink-0">
                   <User size={40} className="text-slate-400" />
-                  <div className="absolute -bottom-2 -right-2 bg-matatu-yellow text-black text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-900">
-                      KE
-                  </div>
+                  {!isGuest && (
+                    <div className="absolute -bottom-2 -right-2 bg-matatu-yellow text-black text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-900">
+                        KE
+                    </div>
+                  )}
               </div>
               <div className="min-w-0">
                   <h2 className="font-display font-black text-2xl text-white uppercase tracking-wider truncate">
-                      {playerName || 'Guest Driver'}
+                      {isGuest ? 'Guest Driver' : playerName}
                   </h2>
                   <p className="text-slate-400 text-xs uppercase tracking-widest mb-1">
-                      {saccoName || 'Freelancer'}
+                      {isGuest ? 'Unregistered' : saccoName}
                   </p>
                   <div className="inline-flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded text-xs text-yellow-400 font-bold border border-yellow-500/30">
                      <Trophy size={12} /> {rankTitle}
@@ -131,9 +140,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
 
             {/* Footer / Actions */}
             <div className="flex gap-3">
-                <Button variant="secondary" fullWidth onClick={handleEditProfile}>
+                <Button variant={isGuest ? 'primary' : 'secondary'} fullWidth onClick={handleEditProfile}>
                     <span className="flex items-center gap-2 justify-center text-xs">
-                        <Settings size={16} /> Edit Details
+                        {isGuest ? (
+                           <> <UserPlus size={16} /> Create Profile </>
+                        ) : (
+                           <> <Settings size={16} /> View Details </>
+                        )}
                     </span>
                 </Button>
                 {/* Could add a 'Share Profile' button here later */}
@@ -141,7 +154,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
 
             <div className="mt-4 text-center">
                 <p className="text-[10px] text-slate-400 font-mono uppercase tracking-widest">
-                    ID: {userMode === 'GUEST' ? 'UNREGISTERED' : btoa(playerName).substring(0, 12).toUpperCase()}
+                    ID: {isGuest ? 'UNREGISTERED' : btoa(playerName).substring(0, 12).toUpperCase()}
                 </p>
             </div>
 
