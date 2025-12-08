@@ -17,12 +17,17 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   const timeOfDay = useGameStore(state => state.timeOfDay);
   const gameStatus = useGameStore(state => state.gameStatus);
   const isCrashing = useGameStore(state => state.isCrashing);
+  const selectedRoute = useGameStore(state => state.selectedRoute);
+  const currentSpeed = useGameStore(state => state.currentSpeed);
   const currentPassengers = useGameStore(state => state.currentPassengers);
   const [lane, setLane] = useState<-1 | 1>(-1); 
   const LERP_SPEED = 8;
   const TILT_ANGLE = 0.1;
 
   const reportLaneChange = useGameStore(state => state.reportLaneChange);
+
+  // Check if current route is the Dirt Road
+  const isOffroad = selectedRoute?.id === 'rural-dirt';
 
   useEffect(() => {
     setLaneCallback(lane);
@@ -120,7 +125,28 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
          meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, delta * LERP_SPEED);
          const xDiff = targetX - meshRef.current.position.x;
          meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, -xDiff * TILT_ANGLE, delta * LERP_SPEED);
-         meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 15) * 0.02; 
+         
+         // Standard idle bob
+         let yPos = Math.sin(state.clock.elapsedTime * 15) * 0.02;
+
+         // Offroad Bouncing Mechanic
+         if (isOffroad && currentSpeed > 5) {
+            // Intense, chaotic bouncing based on speed
+            const bounceFreq = 30 + (currentSpeed * 0.5); // Faster bumps at speed
+            const bounceAmp = 0.05 + (currentSpeed / 200) * 0.15; // Higher bumps at speed
+            
+            // Perlin-noise like effect using combined sines
+            const noise = Math.sin(state.clock.elapsedTime * bounceFreq) * 
+                          Math.cos(state.clock.elapsedTime * (bounceFreq * 0.7));
+            
+            yPos += noise * bounceAmp;
+
+            // Add slight random roll/pitch for rough terrain feel
+            meshRef.current.rotation.z += (Math.random() - 0.5) * 0.02 * (currentSpeed/50);
+            meshRef.current.rotation.x += (Math.random() - 0.5) * 0.01 * (currentSpeed/50);
+         }
+
+         meshRef.current.position.y = yPos;
       }
     }
   });

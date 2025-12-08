@@ -100,6 +100,17 @@ export const BusStopShelter = () => {
   );
 };
 
+export const Rock = ({ scale = 1 }: { scale?: number }) => {
+  return (
+    <group scale={[scale, scale, scale]}>
+      <mesh rotation={[Math.random() * Math.PI, Math.random() * Math.PI, 0]}>
+        <dodecahedronGeometry args={[0.8, 0]} />
+        <meshStandardMaterial color="#5D4037" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+};
+
 export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotation: [number, number, number]; }> = ({ position, rotation }) => {
   const shirtColor = useMemo(() => ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)], []);
   const pantsColor = useMemo(() => ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)], []);
@@ -129,13 +140,18 @@ export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotati
 
 // --- Infrastructure ---
 
-export const Road = () => {
+export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const STRIP_COUNT = 20;
   const STRIP_GAP = 10; 
   const GRASS_OFFSET = ROAD_WIDTH / 2 + 5; 
   const timeOfDay = useGameStore(state => state.timeOfDay);
   
+  const isRural = variant === 'RURAL';
+  const roadColor = isRural ? "#5D4037" : (timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a");
+  const sideColor = isRural ? "#795548" : (timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b");
+  const stripColor = isRural ? "#8d6e63" : "#fbbf24";
+
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
     if (groupRef.current && speed > 0) {
@@ -150,29 +166,31 @@ export const Road = () => {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
         <planeGeometry args={[ROAD_WIDTH, 300]} />
-        <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a"} roughness={0.8} />
+        <meshStandardMaterial color={roadColor} roughness={1.0} />
       </mesh>
+      {/* Road Strips / Texture */}
       <group ref={groupRef}>
         {Array.from({ length: STRIP_COUNT }).map((_, i) => (
           <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -i * STRIP_GAP]}>
-            <planeGeometry args={[0.15, 4]} />
-            <meshBasicMaterial color="#fbbf24" />
+            <planeGeometry args={[isRural ? 0.4 : 0.15, isRural ? 2 : 4]} />
+            <meshStandardMaterial color={stripColor} opacity={isRural ? 0.3 : 1} transparent={isRural} />
           </mesh>
         ))}
       </group>
+      {/* Sides */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
-        <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"} />
+        <meshStandardMaterial color={sideColor} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRASS_OFFSET, -0.1, 0]}>
         <planeGeometry args={[10, 300]} />
-        <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"} />
+        <meshStandardMaterial color={sideColor} />
       </mesh>
     </group>
   );
 };
 
-export const Scenery = () => {
+export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const { timeOfDay, totalRouteDistance, distanceTraveled } = useGameStore();
   
@@ -182,16 +200,27 @@ export const Scenery = () => {
   const distRemaining = totalRouteDistance - distanceTraveled;
   const isCityApproaching = distRemaining < 800;
 
+  const isRural = variant === 'RURAL';
+
   const sceneryItems = useMemo(() => {
     return Array.from({ length: OBJECT_COUNT }).map((_, i) => {
       const side = i % 2 === 0 ? 1 : -1;
       const x = (OFFSET_FROM_ROAD + Math.random() * 4) * side;
       const z = -i * GAP;
-      const type = i % 6 === 0 ? 'SIGN' : i % 3 === 0 ? 'BUSH' : 'TREE';
+      
+      let type = 'TREE';
+      if (isRural) {
+         // Rural: Mix of Rocks and Trees, no Signs
+         type = Math.random() > 0.6 ? 'ROCK' : 'TREE';
+      } else {
+         // City: Mix of Trees, Bushes, Signs
+         type = i % 6 === 0 ? 'SIGN' : i % 3 === 0 ? 'BUSH' : 'TREE';
+      }
+      
       const scale = 0.8 + Math.random() * 0.4;
       return { x, z, type, side, scale };
     });
-  }, []);
+  }, [isRural]);
 
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
@@ -225,6 +254,8 @@ export const Scenery = () => {
               <dodecahedronGeometry args={[0.8, 0]} />
               <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#143311" : "#2d5a27"} />
             </mesh>
+          ) : item.type === 'ROCK' ? (
+             <Rock scale={item.scale} />
           ) : (
             <group>
               <mesh position={[0, 0.5, 0]}>
@@ -233,7 +264,7 @@ export const Scenery = () => {
               </mesh>
               <mesh position={[0, 2, 0]}>
                 <coneGeometry args={[1.5, 3, 8]} />
-                <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#032b20" : "#065f46"} />
+                <meshStandardMaterial color={timeOfDay === 'NIGHT' ? "#032b20" : isRural ? "#386641" : "#065f46"} />
               </mesh>
             </group>
           )}

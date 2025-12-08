@@ -20,6 +20,17 @@ const MAPS: Route[] = [
     isLocked: false
   },
   {
+    id: 'rural-dirt',
+    name: 'Upcountry Dirt Road',
+    distance: 17.0,
+    potentialEarnings: 6000,
+    trafficLevel: 'Low',
+    dangerLevel: 'Sketchy',
+    timeLimit: '55 mins',
+    description: 'A rough offroad route through the village. Very bumpy and dusty.',
+    isLocked: false
+  },
+  {
     id: 'thika-highway',
     name: 'Thika Highway',
     distance: 40.2,
@@ -51,10 +62,10 @@ export const MapSelectionScreen: React.FC = () => {
   }, []);
 
   const handleRouteSelect = (map: Route) => {
-    // If guest tries to select any map other than the first one (ID check or Index check)
-    // Currently, secondary maps are locked anyway, but if they were unlocked in logic, we'd still want to gate them for guests.
-    // For now, we stick to the prompt: "If they again try to select another map, they are prevented."
-    if (userMode === 'GUEST' && map.id !== MAPS[0].id) {
+    // Guest check logic - allow first two maps (City + Dirt)
+    const freeMaps = ['kiambu-route', 'rural-dirt'];
+    
+    if (userMode === 'GUEST' && !freeMaps.includes(map.id)) {
         setShowAuthGate(true);
         return;
     }
@@ -179,7 +190,7 @@ export const MapSelectionScreen: React.FC = () => {
                              <span className="flex items-center gap-1"><Car size={12}/> {map.trafficLevel}</span>
                           </div>
                         </div>
-                        {isLocked ? <Lock className="text-slate-500 mb-1" /> : (userMode === 'GUEST' && map.id !== MAPS[0].id && <Lock className="text-matatu-yellow mb-1" />)}
+                        {isLocked && <Lock className="text-slate-500 mb-1" />}
                       </div>
                     </div>
                   </div>

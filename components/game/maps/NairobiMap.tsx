@@ -89,9 +89,9 @@ const NairobiCityLayout = () => {
 export const NairobiMap = () => {
   return (
     <group>
-      <Scenery />
+      <Scenery variant="CITY" />
       <NairobiCityLayout />
-      <Road />
+      <Road variant="CITY" />
       <StageMarker />
       <PoliceMarker />
     </group>
