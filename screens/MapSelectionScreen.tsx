@@ -31,6 +31,17 @@ const MAPS: Route[] = [
     isLocked: false
   },
   {
+    id: 'limuru-drive',
+    name: 'Limuru Misty Drive',
+    distance: 22.5,
+    potentialEarnings: 7500,
+    trafficLevel: 'High',
+    dangerLevel: 'Sketchy',
+    timeLimit: '1h 00m',
+    description: 'A dangerous single-carriageway. Overtake slow trucks but watch out for incoming traffic in the fog!',
+    isLocked: false
+  },
+  {
     id: 'thika-highway',
     name: 'Thika Highway',
     distance: 40.2,
@@ -63,8 +74,8 @@ export const MapSelectionScreen: React.FC = () => {
   }, []);
 
   const handleRouteSelect = (map: Route) => {
-    // Guest check logic - allow first two maps (City + Dirt) and now Thika for trial
-    const freeMaps = ['kiambu-route', 'rural-dirt', 'thika-highway'];
+    // Guest check logic - allow first few maps
+    const freeMaps = ['kiambu-route', 'rural-dirt', 'thika-highway', 'limuru-drive'];
     
     if (userMode === 'GUEST' && !freeMaps.includes(map.id)) {
         setShowAuthGate(true);
@@ -210,7 +221,7 @@ export const MapSelectionScreen: React.FC = () => {
                    <div className="text-xs text-slate-400 mt-0.5">{activeRoute.distance}km • {activeRoute.timeLimit}</div>
                 </div>
                 <div className="text-right">
-                   <div className="text-[10px] text-slate-500 uppercase font-bold">Reward</div>
+                   <div className="text-[10px] text-slate-500 uppercase font-bold Reward">Reward</div>
                    <div className="text-green-400 font-mono font-bold">KES {activeRoute.potentialEarnings}</div>
                 </div>
              </div>

@@ -32,8 +32,8 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
     if (!groupRef.current) return;
 
     // --- Movement Logic ---
-    // If direction is SAME (Highway): Relative Speed = PlayerSpeed - TrafficSpeed
-    // If direction is OPPOSITE (City): Relative Speed = PlayerSpeed + TrafficSpeed
+    // If direction is SAME (Highway/Overtaking): Relative Speed = PlayerSpeed - TrafficSpeed
+    // If direction is OPPOSITE (City/Incoming): Relative Speed = PlayerSpeed + TrafficSpeed
     
     let moveDelta = 0;
     if (direction === 'SAME') {
@@ -58,10 +58,7 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
 
     // --- Sound Logic (Whoosh when passing) ---
     if (!passedPlayerRef.current) {
-        // If Highway: we pass them if we are faster (currentZ goes from negative to positive) OR they pass us (positive to negative)
-        // If City: they always come from negative Z to positive (wait, city logic spawns at -150 and moves to +20)
-        
-        // Simplified: Just check if we cross Z=0 area
+        // Simple whoosh check when crossing Z=0
         if (direction === 'SAME') {
              // Overtake (We pass them OR they pass us)
              if ((initialZ < 0 && currentZ >= 0) || (initialZ > 0 && currentZ <= 0)) {
@@ -95,7 +92,7 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
   );
 });
 
-// --- City / Rural Traffic System ---
+// --- City / Rural Traffic System (Simple Oncoming) ---
 export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   const { gameStatus, isCrashing } = useGameStore();
   const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
@@ -143,7 +140,92 @@ export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   );
 };
 
-// --- Highway Traffic System ---
+// --- Two-Way Overtaking System (Limuru Road) ---
+export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
+    const { gameStatus, isCrashing, currentSpeed } = useGameStore();
+    const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
+    
+    // Two timers: one for incoming, one for same direction
+    const nextOncomingSpawnRef = useRef(0);
+    const nextSameDirSpawnRef = useRef(0);
+
+    // Reset traffic on restart
+    useEffect(() => {
+        if (gameStatus === 'IDLE') {
+            setVehicleList([]);
+            nextOncomingSpawnRef.current = 0;
+            nextSameDirSpawnRef.current = 0;
+        }
+    }, [gameStatus]);
+
+    const removeVehicle = (id: number) => {
+        setVehicleList(prev => prev.filter(v => v.id !== id));
+    };
+
+    useFrame((state) => {
+        if (gameStatus !== 'PLAYING' || isCrashing) return;
+        
+        // 1. Spawn SAME DIRECTION cars (Obstacles to overtake)
+        // Only spawn if player is moving
+        if (currentSpeed > 10 && state.clock.elapsedTime > nextSameDirSpawnRef.current) {
+            const types: any[] = ['BUS', 'MATATU', 'CAR']; // Heavy slow traffic
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            // Slower than player usually to force overtake
+            const trafficSpeed = Math.max(30, currentSpeed * (0.6 + Math.random() * 0.2)); 
+
+            const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -300, 
+                lane: -1, // Player's lane (Left)
+                laneOffset: CITY_LANE_OFFSET,
+                speed: trafficSpeed,
+                type,
+                direction: 'SAME',
+                playerLane,
+                onRemove: removeVehicle
+            };
+    
+            setVehicleList(prev => [...prev, newVehicle]);
+            
+            // Spawn Rate: Frequent enough to be annoying
+            nextSameDirSpawnRef.current = state.clock.elapsedTime + (3 + Math.random() * 4);
+        }
+
+        // 2. Spawn OPPOSITE DIRECTION cars (Danger)
+        if (state.clock.elapsedTime > nextOncomingSpawnRef.current) {
+            const types: any[] = ['CAR', 'SUV', 'MATATU'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -300, 
+                lane: 1, // Opposite lane (Right)
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 60 + Math.random() * 30, // Incoming is fast
+                type,
+                direction: 'OPPOSITE',
+                playerLane,
+                onRemove: removeVehicle
+            };
+    
+            setVehicleList(prev => [...prev, newVehicle]);
+            
+            // Spawn Rate: Gaps are critical for overtaking
+            nextOncomingSpawnRef.current = state.clock.elapsedTime + (2 + Math.random() * 3);
+        }
+    });
+  
+    return (
+      <>
+        {vehicleList.map(v => (
+            <TrafficVehicle key={v.id} {...v} playerLane={playerLane} onRemove={removeVehicle} />
+        ))}
+      </>
+    );
+};
+
+// --- Highway Traffic System (3 Lanes) ---
 export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     const { gameStatus, isCrashing, currentSpeed } = useGameStore();
     const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
@@ -165,31 +247,24 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     useFrame((state) => {
         if (gameStatus !== 'PLAYING' || isCrashing) return;
         
-        // Only spawn if moving fast enough to make sense
+        // Only spawn if moving fast enough
         if (currentSpeed > 20 && state.clock.elapsedTime > nextSpawnRef.current) {
             
-            // --- Lane Selection Strategy ---
             // Lanes: -1 (Left/Slow), 0 (Mid), 1 (Right/Fast)
             const lanes = [-1, 0, 1];
             
-            // Try not to pick the same lane twice in a row to prevent vertical stacking
+            // Try not to pick the same lane twice in a row
             let validLanes = lanes.filter(l => l !== lastSpawnLaneRef.current);
             if (validLanes.length === 0) validLanes = lanes;
             const spawnLane = validLanes[Math.floor(Math.random() * validLanes.length)];
             lastSpawnLaneRef.current = spawnLane;
 
-            // --- Speed Strategy (No Blocking Walls) ---
-            // We scale traffic speed relative to player's current speed capability but clamped
-            // Lane -1: 50-70 units/s (Slow lane)
-            // Lane 0: 70-90 units/s
-            // Lane 1: 90-120 units/s (Fast lane)
-            
             let minS = 40, maxS = 60;
             let type: any = 'MATATU';
 
             if (spawnLane === -1) { // Left (Slow)
                 minS = 40; maxS = 65;
-                const types = ['BUS', 'MATATU', 'CAR']; // Heavy traffic
+                const types = ['BUS', 'MATATU', 'CAR']; 
                 type = types[Math.floor(Math.random() * types.length)];
             } else if (spawnLane === 0) { // Middle
                 minS = 65; maxS = 85;
@@ -203,15 +278,9 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
 
             const trafficSpeed = minS + Math.random() * (maxS - minS);
 
-            // If traffic is slower than player, spawn far ahead. 
-            // If traffic is faster than player, spawn behind (to overtake us).
-            // Currently simplified: Spawn far ahead and let logic handle relative speed.
-            // Z = -300. 
-            // If we are doing 100 and they are doing 60, relative is +40. They come towards us from -300.
-            
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
-                initialZ: -300 - (Math.random() * 50), // Add variance to Z so they don't form lines
+                initialZ: -300 - (Math.random() * 50),
                 lane: spawnLane,
                 laneOffset: HIGHWAY_LANE_OFFSET,
                 speed: trafficSpeed,
@@ -223,8 +292,6 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     
             setVehicleList(prev => [...prev, newVehicle]);
             
-            // Spawn Rate: Higher speed = more road covered = more cars needed?
-            // Fixed interval with randomness prevents patterns
             const interval = 0.5 + Math.random() * 0.8;
             nextSpawnRef.current = state.clock.elapsedTime + interval;
         }

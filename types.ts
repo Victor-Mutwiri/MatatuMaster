@@ -31,7 +31,7 @@ export interface Route {
   name: string;
   distance: number; // km
   potentialEarnings: number;
-  trafficLevel: 'Low' | 'Medium' | 'Gridlock';
+  trafficLevel: 'Low' | 'Medium' | 'High' | 'Gridlock';
   dangerLevel: 'Safe' | 'Sketchy' | 'No-Go Zone';
   timeLimit?: string; // e.g. "30 mins"
   description?: string;
