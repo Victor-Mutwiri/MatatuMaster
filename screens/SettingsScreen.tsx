@@ -1,17 +1,19 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, User, Settings as SettingsIcon, Volume2, VolumeX, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Settings as SettingsIcon, Volume2, VolumeX, Save, Trash2, Lock, ShieldCheck } from 'lucide-react';
 
 export const SettingsScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName, setPlayerInfo, isSoundOn, toggleSound, resetCareer } = useGameStore();
+  const { setScreen, playerName, saccoName, setPlayerInfo, isSoundOn, toggleSound, resetCareer, userMode } = useGameStore();
   
   const [name, setName] = useState('');
   const [sacco, setSacco] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // If registered, these fields are immutable
+  const isProfileLocked = userMode === 'REGISTERED';
 
   useEffect(() => {
     setName(playerName);
@@ -19,12 +21,15 @@ export const SettingsScreen: React.FC = () => {
   }, [playerName, saccoName]);
 
   const handleSave = () => {
-    setPlayerInfo(name, sacco);
+    // Only allow saving if not locked
+    if (!isProfileLocked) {
+        setPlayerInfo(name, sacco);
+    }
     setScreen('SETUP');
   };
 
   const handleBack = () => {
-    setScreen('SETUP');
+    setScreen('SETUP'); // Note: Setup will redirect to choice/GameMode based on auth status
   };
 
   const handleReset = () => {
@@ -57,7 +62,14 @@ export const SettingsScreen: React.FC = () => {
         <div className="flex-1 space-y-8 overflow-y-auto pb-20">
             
             {/* Profile Section */}
-            <section className="bg-slate-900/50 border border-slate-700 rounded-2xl p-6">
+            <section className="bg-slate-900/50 border border-slate-700 rounded-2xl p-6 relative overflow-hidden">
+                {isProfileLocked && (
+                    <div className="absolute top-0 right-0 bg-green-900/30 border-l border-b border-green-500/30 rounded-bl-xl px-3 py-1 flex items-center gap-2">
+                        <ShieldCheck size={14} className="text-green-400" />
+                        <span className="text-[10px] uppercase font-bold text-green-400">Verified Profile</span>
+                    </div>
+                )}
+                
                 <div className="flex items-center gap-3 mb-6 border-b border-slate-700 pb-2">
                     <User className="text-matatu-yellow" size={24} />
                     <h3 className="font-display text-lg font-bold text-white">Driver Profile</h3>
@@ -65,36 +77,57 @@ export const SettingsScreen: React.FC = () => {
                 
                 <div className="space-y-4">
                     <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                             Conductor Name / Alias
+                            {isProfileLocked && <Lock size={12} className="text-slate-500" />}
                         </label>
                         <input 
                             type="text" 
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                            disabled={isProfileLocked}
                             placeholder="Enter your name"
-                            className="w-full bg-slate-800 border-2 border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/80 transition-all"
+                            className={`w-full border-2 rounded-lg p-3 text-white transition-all
+                                ${isProfileLocked 
+                                    ? 'bg-slate-950 border-slate-800 text-slate-500 cursor-not-allowed' 
+                                    : 'bg-slate-800 border-slate-700 focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/80'}
+                            `}
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                             Sacco Name
+                            {isProfileLocked && <Lock size={12} className="text-slate-500" />}
                         </label>
                         <input 
                             type="text" 
                             value={sacco}
                             onChange={(e) => setSacco(e.target.value)}
+                            disabled={isProfileLocked}
                             placeholder="Enter your SACCO"
-                            className="w-full bg-slate-800 border-2 border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/80 transition-all"
+                             className={`w-full border-2 rounded-lg p-3 text-white transition-all
+                                ${isProfileLocked 
+                                    ? 'bg-slate-950 border-slate-800 text-slate-500 cursor-not-allowed' 
+                                    : 'bg-slate-800 border-slate-700 focus:outline-none focus:border-matatu-yellow focus:bg-slate-800/80'}
+                            `}
                         />
                     </div>
-                    <div className="pt-2">
-                        <Button fullWidth onClick={handleSave} disabled={!name || !sacco}>
-                            <span className="flex items-center justify-center gap-2">
-                                <Save size={16} /> Save Profile
-                            </span>
-                        </Button>
-                    </div>
+
+                    {!isProfileLocked ? (
+                        <div className="pt-2">
+                            <Button fullWidth onClick={handleSave} disabled={!name || !sacco}>
+                                <span className="flex items-center justify-center gap-2">
+                                    <Save size={16} /> Save Profile
+                                </span>
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="pt-2">
+                            <p className="text-xs text-slate-500 text-center italic">
+                                Identity details are permanent for registered conductors.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </section>
 
