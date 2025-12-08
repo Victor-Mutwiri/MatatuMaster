@@ -36,10 +36,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
   if (lifetimeStats.totalDistanceKm > 5000) rankTitle = "Matatu Master";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in"
+      onClick={onClose}
+    >
       
       {/* ID Badge Container */}
-      <div className="relative w-full max-w-md bg-slate-100 rounded-2xl overflow-hidden shadow-2xl flex flex-col transform transition-all scale-100">
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md bg-slate-100 rounded-2xl overflow-hidden shadow-2xl flex flex-col transform transition-all scale-100"
+      >
         
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
@@ -49,14 +55,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
         {/* Close Button */}
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 p-2 bg-black/5 hover:bg-black/10 rounded-full transition-colors text-slate-600"
+          className="absolute top-3 right-3 z-30 p-2 bg-black/20 hover:bg-red-500 text-white/80 hover:text-white rounded-full transition-all backdrop-blur-md shadow-lg"
+          title="Close Profile"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
 
         {/* Header Section */}
         <div className="bg-slate-900 text-white p-6 pb-8 relative overflow-hidden">
-           <div className="flex justify-between items-start relative z-10">
+           <div className="flex justify-between items-start relative z-10 pr-8">
               <div className="flex items-center gap-2">
                  <div className="bg-matatu-yellow text-black text-xs font-black px-2 py-0.5 rounded uppercase tracking-widest">
                     PSV License
@@ -149,7 +156,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                         )}
                     </span>
                 </Button>
-                {/* Could add a 'Share Profile' button here later */}
             </div>
 
             <div className="mt-4 text-center">
