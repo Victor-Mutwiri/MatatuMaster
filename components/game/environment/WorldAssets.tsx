@@ -3,6 +3,7 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
+import { Wheel, VehicleHeadlight, LicensePlate } from '../vehicles/VehicleParts';
 
 const ROAD_WIDTH = 8;
 const HIGHWAY_WIDTH = 15; // Increased from 12 to accommodate wider lanes (3.5 * 3 + margins)
@@ -111,6 +112,41 @@ export const Rock = ({ scale = 1 }: { scale?: number }) => {
     </group>
   );
 };
+
+export const CliffFace = () => {
+  return (
+    <group>
+        {/* Large rock wall */}
+        <mesh position={[0, 10, 0]} rotation={[0, 0, 0.2]}>
+             <boxGeometry args={[5, 40, 40]} />
+             <meshStandardMaterial color="#5D4037" roughness={1.0} />
+        </mesh>
+        {/* Random outcroppings */}
+        {Array.from({length: 5}).map((_, i) => (
+            <mesh key={i} position={[2, Math.random() * 20 - 5, Math.random() * 30 - 15]} rotation={[Math.random(), Math.random(), Math.random()]}>
+                <dodecahedronGeometry args={[3, 0]} />
+                <meshStandardMaterial color="#4e342e" roughness={1.0} />
+            </mesh>
+        ))}
+    </group>
+  );
+}
+
+export const ValleyView = () => {
+    return (
+        <group position={[50, -20, 0]}>
+            {/* Distant Hills */}
+            <mesh position={[0, 0, -50]}>
+                <coneGeometry args={[40, 30, 4]} />
+                <meshStandardMaterial color="#5f6368" />
+            </mesh>
+            <mesh position={[20, -5, 20]}>
+                <coneGeometry args={[30, 25, 4]} />
+                <meshStandardMaterial color="#70757a" />
+            </mesh>
+        </group>
+    )
+}
 
 export const HighwayBarrier = () => {
     return (
@@ -351,6 +387,48 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
     </group>
   );
 };
+
+export const HeavyTruck = () => {
+    // A simplified visual for the heavy truck (reuse bus geometry but different color/load)
+    const bodyColor = "#f59e0b"; // Orange Cabin
+    const cargoColor = "#374151"; // Grey Cargo
+    
+    return (
+        <group position={[0, 0.6, 0]}>
+            {/* Cabin */}
+            <mesh position={[0, 0.8, 3.5]}>
+                <boxGeometry args={[2.0, 1.8, 1.5]} />
+                <meshStandardMaterial color={bodyColor} />
+            </mesh>
+            {/* Cargo Container */}
+            <mesh position={[0, 1.5, -0.5]}>
+                <boxGeometry args={[2.1, 2.5, 6.0]} />
+                <meshStandardMaterial color={cargoColor} roughness={0.9} />
+            </mesh>
+            {/* Windshield */}
+             <mesh position={[0, 1.2, 4.26]} rotation={[0.05, 0, 0]}>
+                <boxGeometry args={[1.9, 0.8, 0.1]} />
+                <meshStandardMaterial color="#111" metalness={0.8} roughness={0.1} />
+            </mesh>
+            {/* Wheels */}
+            <Wheel position={[1.0, -0.15, 3.5]} radius={0.45} />
+            <Wheel position={[-1.0, -0.15, 3.5]} radius={0.45} />
+            <Wheel position={[1.0, -0.15, -2.0]} radius={0.45} />
+            <Wheel position={[-1.0, -0.15, -2.0]} radius={0.45} />
+            <Wheel position={[1.0, -0.15, -0.5]} radius={0.45} />
+            <Wheel position={[-1.0, -0.15, -0.5]} radius={0.45} />
+            
+            <VehicleHeadlight position={[0.8, 0.4, 4.26]} />
+            <VehicleHeadlight position={[-0.8, 0.4, 4.26]} />
+            
+             {/* Brake Lights Bar */}
+            <mesh position={[0, 1.0, -3.51]}>
+                <boxGeometry args={[1.8, 0.2, 0.1]} />
+                <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={1} />
+            </mesh>
+        </group>
+    )
+}
 
 // --- Markers ---
 

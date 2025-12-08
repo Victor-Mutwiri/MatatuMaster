@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import { playSfx } from '../../../utils/audio';
 import { Motorbike, SmallCar, Matatu14Seater, Matatu52Seater, Matatu32Seater, PlayerPersonalCar } from '../vehicles/VehicleModels';
+import { HeavyTruck } from '../environment/WorldAssets';
 import * as THREE from 'three';
 
 const CITY_LANE_OFFSET = 2.2;
@@ -17,7 +18,7 @@ interface TrafficVehicleProps {
   lane: number;
   laneOffset: number;
   speed: number;
-  type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS' | 'SUV';
+  type: 'BIKE' | 'CAR' | 'MATATU' | 'BUS' | 'SUV' | 'HEAVY_TRUCK';
   direction: 'SAME' | 'OPPOSITE';
   playerLane: number;
   onRemove: (id: number) => void;
@@ -88,6 +89,7 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
         {type === 'SUV' && <PlayerPersonalCar />}
         {type === 'MATATU' && <Matatu14Seater />}
         {type === 'BUS' && <Matatu52Seater />}
+        {type === 'HEAVY_TRUCK' && <HeavyTruck />}
     </group>
   );
 });
@@ -224,6 +226,76 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
       </>
     );
 };
+
+// --- Escarpment Traffic (Heavy Trucks) ---
+export const EscarpmentTraffic = ({ playerLane }: { playerLane: number }) => {
+    const { gameStatus, isCrashing } = useGameStore();
+    const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
+    const nextOncomingSpawnRef = useRef(0);
+    const nextHeavySpawnRef = useRef(0);
+
+    useEffect(() => {
+        if (gameStatus === 'IDLE') {
+            setVehicleList([]);
+            nextOncomingSpawnRef.current = 0;
+            nextHeavySpawnRef.current = 0;
+        }
+    }, [gameStatus]);
+
+    const removeVehicle = (id: number) => {
+        setVehicleList(prev => prev.filter(v => v.id !== id));
+    };
+
+    useFrame((state) => {
+        if (gameStatus !== 'PLAYING' || isCrashing) return;
+        
+        // 1. Heavy Trucks (Crawling down the hill in Left Lane)
+        if (state.clock.elapsedTime > nextHeavySpawnRef.current) {
+             const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -300, 
+                lane: -1, // Player's default lane (Left)
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 15, // CRAWLING SPEED (The Challenge)
+                type: 'HEAVY_TRUCK',
+                direction: 'SAME',
+                playerLane,
+                onRemove: removeVehicle
+            };
+            setVehicleList(prev => [...prev, newVehicle]);
+            // Spawn frequently to force constant lane switching
+            nextHeavySpawnRef.current = state.clock.elapsedTime + (3 + Math.random() * 3);
+        }
+
+        // 2. Oncoming Traffic (Right Lane - Fast)
+        if (state.clock.elapsedTime > nextOncomingSpawnRef.current) {
+             const types: any[] = ['CAR', 'SUV', 'MATATU'];
+             const type = types[Math.floor(Math.random() * types.length)];
+             
+             const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -300, 
+                lane: 1, // Opposite Lane
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 70 + Math.random() * 30, // Fast Uphill
+                type,
+                direction: 'OPPOSITE',
+                playerLane,
+                onRemove: removeVehicle
+            };
+            setVehicleList(prev => [...prev, newVehicle]);
+            nextOncomingSpawnRef.current = state.clock.elapsedTime + (1.5 + Math.random() * 2);
+        }
+    });
+
+    return (
+        <>
+        {vehicleList.map(v => (
+            <TrafficVehicle key={v.id} {...v} playerLane={playerLane} onRemove={removeVehicle} />
+        ))}
+        </>
+    );
+}
 
 // --- Highway Traffic System (3 Lanes) ---
 export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {

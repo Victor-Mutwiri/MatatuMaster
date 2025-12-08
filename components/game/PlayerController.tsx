@@ -13,6 +13,46 @@ import {
 const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
 
+// Simple Particle System for Brake Smoke
+const BrakeSmoke = ({ isEmitting }: { isEmitting: boolean }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const [particles, setParticles] = useState<{id: number, x: number, y: number, z: number, scale: number, opacity: number}[]>([]);
+    
+    useFrame((state, delta) => {
+        // Emit
+        if (isEmitting && Math.random() > 0.8) {
+             setParticles(prev => [...prev, {
+                 id: Math.random(),
+                 x: (Math.random() - 0.5) * 0.5,
+                 y: 0,
+                 z: 0,
+                 scale: 0.2,
+                 opacity: 0.8
+             }]);
+        }
+        
+        // Update
+        setParticles(prev => prev.map(p => ({
+            ...p,
+            y: p.y + delta * 2,
+            z: p.z + delta * 5, // Move back relative to car
+            scale: p.scale + delta * 2,
+            opacity: p.opacity - delta * 1.5
+        })).filter(p => p.opacity > 0));
+    });
+
+    return (
+        <group ref={groupRef}>
+             {particles.map(p => (
+                 <mesh key={p.id} position={[p.x, p.y, p.z]} scale={[p.scale, p.scale, p.scale]}>
+                     <sphereGeometry args={[1, 6, 6]} />
+                     <meshBasicMaterial color="#555" transparent opacity={p.opacity} />
+                 </mesh>
+             ))}
+        </group>
+    )
+}
+
 export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType | null, setLaneCallback: (l: number) => void }) => {
   const meshRef = useRef<THREE.Group>(null);
   const timeOfDay = useGameStore(state => state.timeOfDay);
@@ -21,6 +61,8 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   const selectedRoute = useGameStore(state => state.selectedRoute);
   const currentSpeed = useGameStore(state => state.currentSpeed);
   const currentPassengers = useGameStore(state => state.currentPassengers);
+  const brakeTemp = useGameStore(state => state.brakeTemp);
+  
   const [lane, setLane] = useState<number>(-1); 
   const LERP_SPEED = 8;
   const TILT_ANGLE = 0.1;
@@ -33,6 +75,9 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
 
   // Dynamic Lane Offset
   const currentLaneOffset = isHighway ? HIGHWAY_LANE_OFFSET : CITY_LANE_OFFSET;
+  
+  // Brake Fade Visuals
+  const isBrakeSmoking = brakeTemp > 60;
 
   useEffect(() => {
     setLaneCallback(lane);
@@ -175,6 +220,14 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
          {type === '14-seater' && <Matatu14Seater />}
          {type === '32-seater' && <Matatu32Seater />}
          {type === '52-seater' && <Matatu52Seater />}
+       </group>
+
+       {/* Brake Smoke Effects on wheels */}
+       <group position={[0.7, 0, 1]}>
+          <BrakeSmoke isEmitting={isBrakeSmoking} />
+       </group>
+       <group position={[-0.7, 0, 1]}>
+          <BrakeSmoke isEmitting={isBrakeSmoking} />
        </group>
     </group>
   );

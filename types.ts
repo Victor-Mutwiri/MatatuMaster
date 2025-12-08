@@ -70,6 +70,7 @@ export interface GameState {
   fuelUsedLiters: number; // Actual liters consumed
   totalPassengersCarried: number; // Session total
   bribesPaid: number; // Session total
+  brakeTemp: number; // 0-100, Brake Fade Mechanic
   
   // Lifetime Tracking
   lifetimeStats: LifetimeStats;
@@ -137,6 +138,7 @@ declare global {
       circleGeometry: any;
       coneGeometry: any;
       dodecahedronGeometry: any;
+      tetrahedronGeometry: any;
       
       // Materials
       meshStandardMaterial: any;
@@ -174,6 +176,7 @@ declare module 'react' {
       circleGeometry: any;
       coneGeometry: any;
       dodecahedronGeometry: any;
+      tetrahedronGeometry: any;
       
       // Materials
       meshStandardMaterial: any;

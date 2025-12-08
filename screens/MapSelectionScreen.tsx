@@ -42,6 +42,17 @@ const MAPS: Route[] = [
     isLocked: false
   },
   {
+    id: 'maimahiu-escarpment',
+    name: 'Mai Mahiu Escarpment',
+    distance: 35.0,
+    potentialEarnings: 9500,
+    trafficLevel: 'High',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '1h 10m',
+    description: 'The Gravity Challenge. A steep descent down the Rift Valley. Gravity accelerates you, brakes will overheat!',
+    isLocked: false
+  },
+  {
     id: 'thika-highway',
     name: 'Thika Highway',
     distance: 40.2,
@@ -75,7 +86,7 @@ export const MapSelectionScreen: React.FC = () => {
 
   const handleRouteSelect = (map: Route) => {
     // Guest check logic - allow first few maps
-    const freeMaps = ['kiambu-route', 'rural-dirt', 'thika-highway', 'limuru-drive'];
+    const freeMaps = ['kiambu-route', 'rural-dirt', 'thika-highway', 'limuru-drive', 'maimahiu-escarpment'];
     
     if (userMode === 'GUEST' && !freeMaps.includes(map.id)) {
         setShowAuthGate(true);
@@ -143,6 +154,10 @@ export const MapSelectionScreen: React.FC = () => {
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
                       <span className="text-slate-500 uppercase font-bold text-xs">Earnings</span>
                       <span className="text-green-400 font-mono">KES {activeRoute.potentialEarnings}</span>
+                   </div>
+                   <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
+                      <span className="text-slate-500 uppercase font-bold text-xs">Difficulty</span>
+                      <span className={`${activeRoute.dangerLevel === 'No-Go Zone' ? 'text-red-500' : 'text-orange-400'} font-bold`}>{activeRoute.dangerLevel}</span>
                    </div>
                 </div>
              </div>

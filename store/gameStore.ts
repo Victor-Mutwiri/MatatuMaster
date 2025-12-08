@@ -131,6 +131,7 @@ interface GameStore extends GameState {
   resetCareer: () => void; 
   updateDistance: (delta: number) => void;
   setCurrentSpeed: (speed: number) => void;
+  setBrakeTemp: (temp: number) => void;
   
   // Progression
   registerUser: () => void;
@@ -184,6 +185,7 @@ export const useGameStore = create<GameStore>()(
       fuelUsedLiters: 0,
       totalPassengersCarried: 0,
       bribesPaid: 0,
+      brakeTemp: 0,
       
       lifetimeStats: INITIAL_LIFETIME,
 
@@ -222,6 +224,8 @@ export const useGameStore = create<GameStore>()(
       selectRoute: (route) => set({ selectedRoute: route }),
 
       setCurrentSpeed: (speed) => set({ currentSpeed: speed }),
+      
+      setBrakeTemp: (temp) => set({ brakeTemp: temp }),
 
       registerUser: () => set({ userMode: 'REGISTERED' }),
 
@@ -512,6 +516,7 @@ export const useGameStore = create<GameStore>()(
           fuelUsedLiters: 0,
           totalPassengersCarried: 0,
           bribesPaid: 0,
+          brakeTemp: 0,
           currentPassengers: 0,
           maxPassengers: maxPax,
           nextStageDistance: 1500,
@@ -559,6 +564,7 @@ export const useGameStore = create<GameStore>()(
         currentPassengers: 0,
         policeData: null,
         stageData: null,
+        brakeTemp: 0,
         happiness: 100
       }),
 
@@ -662,6 +668,7 @@ export const useGameStore = create<GameStore>()(
         gameTimeRemaining: 0,
         happiness: 100,
         isStereoOn: false,
+        brakeTemp: 0,
         timeOfDay: 'DAY',
         isAccelerating: false,
         isBraking: false

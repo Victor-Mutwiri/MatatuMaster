@@ -15,7 +15,10 @@ export const PhysicsController = () => {
     activeModal,
     setControl,
     isEngineSoundOn,
-    vehicleType
+    vehicleType,
+    selectedRoute,
+    setBrakeTemp,
+    brakeTemp
   } = useGameStore();
 
   const engineRef = useRef<EngineSynthesizer | null>(null);
@@ -28,6 +31,13 @@ export const PhysicsController = () => {
   const BRAKE_RATE = 80;
   const FRICTION_RATE = 15;
   const CREEP_SPEED = 5;
+  
+  // Escarpment Specifics
+  const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
+  const GRAVITY_ACCEL = 10; // Downhill roll speed
+  const BRAKE_HEAT_RATE = 30; // Heat per second while braking
+  const BRAKE_COOL_RATE = 10; // Cool per second while not braking
+  const BRAKE_FADE_THRESHOLD = 70; // Temperature where brakes start failing
 
   // Listen for keyboard controls
   useEffect(() => {
@@ -92,6 +102,7 @@ export const PhysicsController = () => {
     } = useGameStore.getState();
 
     let newSpeed = currentSpeed;
+    let newBrakeTemp = brakeTemp;
 
     // --- Auto Deceleration Logic ---
     const distToStage = nextStageDistance - distanceTraveled;
@@ -112,16 +123,44 @@ export const PhysicsController = () => {
 
     if (isAccelerating) {
       newSpeed += ACCEL_RATE * delta;
+      
+      // Cooling brakes while accelerating
+      newBrakeTemp = Math.max(0, newBrakeTemp - BRAKE_COOL_RATE * delta);
+
     } else if (isBraking) {
-      newSpeed -= BRAKE_RATE * delta;
+      // Calculate Brake Efficiency based on Temp
+      let efficiency = 1.0;
+      if (isEscarpment) {
+        newBrakeTemp = Math.min(100, newBrakeTemp + BRAKE_HEAT_RATE * delta);
+        if (newBrakeTemp > BRAKE_FADE_THRESHOLD) {
+           // Efficiency drops from 100% to 20% as temp goes from 70 to 100
+           const overheatFactor = (newBrakeTemp - BRAKE_FADE_THRESHOLD) / (100 - BRAKE_FADE_THRESHOLD);
+           efficiency = 1.0 - (overheatFactor * 0.8);
+        }
+      }
+      
+      newSpeed -= BRAKE_RATE * efficiency * delta;
+    
     } else {
       // Friction / Coasting
-      if (newSpeed > CREEP_SPEED) {
-        newSpeed -= FRICTION_RATE * delta;
-      } else if (newSpeed < CREEP_SPEED) {
-        newSpeed += FRICTION_RATE * delta;
-        if (newSpeed > CREEP_SPEED) newSpeed = CREEP_SPEED;
+      
+      if (isEscarpment) {
+         // Gravity pull downhill overrides friction if moving
+         newSpeed += GRAVITY_ACCEL * delta;
+         newBrakeTemp = Math.max(0, newBrakeTemp - BRAKE_COOL_RATE * delta);
+      } else {
+         if (newSpeed > CREEP_SPEED) {
+            newSpeed -= FRICTION_RATE * delta;
+         } else if (newSpeed < CREEP_SPEED) {
+            newSpeed += FRICTION_RATE * delta;
+            if (newSpeed > CREEP_SPEED) newSpeed = CREEP_SPEED;
+         }
       }
+    }
+    
+    // Update global brake temp
+    if (brakeTemp !== newBrakeTemp) {
+        setBrakeTemp(newBrakeTemp);
     }
 
     if (newSpeed > speedLimit) {
@@ -130,7 +169,10 @@ export const PhysicsController = () => {
     }
 
     if (newSpeed < 0) newSpeed = 0;
-    if (newSpeed > MAX_SPEED) newSpeed = MAX_SPEED;
+    
+    // Allow overspeeding on escarpment due to gravity, but cap absolute max to avoid glitching
+    const absoluteMax = isEscarpment ? MAX_SPEED * 1.3 : MAX_SPEED;
+    if (newSpeed > absoluteMax) newSpeed = absoluteMax;
 
     setCurrentSpeed(newSpeed);
     
@@ -149,7 +191,12 @@ export const PhysicsController = () => {
 export const CameraRig = () => {
   const { camera } = useThree();
   const startPos = useMemo(() => CAMERA_POS.clone(), []);
+  const selectedRoute = useGameStore(state => state.selectedRoute);
   
+  // Tilt camera slightly down for Escarpment to simulate downhill view
+  const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
+  const baseRotationX = isEscarpment ? -0.1 : 0; 
+
   useFrame((state) => {
     const { currentSpeed, isCrashing } = useGameStore.getState();
 
@@ -172,7 +219,15 @@ export const CameraRig = () => {
        camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z + (currentSpeed * 0.02), 0.05);
     }
     
-    camera.lookAt(0, 0, -5);
+    // Look at slightly modified target
+    camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, baseRotationX, 0.05);
+    
+    // Normally lookAt overrides rotation, but if we don't use lookAt every frame or use a target object:
+    // Actually R3F LookAt is cleaner. Let's just adjust the lookAt target Y
+    const targetY = isEscarpment ? -4 : 0;
+    const currentTargetY = -5; // Default from original code (lookAt(0,0,-5))
+    // We can't easily lerp lookAt target without a ref, so we'll just stick to standard
+    camera.lookAt(0, targetY, -5);
   });
 
   return null;
