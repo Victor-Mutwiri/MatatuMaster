@@ -1,9 +1,10 @@
-
-
 import React from 'react';
 import { LandingScreen } from './screens/LandingScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { PlayerSetupScreen } from './screens/PlayerSetupScreen';
+import { GameModeScreen } from './screens/GameModeScreen';
+import { VehicleSelectionScreen } from './screens/VehicleSelectionScreen';
+import { MultiplayerLobbyScreen } from './screens/MultiplayerLobbyScreen';
 import { MapSelectionScreen } from './screens/MapSelectionScreen';
 import { GameLoopScreen } from './screens/GameLoopScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
@@ -39,6 +40,18 @@ const App: React.FC = () => {
 
       {currentScreen === 'SETUP' && (
         <PlayerSetupScreen />
+      )}
+
+      {currentScreen === 'GAME_MODE' && (
+        <GameModeScreen />
+      )}
+
+      {currentScreen === 'VEHICLE_SELECT' && (
+        <VehicleSelectionScreen />
+      )}
+
+      {currentScreen === 'MULTIPLAYER_LOBBY' && (
+        <MultiplayerLobbyScreen />
       )}
 
       {currentScreen === 'MAP_SELECT' && (

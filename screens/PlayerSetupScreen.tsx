@@ -1,26 +1,17 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { VehicleType } from '../types';
-import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { User, Bus, CheckCircle2, Settings, AlertTriangle, Bike, Car, ShoppingCart, Zap, Shield, TrendingUp, ArrowLeft, Wallet, Lock, UserPlus, Eye } from 'lucide-react';
-// import { VehicleShowroomModal } from '../components/game/VehicleShowroomModal';
+import { useGameStore } from '../store/gameStore';
+import { Settings, AlertTriangle, Wallet, UserPlus, ArrowLeft, User } from 'lucide-react';
 
 export const PlayerSetupScreen: React.FC = () => {
-  const { setVehicleType, setScreen, playerName, saccoName, bankBalance, userMode, unlockedVehicles, unlockVehicle, registerUser } = useGameStore();
+  const { setScreen, playerName, saccoName, bankBalance, userMode, registerUser } = useGameStore();
   
-  const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
-  // const [previewVehicle, setPreviewVehicle] = useState<VehicleType | null>(null);
-
   const isProfileValid = playerName.trim().length > 0 && saccoName.trim().length > 0;
-  // Valid if profile is set AND vehicle selected AND vehicle is unlocked
-  const isFormValid = isProfileValid && selectedVehicle !== null && unlockedVehicles.includes(selectedVehicle);
 
   const handleContinue = () => {
-    if (isFormValid) {
-      setVehicleType(selectedVehicle!);
-      setScreen('MAP_SELECT');
+    if (isProfileValid) {
+      setScreen('GAME_MODE');
     }
   };
 
@@ -32,323 +23,132 @@ export const PlayerSetupScreen: React.FC = () => {
     setScreen('SETTINGS');
   };
 
-  const handleUnlockAttempt = (type: VehicleType) => {
-    if (userMode === 'GUEST') {
-      alert("You must Register an Account to buy vehicles!");
-      return;
-    }
-    unlockVehicle(type);
-  };
-
-  const vehicleOptions = [
-    { 
-      type: 'boda' as VehicleType, 
-      name: 'The Boxer', 
-      capacity: 1, 
-      icon: <Bike size={24} className="text-orange-400" />,
-      desc: 'High risk, high speed.',
-      stats: { speed: 95, capacity: 10 },
-      color: 'border-orange-500'
-    },
-    { 
-      type: 'tuktuk' as VehicleType, 
-      name: 'Keke Napep', 
-      capacity: 3, 
-      icon: <ShoppingCart size={24} className="text-yellow-400" />,
-      desc: 'Slow but steady.',
-      stats: { speed: 45, capacity: 20 },
-      color: 'border-yellow-500'
-    },
-    { 
-      type: 'personal-car' as VehicleType, 
-      name: 'Uber Chap', 
-      capacity: 4, 
-      icon: <Car size={24} className="text-blue-400" />, 
-      desc: 'Comfortable cruising.',
-      stats: { speed: 85, capacity: 25 },
-      color: 'border-blue-500'
-    },
-    { 
-      type: '14-seater' as VehicleType, 
-      name: 'The Shark', 
-      capacity: 14, 
-      icon: <Zap size={24} className="text-yellow-400" />,
-      desc: 'Speed demon.',
-      stats: { speed: 90, capacity: 45 },
-      color: 'border-yellow-500'
-    },
-    { 
-      type: '32-seater' as VehicleType, 
-      name: 'The Rumble', 
-      capacity: 32, 
-      icon: <Shield size={24} className="text-blue-400" />,
-      desc: 'Balanced reliability.',
-      stats: { speed: 60, capacity: 70 },
-      color: 'border-blue-500'
-    },
-    { 
-      type: '52-seater' as VehicleType, 
-      name: 'The Titan', 
-      capacity: 52, 
-      icon: <TrendingUp size={24} className="text-green-400" />,
-      desc: 'Profit machine.',
-      stats: { speed: 40, capacity: 100 },
-      color: 'border-green-500'
-    },
-  ];
-
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
-      {/* 
-      {previewVehicle && (
-        <VehicleShowroomModal 
-          vehicleType={previewVehicle} 
-          onClose={() => setPreviewVehicle(null)} 
-        />
-      )} 
-      */}
-
-      <div className="flex flex-col lg:flex-row h-full w-full max-w-7xl mx-auto md:p-6 lg:gap-8 relative">
+      <div className="flex flex-col items-center justify-center min-h-full w-full max-w-2xl mx-auto p-6 relative">
         
-        {/* --- LEFT PANEL: ID / PROFILE --- */}
-        <div className="flex flex-col w-full lg:w-[320px] shrink-0 z-20 p-4 md:p-0 bg-slate-950 lg:bg-transparent sticky top-0">
-          
-          <div className="flex items-center justify-between mb-4">
+        {/* Header */}
+        <div className="w-full flex items-center justify-between mb-8">
              <div className="flex items-center gap-3">
                 <button 
                   onClick={handleBack}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"
                 >
-                  <ArrowLeft size={16} />
+                  <ArrowLeft size={20} />
                 </button>
                 <div>
-                  <h2 className="font-display text-xl font-bold text-white uppercase tracking-wider leading-none">
-                    Setup
+                  <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider leading-none">
+                    Profile
                   </h2>
+                  <p className="text-slate-400 text-xs uppercase tracking-widest mt-1">Identity Check</p>
                 </div>
              </div>
              
              <button 
                onClick={goToSettings}
-               className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95"
+               className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95"
              >
-               <Settings size={16} />
+               <Settings size={16} /> <span className="text-xs font-bold uppercase hidden sm:inline">Edit</span>
              </button>
-          </div>
+        </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-xl p-4 shadow-xl space-y-4">
+        {/* Profile Card */}
+        <div className="w-full bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-6 relative overflow-hidden">
+             
+             {/* Decorative Background Element */}
+             <div className="absolute top-0 right-0 w-32 h-32 bg-matatu-yellow/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+
              {isProfileValid ? (
-               <div className="space-y-3">
-                  <div className="flex justify-between items-start">
-                     <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 flex-1 mr-2">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Driver</label>
-                       <div className="text-white font-display text-lg font-bold truncate">{playerName}</div>
-                     </div>
-                     <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 w-16 flex items-center justify-center">
-                        <span className={`text-2xl font-bold ${userMode === 'REGISTERED' ? 'text-green-500' : 'text-slate-500'}`}>
-                           {userMode === 'REGISTERED' ? '✓' : '?'}
-                        </span>
-                     </div>
-                  </div>
+               <div className="space-y-6">
                   
-                  <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">SACCO</label>
-                    <div className="text-matatu-yellow font-display text-lg font-bold truncate">{saccoName}</div>
-                  </div>
-                  
-                  {/* Total Wealth Card */}
-                  <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-3 rounded-lg border border-green-500/30 relative overflow-hidden group">
-                     <div className="absolute right-[-10px] top-[-10px] bg-green-500/10 w-20 h-20 rounded-full blur-xl group-hover:bg-green-500/20 transition-all"></div>
-                     <label className="text-[10px] font-bold text-green-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                        <Wallet size={12} /> Cash
-                     </label>
-                     <div className="text-white font-mono text-xl font-bold truncate">
-                        KES {bankBalance.toLocaleString()}
-                     </div>
-                     {userMode === 'GUEST' && (
-                        <div className="text-[10px] text-red-400 mt-1 font-bold">
-                           * Not saving to cloud (Guest)
+                  {/* Avatar / ID Section */}
+                  <div className="flex items-center gap-4 border-b border-slate-800 pb-6">
+                    <div className="w-20 h-20 bg-slate-800 rounded-2xl border-2 border-slate-600 flex items-center justify-center shadow-inner">
+                        <User size={40} className="text-slate-400" />
+                    </div>
+                    <div className="flex-1">
+                        <div className="bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700 mb-2">
+                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Driver Name</label>
+                           <div className="text-white font-display text-xl font-bold truncate tracking-wide">{playerName}</div>
                         </div>
-                     )}
+                        <div className="bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700">
+                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Sacco</label>
+                           <div className="text-matatu-yellow font-display text-lg font-bold truncate tracking-wide">{saccoName}</div>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                        <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center ${userMode === 'REGISTERED' ? 'border-green-500/20 bg-green-500/10' : 'border-slate-700 bg-slate-800'}`}>
+                           <span className={`text-xl font-bold ${userMode === 'REGISTERED' ? 'text-green-500' : 'text-slate-500'}`}>
+                              {userMode === 'REGISTERED' ? '✓' : '?'}
+                           </span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-slate-500">{userMode}</span>
+                    </div>
                   </div>
                   
-                  {/* Register Button for Guests */}
+                  {/* Bank Section */}
+                  <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-4 rounded-xl border border-green-500/30 relative overflow-hidden group">
+                     <div className="absolute right-[-10px] top-[-10px] bg-green-500/10 w-24 h-24 rounded-full blur-xl group-hover:bg-green-500/20 transition-all"></div>
+                     <div className="relative z-10 flex justify-between items-end">
+                        <div>
+                            <label className="text-xs font-bold text-green-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+                                <Wallet size={14} /> Total Earnings
+                            </label>
+                            <div className="text-white font-mono text-3xl font-bold truncate">
+                                KES {bankBalance.toLocaleString()}
+                            </div>
+                        </div>
+                        {userMode === 'GUEST' && (
+                            <div className="text-xs text-red-400 font-bold bg-red-900/20 px-2 py-1 rounded">
+                                * Not Cloud Saved
+                            </div>
+                        )}
+                     </div>
+                  </div>
+                  
+                  {/* Guest CTA */}
                   {userMode === 'GUEST' && (
                      <Button 
-                        variant="primary" 
+                        variant="secondary" 
                         fullWidth 
-                        size="sm" 
                         onClick={registerUser}
-                        className="animate-pulse"
+                        className="border-slate-600 hover:border-white"
                      >
                         <span className="flex items-center justify-center gap-2">
-                           <UserPlus size={16} /> Register Account
+                           <UserPlus size={16} /> Register to Save Progress
                         </span>
                      </Button>
                   )}
 
                </div>
              ) : (
-               <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg text-center space-y-2">
-                  <div className="flex justify-center">
-                     <AlertTriangle className="text-red-500" size={20} />
+               <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl text-center space-y-4">
+                  <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                     <AlertTriangle className="text-red-500" size={32} />
                   </div>
-                  <p className="text-red-200 text-xs font-bold">Profile Incomplete!</p>
-                  <Button variant="secondary" fullWidth onClick={goToSettings} size="sm" className="text-xs">
+                  <div>
+                    <h3 className="text-red-200 text-lg font-bold mb-1">Profile Incomplete</h3>
+                    <p className="text-red-400/80 text-sm">You need a Driver Name and Sacco to operate legally.</p>
+                  </div>
+                  <Button variant="primary" fullWidth onClick={goToSettings}>
                      Configure Profile
                   </Button>
                </div>
              )}
           </div>
           
-          {/* Desktop Start Button */}
-          <div className="hidden lg:block mt-6">
+          {/* Main Action */}
+          <div className="w-full pt-4">
              <Button 
                 size="lg" 
                 fullWidth
-                disabled={!isFormValid}
+                disabled={!isProfileValid}
                 onClick={handleContinue}
-                className={isFormValid ? 'opacity-100' : 'opacity-50'}
+                className={`h-16 text-xl shadow-xl transition-all ${isProfileValid ? 'opacity-100' : 'opacity-50'}`}
               >
-                {isProfileValid ? 'Start Shift' : 'Complete Profile'}
+                {isProfileValid ? 'Next Step' : 'Setup Required'}
               </Button>
           </div>
-        </div>
-
-        {/* --- RIGHT PANEL: FLEET SELECTION --- */}
-        <div className="flex-1 flex flex-col min-w-0 px-4 md:px-0 pb-24 lg:pb-0">
-          <div className="mb-3 hidden lg:block">
-             <h3 className="font-display text-lg font-bold text-white uppercase flex items-center gap-2">
-                <Bus className="text-matatu-yellow" size={20} /> Select Vehicle
-             </h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-            {vehicleOptions.map((v) => {
-              const isSelected = selectedVehicle === v.type;
-              const isUnlocked = unlockedVehicles.includes(v.type);
-              const price = VEHICLE_SPECS[v.type].price;
-              const canAfford = bankBalance >= price;
-
-              return (
-                <div 
-                  key={v.type}
-                  onClick={() => setSelectedVehicle(v.type)}
-                  className={`
-                    relative cursor-pointer rounded-xl border-2 transition-all duration-200 overflow-hidden flex flex-col p-3 gap-2 group
-                    ${isSelected 
-                      ? `bg-slate-800 ${v.color} shadow-lg ring-1 ring-white/10` 
-                      : 'bg-slate-900/40 border-slate-800 hover:bg-slate-800'
-                    }
-                    ${!isUnlocked && !isSelected ? 'opacity-70 grayscale hover:grayscale-0' : ''}
-                  `}
-                >
-                  {/* Status Badges */}
-                  <div className="flex justify-between items-start">
-                     {isUnlocked ? (
-                        <div className="flex gap-2 w-full justify-between">
-                            {isSelected && (
-                                <div className="bg-green-500/20 text-green-400 p-1 rounded-full">
-                                    <CheckCircle2 size={16} />
-                                </div>
-                            )}
-                        </div>
-                     ) : (
-                        <div className="bg-slate-900/80 p-1.5 rounded-md flex items-center gap-1 text-slate-400 border border-slate-700">
-                           <Lock size={12} />
-                           <span className="text-[10px] font-bold uppercase">Locked</span>
-                        </div>
-                     )}
-
-                     {/* ALWAYS SHOW PREVIEW BUTTON - Disabled per request */}
-                     {/* 
-                     <button 
-                         onClick={(e) => {
-                             e.stopPropagation();
-                             setPreviewVehicle(v.type);
-                         }}
-                         className="absolute top-3 right-3 p-1.5 bg-slate-900/80 rounded-full text-slate-300 hover:text-white hover:bg-blue-600 transition-all z-20 border border-slate-700 shadow-md"
-                         title="Preview Vehicle"
-                     >
-                         <Eye size={14} />
-                     </button>
-                     */}
-                  </div>
-
-                   {/* Capacity Badge */}
-                   {!isUnlocked && (
-                         <div className="text-right mt-1">
-                            <span className="font-mono text-matatu-yellow font-bold text-xs bg-black/20 px-2 py-0.5 rounded">
-                                {v.capacity} Seats
-                            </span>
-                         </div>
-                   )}
-
-
-                  {/* Icon & Details */}
-                  <div className="flex items-center gap-3 mt-1">
-                     <div className={`
-                        w-12 h-12 rounded-full flex items-center justify-center border bg-slate-900/50 shrink-0
-                        ${isSelected ? 'border-white/20' : 'border-slate-700'}
-                     `}>
-                        {v.icon}
-                     </div>
-                     <div className="min-w-0">
-                        <h4 className="font-display font-bold text-base text-white truncate">{v.name}</h4>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{v.type}</p>
-                     </div>
-                  </div>
-                  
-                  <p className="text-xs text-slate-300 line-clamp-2 min-h-[2.5em]">{v.desc}</p>
-                  
-                  {/* Footer Action */}
-                  <div className="mt-auto pt-2 border-t border-white/5">
-                     {isUnlocked ? (
-                        <div className="text-xs text-green-400 font-bold uppercase flex items-center gap-1">
-                           <CheckCircle2 size={12} /> Owned
-                        </div>
-                     ) : (
-                        <div className="flex flex-col gap-2">
-                           <div className="flex justify-between items-center text-xs">
-                              <span className="text-slate-500">Price</span>
-                              <span className="text-white font-bold font-mono">KES {price.toLocaleString()}</span>
-                           </div>
-                           
-                           {isSelected && (
-                              <Button 
-                                 size="sm" 
-                                 fullWidth 
-                                 variant={userMode === 'GUEST' ? 'secondary' : canAfford ? 'primary' : 'outline'}
-                                 disabled={userMode !== 'GUEST' && !canAfford}
-                                 onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUnlockAttempt(v.type);
-                                 }}
-                              >
-                                 {userMode === 'GUEST' ? 'Login to Buy' : canAfford ? 'Buy Vehicle' : 'Insufficient Funds'}
-                              </Button>
-                           )}
-                        </div>
-                     )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Mobile Sticky Button */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-950/90 backdrop-blur border-t border-slate-800 z-50 lg:hidden">
-             <Button 
-               size="lg" 
-               fullWidth={true}
-               disabled={!isFormValid}
-               onClick={handleContinue}
-               className={isFormValid ? 'opacity-100' : 'opacity-50'}
-             >
-               {isProfileValid ? 'Start Shift' : 'Complete Profile'}
-             </Button>
-        </div>
 
       </div>
     </GameLayout>

@@ -63,7 +63,7 @@ export const MapSelectionScreen: React.FC = () => {
         {/* Header (Sticky / Fixed Top) */}
         <div className="flex items-center gap-4 p-4 md:p-0 z-20 shrink-0">
              <button 
-               onClick={() => setScreen('SETUP')}
+               onClick={() => setScreen('VEHICLE_SELECT')}
                className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"
              >
                <ArrowLeft size={20} />
