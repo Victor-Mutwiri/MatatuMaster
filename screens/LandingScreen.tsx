@@ -24,11 +24,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onStart }) => {
 
       <div className="relative z-10 flex flex-col items-center min-h-full w-full max-w-6xl mx-auto px-4 py-8 lg:py-12">
         
-        {/* Top Right Actions */}
-        <div className="w-full flex justify-end mb-8 md:absolute md:top-6 md:right-6 md:mb-0">
+        {/* Top Right Actions - Shifted left to accommodate Profile Button */}
+        <div className="w-full flex justify-end mb-8 md:absolute md:top-6 md:right-24 md:mb-0 z-40">
            <button 
              onClick={() => setScreen('LEADERBOARD')}
-             className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 border border-slate-700 rounded-full text-white font-bold text-xs uppercase hover:bg-slate-800 hover:scale-105 transition-all shadow-lg group"
+             className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 border border-slate-700 rounded-full text-white font-bold text-xs uppercase hover:bg-slate-800 hover:scale-105 transition-all shadow-lg group backdrop-blur-md"
            >
               <Trophy size={16} className="text-matatu-yellow group-hover:animate-bounce" /> Leaderboard
            </button>
