@@ -1,9 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+
+import React, { useRef, useEffect, useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
 import { Route } from '../types';
 import { Clock, Lock, MapPin, ArrowLeft, TrendingUp, Car, Shield, Navigation } from 'lucide-react';
+import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 const MAPS: Route[] = [
   {
@@ -40,12 +42,27 @@ const MAPS: Route[] = [
 ];
 
 export const MapSelectionScreen: React.FC = () => {
-  const { selectRoute, selectedRoute, startGameLoop, setScreen } = useGameStore();
+  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode } = useGameStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   useEffect(() => {
     if (!selectedRoute) selectRoute(MAPS[0]);
   }, []);
+
+  const handleRouteSelect = (map: Route) => {
+    // If guest tries to select any map other than the first one (ID check or Index check)
+    // Currently, secondary maps are locked anyway, but if they were unlocked in logic, we'd still want to gate them for guests.
+    // For now, we stick to the prompt: "If they again try to select another map, they are prevented."
+    if (userMode === 'GUEST' && map.id !== MAPS[0].id) {
+        setShowAuthGate(true);
+        return;
+    }
+    
+    if (!map.isLocked) {
+        selectRoute(map);
+    }
+  };
 
   const handleStartGame = () => {
     if (selectedRoute && !selectedRoute.isLocked) {
@@ -57,7 +74,13 @@ export const MapSelectionScreen: React.FC = () => {
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
-      
+      <AuthGateModal 
+        isOpen={showAuthGate} 
+        onClose={() => setShowAuthGate(false)}
+        featureName="Advanced Routes"
+        message="You must create a profile to access high-stakes routes and track new records."
+      />
+
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto md:p-6 lg:gap-8 relative">
         
         {/* Header (Sticky / Fixed Top) */}
@@ -125,7 +148,7 @@ export const MapSelectionScreen: React.FC = () => {
                 return (
                   <div 
                     key={map.id}
-                    onClick={() => !isLocked && selectRoute(map)}
+                    onClick={() => handleRouteSelect(map)}
                     className={`
                       relative shrink-0 w-[80vw] sm:w-[340px] aspect-[4/3] lg:aspect-[16/9] snap-center rounded-2xl overflow-hidden transition-all duration-300 group
                       flex flex-col border-2 select-none
@@ -156,7 +179,7 @@ export const MapSelectionScreen: React.FC = () => {
                              <span className="flex items-center gap-1"><Car size={12}/> {map.trafficLevel}</span>
                           </div>
                         </div>
-                        {isLocked && <Lock className="text-slate-500 mb-1" />}
+                        {isLocked ? <Lock className="text-slate-500 mb-1" /> : (userMode === 'GUEST' && map.id !== MAPS[0].id && <Lock className="text-matatu-yellow mb-1" />)}
                       </div>
                     </div>
                   </div>

@@ -1,18 +1,37 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
 import { ArrowLeft, Users, Trophy, Zap, Globe } from 'lucide-react';
+import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const GameModeScreen: React.FC = () => {
-  const { setScreen } = useGameStore();
+  const { setScreen, userMode } = useGameStore();
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   const handleBack = () => {
-    setScreen('SETUP');
+    // If user is guest, back goes to Landing. If registered, back goes to Landing (logging out effectively or just back)
+    setScreen('LANDING'); 
+  };
+
+  const handleMultiplayerClick = () => {
+    if (userMode === 'GUEST') {
+        setShowAuthGate(true);
+    } else {
+        setScreen('MULTIPLAYER_LOBBY');
+    }
   };
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
+      <AuthGateModal 
+        isOpen={showAuthGate} 
+        onClose={() => setShowAuthGate(false)}
+        featureName="Multiplayer"
+        message="You need a registered profile to be discoverable by friends and join online lobbies."
+      />
+
       <div className="flex flex-col h-full w-full max-w-6xl mx-auto p-6 relative">
         
         {/* Header */}
@@ -69,7 +88,7 @@ export const GameModeScreen: React.FC = () => {
 
             {/* Mode 2: Multiplayer */}
             <div 
-                onClick={() => setScreen('MULTIPLAYER_LOBBY')}
+                onClick={handleMultiplayerClick}
                 className="group relative w-full md:w-1/2 h-[300px] md:h-[450px] bg-slate-900 rounded-3xl overflow-hidden cursor-pointer border-2 border-slate-800 hover:border-neon-blue transition-all duration-300 shadow-2xl hover:shadow-[0_0_50px_rgba(0,243,255,0.2)]"
             >
                 {/* Background Image/Gradient */}

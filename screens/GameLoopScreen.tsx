@@ -7,6 +7,7 @@ import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
 import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause } from 'lucide-react';
+import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const GameLoopScreen: React.FC = () => {
   const { 
@@ -28,10 +29,12 @@ export const GameLoopScreen: React.FC = () => {
     happiness,
     selectedRoute,
     resumeGame,
-    setQuitConfirmation
+    setQuitConfirmation,
+    userMode
   } = useGameStore();
 
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   // Timer Effect
   useEffect(() => {
@@ -82,6 +85,14 @@ export const GameLoopScreen: React.FC = () => {
 
   const handleCancelQuit = () => {
     setQuitConfirmation(false);
+  };
+
+  const handleBankAndContinue = () => {
+    if (userMode === 'GUEST') {
+        setShowAuthGate(true);
+    } else {
+        exitToMapSelection();
+    }
   };
 
   // Scoring Calculation
@@ -146,7 +157,7 @@ export const GameLoopScreen: React.FC = () => {
          </div>
 
          <div className="space-y-3">
-            <Button variant="primary" fullWidth onClick={exitToMapSelection}>
+            <Button variant="primary" fullWidth onClick={handleBankAndContinue}>
               <span className="flex items-center justify-center gap-2">
                  <Coins size={18} /> Bank & Continue
               </span>
@@ -164,6 +175,13 @@ export const GameLoopScreen: React.FC = () => {
   return (
     <div className="relative w-full h-screen bg-slate-900 overflow-hidden">
       
+      <AuthGateModal 
+        isOpen={showAuthGate} 
+        onClose={() => setShowAuthGate(false)}
+        featureName="Banking Earnings"
+        message="Your cash is burning a hole in your pocket! Create a profile to deposit earnings and climb the wealth leaderboard."
+      />
+
       {/* 3D Game World */}
       <div className="absolute inset-0 z-0">
         <GameScene vehicleType={vehicleType} />

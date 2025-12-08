@@ -1,16 +1,18 @@
+
 import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
 import { Bus, CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp } from 'lucide-react';
+import { AuthGateModal } from '../components/ui/AuthGateModal';
 // import { VehicleShowroomModal } from '../components/game/VehicleShowroomModal';
 
 export const VehicleSelectionScreen: React.FC = () => {
   const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
-  // const [previewVehicle, setPreviewVehicle] = useState<VehicleType | null>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   // Valid if vehicle selected AND vehicle is unlocked
   const isSelectionValid = selectedVehicle !== null && unlockedVehicles.includes(selectedVehicle);
@@ -28,7 +30,7 @@ export const VehicleSelectionScreen: React.FC = () => {
 
   const handleUnlockAttempt = (type: VehicleType) => {
     if (userMode === 'GUEST') {
-      alert("You must Register an Account to buy vehicles!");
+      setShowAuthGate(true);
       return;
     }
     unlockVehicle(type);
@@ -93,14 +95,12 @@ export const VehicleSelectionScreen: React.FC = () => {
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
-      {/* 
-      {previewVehicle && (
-        <VehicleShowroomModal 
-          vehicleType={previewVehicle} 
-          onClose={() => setPreviewVehicle(null)} 
-        />
-      )} 
-      */}
+      <AuthGateModal 
+        isOpen={showAuthGate} 
+        onClose={() => setShowAuthGate(false)}
+        featureName="Vehicle Purchase"
+        message="You need a registered profile to purchase and own new vehicles."
+      />
 
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto p-4 md:p-6 lg:gap-8 relative">
         
@@ -207,7 +207,6 @@ export const VehicleSelectionScreen: React.FC = () => {
                                  size="sm" 
                                  fullWidth 
                                  variant={userMode === 'GUEST' ? 'secondary' : canAfford ? 'primary' : 'outline'}
-                                 disabled={userMode !== 'GUEST' && !canAfford}
                                  onClick={(e) => {
                                     e.stopPropagation();
                                     handleUnlockAttempt(v.type);
