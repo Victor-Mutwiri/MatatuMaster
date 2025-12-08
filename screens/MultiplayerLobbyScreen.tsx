@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User } from 'lucide-react';
+import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
+import { VehicleType } from '../types';
+import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 
 // --- Mock Data Types ---
@@ -14,7 +15,7 @@ interface Friend {
   isOnline: boolean;
   cash: number;
   distance: number;
-  status: 'IDLE' | 'IN_GAME' | 'INVITED';
+  status: 'IDLE' | 'IN_GAME' | 'INVITED' | 'IN_ROOM';
 }
 
 // --- Mock "Global" Database for Search ---
@@ -26,14 +27,34 @@ const MOCK_USER_DATABASE = [
   { id: 'usr_05', name: 'Brayo_Turbo', sacco: 'Embassava', cash: 55000, distance: 120 },
 ];
 
+const VEHICLE_ICONS: Record<VehicleType, React.ReactNode> = {
+  'boda': <Bike />,
+  'tuktuk': <ShoppingCart />,
+  'personal-car': <Car />,
+  '14-seater': <Zap />,
+  '32-seater': <Shield />,
+  '52-seater': <TrendingUp />,
+};
+
 export const MultiplayerLobbyScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName } = useGameStore();
+  const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType } = useGameStore();
+  
+  // View State: 'LOBBY' (Friend list) or 'ROOM' (Staging area)
+  const [viewState, setViewState] = useState<'LOBBY' | 'ROOM'>('LOBBY');
   
   // Local State for Social Features
   const [activeTab, setActiveTab] = useState<'FRIENDS' | 'ADD'>('FRIENDS');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<typeof MOCK_USER_DATABASE>([]);
   
+  // Room State
+  const [activeOpponent, setActiveOpponent] = useState<Friend | null>(null);
+  const [mySelectedVehicle, setMySelectedVehicle] = useState<VehicleType | null>(null);
+  const [opponentSelectedVehicle, setOpponentSelectedVehicle] = useState<VehicleType | null>(null);
+  const [isMyReady, setIsMyReady] = useState(false);
+  const [isOpponentReady, setIsOpponentReady] = useState(false);
+  const [launchCountdown, setLaunchCountdown] = useState<number | null>(null);
+
   // Initialize with one dummy friend
   const [myFriends, setMyFriends] = useState<Friend[]>([
     { 
@@ -47,8 +68,20 @@ export const MultiplayerLobbyScreen: React.FC = () => {
     }
   ]);
 
+  // Unique ID Simulation (Base64 of name)
+  const uniqueId = btoa(playerName).substring(0, 8).toUpperCase();
+
   const handleBack = () => {
-    setScreen('GAME_MODE');
+    if (viewState === 'ROOM') {
+        // Leave room confirm? For now just go back to lobby
+        setViewState('LOBBY');
+        setActiveOpponent(null);
+        setIsMyReady(false);
+        setIsOpponentReady(false);
+        setOpponentSelectedVehicle(null);
+    } else {
+        setScreen('GAME_MODE');
+    }
   };
 
   const handleSearch = (query: string) => {
@@ -57,10 +90,9 @@ export const MultiplayerLobbyScreen: React.FC = () => {
       setSearchResults([]);
       return;
     }
-    // Simulate API Search
     const results = MOCK_USER_DATABASE.filter(u => 
       u.name.toLowerCase().includes(query.toLowerCase()) && 
-      !myFriends.find(f => f.id === u.id) // Don't show existing friends
+      !myFriends.find(f => f.id === u.id)
     );
     setSearchResults(results);
   };
@@ -68,24 +100,231 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   const addFriend = (user: typeof MOCK_USER_DATABASE[0]) => {
     const newFriend: Friend = {
       ...user,
-      isOnline: true, // Simulate they are online
+      isOnline: true,
       status: 'IDLE'
     };
     setMyFriends([...myFriends, newFriend]);
-    setSearchResults(prev => prev.filter(p => p.id !== user.id)); // Remove from results
-    setActiveTab('FRIENDS'); // Switch back to list
+    setSearchResults(prev => prev.filter(p => p.id !== user.id));
+    setActiveTab('FRIENDS');
   };
 
   const inviteFriend = (id: string) => {
     setMyFriends(prev => prev.map(f => 
       f.id === id ? { ...f, status: 'INVITED' } : f
     ));
-    // In a real app, this would trigger a socket event
+
+    // SIMULATION: Friend accepts invite after 1.5 seconds
+    setTimeout(() => {
+        const friend = myFriends.find(f => f.id === id);
+        if (friend) {
+            setActiveOpponent(friend);
+            setViewState('ROOM');
+            // Reset room state
+            setMySelectedVehicle(null);
+            setOpponentSelectedVehicle(null);
+            setIsMyReady(false);
+            setIsOpponentReady(false);
+        }
+    }, 1500);
   };
 
-  // Unique ID Simulation (Base64 of name)
-  const uniqueId = btoa(playerName).substring(0, 8).toUpperCase();
+  // SIMULATION: Opponent Behavior in Room
+  useEffect(() => {
+    if (viewState === 'ROOM' && activeOpponent) {
+        
+        // 1. Opponent "Selecting..."
+        const pickTime = setTimeout(() => {
+            const options: VehicleType[] = ['boda', 'tuktuk', 'personal-car', '14-seater'];
+            const randomPick = options[Math.floor(Math.random() * options.length)];
+            setOpponentSelectedVehicle(randomPick);
+        }, 3000);
 
+        // 2. Opponent "Ready" (Wait for player to pick first, or just ready up after picking)
+        const readyTime = setTimeout(() => {
+            setIsOpponentReady(true);
+        }, 6000);
+
+        return () => {
+            clearTimeout(pickTime);
+            clearTimeout(readyTime);
+        };
+    }
+  }, [viewState, activeOpponent]);
+
+  // Launch Logic
+  useEffect(() => {
+    if (isMyReady && isOpponentReady) {
+        let count = 3;
+        setLaunchCountdown(count);
+        
+        const interval = setInterval(() => {
+            count--;
+            if (count < 0) {
+                clearInterval(interval);
+                // LAUNCH GAME
+                if (mySelectedVehicle) {
+                    setVehicleType(mySelectedVehicle);
+                    setScreen('MAP_SELECT'); // Host (Player) picks map
+                }
+            } else {
+                setLaunchCountdown(count);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }
+  }, [isMyReady, isOpponentReady, mySelectedVehicle, setVehicleType, setScreen]);
+
+
+  // --- RENDER: ROOM VIEW ---
+  if (viewState === 'ROOM' && activeOpponent) {
+      return (
+        <GameLayout noMaxWidth className="bg-slate-950">
+             <div className="flex flex-col h-full w-full max-w-6xl mx-auto p-4 md:p-6 lg:gap-8 relative">
+                
+                {/* Room Header */}
+                <div className="flex items-center justify-between mb-6 z-20">
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={handleBack}
+                            className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div>
+                            <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider leading-none">
+                                Staging Area
+                            </h2>
+                            <p className="text-slate-400 text-xs uppercase tracking-widest mt-1">Room Code: {uniqueId}-X</p>
+                        </div>
+                    </div>
+                    {/* Status Pill */}
+                    <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-full flex items-center gap-2">
+                         <div className={`w-2 h-2 rounded-full ${isMyReady && isOpponentReady ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+                         <span className="text-xs font-bold uppercase text-slate-300">
+                             {isMyReady && isOpponentReady ? 'Launching...' : 'Waiting for Players'}
+                         </span>
+                    </div>
+                </div>
+
+                {/* Main Stage */}
+                <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 items-stretch justify-center pb-20 md:pb-0">
+                    
+                    {/* PLAYER 1 (YOU) */}
+                    <div className={`flex-1 bg-slate-900/50 border-2 rounded-3xl p-6 flex flex-col transition-all duration-300 ${isMyReady ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]' : 'border-slate-800'}`}>
+                         <div className="flex items-center gap-4 mb-6">
+                            <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-600 shadow-lg">
+                                <User className="text-matatu-yellow" size={32} />
+                            </div>
+                            <div>
+                                <div className="text-white font-display font-bold text-xl">{playerName}</div>
+                                <div className="text-matatu-yellow text-xs font-bold uppercase tracking-wider">{saccoName}</div>
+                            </div>
+                         </div>
+
+                         <div className="flex-1 mb-6 relative">
+                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Your Ride</div>
+                             {/* Mini Vehicle Selector */}
+                             <div className="grid grid-cols-2 gap-2 h-full content-start overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+                                {unlockedVehicles.map(vType => {
+                                    const isSelected = mySelectedVehicle === vType;
+                                    const spec = VEHICLE_SPECS[vType];
+                                    return (
+                                        <button 
+                                            key={vType}
+                                            disabled={isMyReady}
+                                            onClick={() => setMySelectedVehicle(vType)}
+                                            className={`p-3 rounded-xl border text-left transition-all ${isSelected ? 'bg-matatu-yellow text-black border-matatu-yellow shadow-lg scale-[1.02]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'} ${isMyReady ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        >
+                                            <div className="mb-2">{VEHICLE_ICONS[vType]}</div>
+                                            <div className="font-bold text-xs uppercase leading-tight">{vType.replace('-', ' ')}</div>
+                                            <div className="text-[10px] opacity-70">Top Speed: {spec.maxSpeedKmh}</div>
+                                        </button>
+                                    )
+                                })}
+                             </div>
+                         </div>
+
+                         <Button 
+                            variant={isMyReady ? "danger" : "primary"}
+                            fullWidth
+                            size="lg"
+                            disabled={!mySelectedVehicle}
+                            onClick={() => setIsMyReady(!isMyReady)}
+                            className={!mySelectedVehicle ? 'opacity-50' : ''}
+                         >
+                            {isMyReady ? "Cancel Ready" : mySelectedVehicle ? "I'm Ready" : "Select Vehicle"}
+                         </Button>
+                    </div>
+
+                    {/* VS BADGE */}
+                    <div className="flex items-center justify-center md:flex-col">
+                        <div className="font-display font-black text-4xl text-slate-700 italic pr-4 md:pr-0 md:pb-4">VS</div>
+                    </div>
+
+                    {/* PLAYER 2 (OPPONENT) */}
+                    <div className={`flex-1 bg-slate-900/50 border-2 rounded-3xl p-6 flex flex-col transition-all duration-300 ${isOpponentReady ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]' : 'border-slate-800'}`}>
+                         <div className="flex items-center gap-4 mb-6 justify-end text-right">
+                            <div>
+                                <div className="text-white font-display font-bold text-xl">{activeOpponent.name}</div>
+                                <div className="text-neon-blue text-xs font-bold uppercase tracking-wider">{activeOpponent.sacco}</div>
+                            </div>
+                            <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-600 shadow-lg relative">
+                                <div className="font-display font-bold text-slate-500 text-2xl">{activeOpponent.name.charAt(0)}</div>
+                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-slate-900"></div>
+                            </div>
+                         </div>
+
+                         <div className="flex-1 flex flex-col items-center justify-center bg-black/20 rounded-2xl border border-slate-800/50 mb-6 p-6">
+                             {!opponentSelectedVehicle ? (
+                                 <div className="flex flex-col items-center gap-3 animate-pulse text-slate-500">
+                                     <Loader2 size={32} className="animate-spin" />
+                                     <span className="text-xs uppercase font-bold tracking-widest">Selecting Vehicle...</span>
+                                 </div>
+                             ) : (
+                                 <div className="flex flex-col items-center gap-4 animate-fade-in-up">
+                                     <div className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center border-4 border-slate-700 shadow-2xl">
+                                         <div className="scale-150 text-slate-300">
+                                            {VEHICLE_ICONS[opponentSelectedVehicle]}
+                                         </div>
+                                     </div>
+                                     <div className="text-center">
+                                         <div className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Vehicle Selected</div>
+                                         <div className="text-white font-display font-bold text-xl uppercase">{opponentSelectedVehicle.replace('-', ' ')}</div>
+                                     </div>
+                                 </div>
+                             )}
+                         </div>
+
+                         <div className={`p-4 rounded-xl flex items-center justify-center gap-3 font-bold uppercase tracking-wider transition-all ${isOpponentReady ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-slate-800 text-slate-500'}`}>
+                             {isOpponentReady ? <CheckCircle2 size={20} /> : <Loader2 size={20} className={opponentSelectedVehicle ? "animate-spin" : "opacity-0"} />}
+                             {isOpponentReady ? "Ready to Race" : opponentSelectedVehicle ? "Confirming..." : "Waiting..."}
+                         </div>
+                    </div>
+
+                </div>
+
+                {/* COUNTDOWN OVERLAY */}
+                {launchCountdown !== null && (
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-none md:rounded-3xl animate-fade-in">
+                        <div className="text-matatu-yellow font-display font-black text-9xl animate-ping opacity-75 absolute">
+                            {launchCountdown === 0 ? "GO" : launchCountdown}
+                        </div>
+                         <div className="text-white font-display font-black text-9xl relative z-10">
+                            {launchCountdown === 0 ? "GO" : launchCountdown}
+                        </div>
+                        <div className="mt-8 text-slate-300 font-bold uppercase tracking-[0.5em] animate-pulse">
+                            Starting Race
+                        </div>
+                    </div>
+                )}
+
+             </div>
+        </GameLayout>
+      );
+  }
+
+  // --- RENDER: LOBBY VIEW (DEFAULT) ---
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
       <div className="flex flex-col h-full w-full max-w-6xl mx-auto p-4 md:p-6 lg:gap-8 relative">
