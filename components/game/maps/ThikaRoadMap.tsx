@@ -1,13 +1,13 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
-import { Road, Scenery, StageMarker, PoliceMarker, HighwayBarrier, ModernBuilding } from '../environment/WorldAssets';
+import { Road, Scenery, StageMarker, PoliceMarker, HighwayBarrier, ModernBuilding, HighwayLightPole } from '../environment/WorldAssets';
 
 const OppositeTrafficVisual = () => {
     const groupRef = useRef<THREE.Group>(null);
-    const speed = useGameStore(state => state.currentSpeed);
+    const speed = useGameStore.getState().currentSpeed;
     
     // Simple low poly cars moving in opposite direction (very fast relative speed)
     useFrame((state, delta) => {
@@ -43,6 +43,74 @@ const OppositeTrafficVisual = () => {
     );
 };
 
+// Controls moving barriers and street lights on both sides
+const HighwayDecorations = () => {
+    const groupRef = useRef<THREE.Group>(null);
+    const { currentSpeed, nextStageDistance, distanceTraveled } = useGameStore();
+    
+    const COUNT = 16;
+    const GAP = 20;
+    
+    // Create static array of offsets for initial placement
+    const chunks = useMemo(() => Array.from({ length: COUNT }).map((_, i) => -i * GAP), []);
+
+    useFrame((state, delta) => {
+        if (!groupRef.current) return;
+        
+        const speed = useGameStore.getState().currentSpeed;
+        const stageZ = -(nextStageDistance - distanceTraveled);
+
+        // Move the entire group or move individual children?
+        // Moving individual children is better for endless scrolling
+        groupRef.current.children.forEach((child) => {
+            if (speed > 0) {
+                child.position.z += speed * delta;
+                
+                // Wrap around
+                if (child.position.z > 20) {
+                    child.position.z -= COUNT * GAP;
+                }
+            }
+
+            // Logic to hide Left Side Poles if Stage is nearby
+            // Child has 2 groups: [0] = Right, [1] = Left
+            const leftSideGroup = child.children[1];
+            if (leftSideGroup) {
+                // Check distance to stage
+                // Child world Z is child.position.z
+                // Stage world Z is stageZ
+                // If they are close, hide the left poles
+                const distToStage = Math.abs(child.position.z - stageZ);
+                
+                // If within 25 units of stage, hide left poles to avoid clipping/blocking
+                leftSideGroup.visible = distToStage > 25;
+            }
+        });
+    });
+
+    return (
+        <group ref={groupRef}>
+            {chunks.map((z, i) => (
+                <group key={i} position={[0, 0, z]}>
+                    
+                    {/* RIGHT SIDE (Barrier + Lights) */}
+                    <group position={[8, 0, 0]}>
+                        <HighwayBarrier />
+                        <HighwayLightPole isLeft={false} />
+                    </group>
+
+                    {/* LEFT SIDE (Barrier + Lights) */}
+                    <group position={[-8, 0, 0]}>
+                        <HighwayBarrier />
+                        <HighwayLightPole isLeft={true} />
+                    </group>
+
+                </group>
+            ))}
+        </group>
+    );
+};
+
 export const ThikaRoadMap = () => {
     const { totalRouteDistance, distanceTraveled } = useGameStore();
     const groupRef = useRef<THREE.Group>(null);
@@ -60,31 +128,8 @@ export const ThikaRoadMap = () => {
     <group>
       <Road variant="HIGHWAY" />
       
-      {/* Central Barrier - Pushed further out due to road width 15 */}
-      <group>
-          {Array.from({ length: 15 }).map((_, i) => (
-               <group key={i} position={[0, 0, -i * 20]}>
-                   <group position={[8, 0, 0]}>
-                       <HighwayBarrier />
-                   </group>
-                   {/* Street Lights */}
-                   <group position={[8, 0, 0]}>
-                        <mesh position={[0, 3, 0]}>
-                            <cylinderGeometry args={[0.1, 0.15, 6]} />
-                            <meshStandardMaterial color="#475569" />
-                        </mesh>
-                        <mesh position={[-2, 6, 0]} rotation={[0, 0, -0.2]}>
-                             <boxGeometry args={[5, 0.15, 0.3]} />
-                             <meshStandardMaterial color="#475569" />
-                        </mesh>
-                        <mesh position={[-4, 5.8, 0]}>
-                             <boxGeometry args={[0.8, 0.2, 0.5]} />
-                             <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1} />
-                        </mesh>
-                   </group>
-               </group>
-          ))}
-      </group>
+      {/* Moving Decorations (Barriers & Lights) */}
+      <HighwayDecorations />
 
       {/* Opposite Lane (Visual Only) - Pushed out */}
       <group position={[22, -0.05, 0]}>
@@ -104,11 +149,6 @@ export const ThikaRoadMap = () => {
             <ModernBuilding height={70} color="#0f172a" position={[50, 0, -30]} />
         </group>
       )}
-
-      {/* Scenery on the left side only (since right is opposite traffic) */}
-      <group position={[-15, 0, 0]}>
-          <Scenery variant="CITY" />
-      </group>
 
       <StageMarker />
       <PoliceMarker />

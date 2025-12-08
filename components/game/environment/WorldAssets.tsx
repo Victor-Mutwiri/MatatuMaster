@@ -128,6 +128,28 @@ export const HighwayBarrier = () => {
     );
 };
 
+export const HighwayLightPole = ({ isLeft = false }: { isLeft?: boolean }) => {
+  return (
+      <group>
+          {/* Main Pole */}
+          <mesh position={[0, 3, 0]}>
+              <cylinderGeometry args={[0.1, 0.15, 6]} />
+              <meshStandardMaterial color="#475569" />
+          </mesh>
+          {/* Arm */}
+          <mesh position={[isLeft ? 2 : -2, 6, 0]} rotation={[0, 0, isLeft ? 0.2 : -0.2]}>
+                <boxGeometry args={[5, 0.15, 0.3]} />
+                <meshStandardMaterial color="#475569" />
+          </mesh>
+          {/* Lamp */}
+          <mesh position={[isLeft ? 4 : -4, 5.8, 0]}>
+                <boxGeometry args={[0.8, 0.2, 0.5]} />
+                <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1} />
+          </mesh>
+      </group>
+  );
+};
+
 export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotation: [number, number, number]; }> = ({ position, rotation }) => {
   const shirtColor = useMemo(() => ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)], []);
   const pantsColor = useMemo(() => ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)], []);
@@ -337,8 +359,8 @@ export const StageModel = ({ distance, passengerCount, isDeparting }: { distance
   const { selectedRoute } = useGameStore();
   const isHighway = selectedRoute?.id === 'thika-highway';
   
-  // Position marker further out on highway
-  const MARKER_X = isHighway ? -9 : -(ROAD_WIDTH / 2 + 2.5);
+  // Position marker further out on highway to avoid road/pole collision
+  const MARKER_X = isHighway ? -12 : -(ROAD_WIDTH / 2 + 2.5);
   
   const crowd = useMemo(() => {
     if (isDeparting || passengerCount <= 0) return [];
