@@ -2,17 +2,18 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, EARNINGS_CAPS } from '../store/gameStore';
 import { Route } from '../types';
 import { Clock, Lock, MapPin, ArrowLeft, TrendingUp, Car, Shield, Navigation } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
+// Base map definitions - Earnings will be overwritten dynamically
 const MAPS: Route[] = [
   {
     id: 'kiambu-route',
     name: 'Nairobi → Kiambu',
     distance: 14.5,
-    potentialEarnings: 4500,
+    potentialEarnings: 4500, // Placeholder
     trafficLevel: 'Medium',
     dangerLevel: 'Safe',
     timeLimit: '45 mins',
@@ -23,7 +24,7 @@ const MAPS: Route[] = [
     id: 'river-road',
     name: 'River Road Gridlock',
     distance: 6.5,
-    potentialEarnings: 15000,
+    potentialEarnings: 15000, // Placeholder
     trafficLevel: 'Gridlock',
     dangerLevel: 'No-Go Zone',
     timeLimit: '40 mins',
@@ -34,7 +35,7 @@ const MAPS: Route[] = [
     id: 'rural-dirt',
     name: 'Upcountry Dirt Road',
     distance: 17.0,
-    potentialEarnings: 6000,
+    potentialEarnings: 6000, // Placeholder
     trafficLevel: 'Low',
     dangerLevel: 'Sketchy',
     timeLimit: '55 mins',
@@ -45,7 +46,7 @@ const MAPS: Route[] = [
     id: 'limuru-drive',
     name: 'Limuru Misty Drive',
     distance: 22.5,
-    potentialEarnings: 7500,
+    potentialEarnings: 7500, // Placeholder
     trafficLevel: 'High',
     dangerLevel: 'Sketchy',
     timeLimit: '1h 00m',
@@ -56,7 +57,7 @@ const MAPS: Route[] = [
     id: 'maimahiu-escarpment',
     name: 'Mai Mahiu Escarpment',
     distance: 35.0,
-    potentialEarnings: 9500,
+    potentialEarnings: 9500, // Placeholder
     trafficLevel: 'High',
     dangerLevel: 'No-Go Zone',
     timeLimit: '1h 10m',
@@ -67,7 +68,7 @@ const MAPS: Route[] = [
     id: 'thika-highway',
     name: 'Thika Highway',
     distance: 40.2,
-    potentialEarnings: 8000,
+    potentialEarnings: 8000, // Placeholder
     trafficLevel: 'Gridlock',
     dangerLevel: 'Sketchy',
     timeLimit: '1h 15m',
@@ -78,7 +79,7 @@ const MAPS: Route[] = [
     id: 'rongai-extreme',
     name: 'Rongai Extreme',
     distance: 25.0,
-    potentialEarnings: 12000,
+    potentialEarnings: 12000, // Placeholder
     trafficLevel: 'Gridlock',
     dangerLevel: 'No-Go Zone',
     timeLimit: '2h 00m',
@@ -88,9 +89,19 @@ const MAPS: Route[] = [
 ];
 
 export const MapSelectionScreen: React.FC = () => {
-  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode } = useGameStore();
+  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType } = useGameStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
+
+  // Helper to get real potential earnings
+  const getEarnings = (mapId: string) => {
+    const currentVehicle = vehicleType || '14-seater';
+    const mapCaps = EARNINGS_CAPS[mapId];
+    if (mapCaps && mapCaps[currentVehicle]) {
+        return mapCaps[currentVehicle];
+    }
+    return 0;
+  };
 
   useEffect(() => {
     if (!selectedRoute) selectRoute(MAPS[0]);
@@ -117,6 +128,7 @@ export const MapSelectionScreen: React.FC = () => {
   };
 
   const activeRoute = selectedRoute || MAPS[0];
+  const activeEarnings = getEarnings(activeRoute.id);
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
@@ -141,6 +153,9 @@ export const MapSelectionScreen: React.FC = () => {
                <h2 className="font-display text-xl font-bold text-white uppercase tracking-wider truncate">
                  Select Route
                </h2>
+               <p className="text-xs text-slate-400 uppercase tracking-widest">
+                  Driving: <span className="text-matatu-yellow font-bold">{vehicleType?.replace('-', ' ') || 'Unknown'}</span>
+               </p>
              </div>
         </div>
 
@@ -164,8 +179,8 @@ export const MapSelectionScreen: React.FC = () => {
                       <span className="text-white font-mono">{activeRoute.distance}km</span>
                    </div>
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
-                      <span className="text-slate-500 uppercase font-bold text-xs">Earnings</span>
-                      <span className="text-green-400 font-mono">KES {activeRoute.potentialEarnings}</span>
+                      <span className="text-slate-500 uppercase font-bold text-xs">Potential</span>
+                      <span className="text-green-400 font-mono">KES {activeEarnings}</span>
                    </div>
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
                       <span className="text-slate-500 uppercase font-bold text-xs">Difficulty</span>
@@ -194,6 +209,7 @@ export const MapSelectionScreen: React.FC = () => {
               {MAPS.map((map) => {
                 const isSelected = selectedRoute?.id === map.id;
                 const isLocked = map.isLocked;
+                const mapEarnings = getEarnings(map.id);
 
                 return (
                   <div 
@@ -226,7 +242,7 @@ export const MapSelectionScreen: React.FC = () => {
                           </h3>
                           <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
                              <span className="flex items-center gap-1"><MapPin size={12}/> {map.distance}km</span>
-                             <span className="flex items-center gap-1"><Car size={12}/> {map.trafficLevel}</span>
+                             <span className="flex items-center gap-1 text-green-400 font-bold"><Car size={12}/> KES {mapEarnings}</span>
                           </div>
                         </div>
                         {isLocked && <Lock className="text-slate-500 mb-1" />}
@@ -248,8 +264,8 @@ export const MapSelectionScreen: React.FC = () => {
                    <div className="text-xs text-slate-400 mt-0.5">{activeRoute.distance}km • {activeRoute.timeLimit}</div>
                 </div>
                 <div className="text-right">
-                   <div className="text-[10px] text-slate-500 uppercase font-bold Reward">Reward</div>
-                   <div className="text-green-400 font-mono font-bold">KES {activeRoute.potentialEarnings}</div>
+                   <div className="text-[10px] text-slate-500 uppercase font-bold Reward">Potential</div>
+                   <div className="text-green-400 font-mono font-bold">KES {activeEarnings}</div>
                 </div>
              </div>
              

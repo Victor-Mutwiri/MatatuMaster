@@ -78,7 +78,6 @@ const VEHICLE_CAPACITY = {
 interface VehicleSpec {
   maxSpeedKmh: number;
   timeMultiplier: number;
-  fareRange: { min: number; max: number };
   price: number; // Cost to unlock
 }
 
@@ -87,38 +86,92 @@ export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
   'boda': { 
     maxSpeedKmh: 140, 
     timeMultiplier: 1.0,
-    fareRange: { min: 50, max: 150 },
     price: 0 // Free
   },
   'tuktuk': { 
     maxSpeedKmh: 90, 
     timeMultiplier: 1.4,
-    fareRange: { min: 30, max: 70 },
     price: 10000
   },
   'personal-car': { 
     maxSpeedKmh: 190, 
     timeMultiplier: 0.85,
-    fareRange: { min: 150, max: 500 },
     price: 40000
   },
   '14-seater': { 
     maxSpeedKmh: 175, 
     timeMultiplier: 1.0,
-    fareRange: { min: 20, max: 100 },
     price: 120000
   },
   '32-seater': { 
     maxSpeedKmh: 130, 
     timeMultiplier: 1.2,
-    fareRange: { min: 20, max: 80 },
     price: 200000
   },
   '52-seater': { 
     maxSpeedKmh: 120, 
     timeMultiplier: 1.3,
-    fareRange: { min: 20, max: 60 },
     price: 350000
+  }
+};
+
+// --- EARNINGS MATRIX (Map ID -> Vehicle Type -> Max Potential) ---
+export const EARNINGS_CAPS: Record<string, Record<VehicleType, number>> = {
+  'kiambu-route': {
+    'boda': 800,
+    'personal-car': 3000,
+    'tuktuk': 600,
+    '14-seater': 1700,
+    '32-seater': 3000,
+    '52-seater': 3800
+  },
+  'river-road': {
+    'boda': 500,
+    'personal-car': 1500,
+    'tuktuk': 500,
+    '14-seater': 600,
+    '32-seater': 1300,
+    '52-seater': 1800
+  },
+  'rural-dirt': {
+    'boda': 400,
+    'personal-car': 1000,
+    'tuktuk': 400,
+    '14-seater': 750,
+    '32-seater': 1100,
+    '52-seater': 1800
+  },
+  'limuru-drive': {
+    'boda': 800,
+    'personal-car': 3000,
+    'tuktuk': 600,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  },
+  'maimahiu-escarpment': {
+    'boda': 700,
+    'personal-car': 4000,
+    'tuktuk': 800,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  },
+  'thika-highway': {
+    'boda': 700,
+    'personal-car': 2000,
+    'tuktuk': 600,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  },
+  'rongai-extreme': {
+    'boda': 800,
+    'personal-car': 3000,
+    'tuktuk': 600,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
   }
 };
 
@@ -187,7 +240,7 @@ export const useGameStore = create<GameStore>()(
       totalPassengersCarried: 0,
       bribesPaid: 0,
       brakeTemp: 0,
-      overlapTimer: 0, // NEW: Track time spent overlapping illegally
+      overlapTimer: 0, 
       
       lifetimeStats: INITIAL_LIFETIME,
 
@@ -320,20 +373,35 @@ export const useGameStore = create<GameStore>()(
       },
       
       triggerStage: () => {
-        const { currentPassengers, nextStagePassengerCount, vehicleType, distanceTraveled, totalRouteDistance } = get();
+        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute, totalRouteDistance } = get();
         
         const waiting = nextStagePassengerCount; 
         const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
         
-        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
-        const { min, max } = spec.fareRange;
+        // --- REALISTIC FARE CALCULATION ---
+        // 1. Get the max earning potential for this map + vehicle combo
+        const mapId = selectedRoute?.id || 'kiambu-route';
+        const vType = vehicleType || '14-seater';
+        const mapCaps = EARNINGS_CAPS[mapId] || EARNINGS_CAPS['kiambu-route'];
+        const earningCap = mapCaps[vType] || 2000;
+
+        // 2. Estimate average stops for this route (Assuming stage every ~2.5km)
+        const estimatedStops = Math.ceil(selectedRoute!.distance / 2.5) || 5;
+
+        // 3. Get Vehicle Capacity
+        const legalCapacity = VEHICLE_CAPACITY[vType].legal;
+
+        // 4. Calculate Ideal Fare per Passenger per Stop to reach Cap if full 50% of time
+        // Formula: Cap / (Stops * AvgLoad)
+        // AvgLoad is usually 70% of legal capacity
+        const avgLoad = Math.max(1, legalCapacity * 0.7);
+        let idealFare = earningCap / (estimatedStops * avgLoad);
         
-        const distanceRemainingRatio = Math.max(0, (totalRouteDistance - distanceTraveled) / totalRouteDistance);
+        // 5. Add Randomness (Supply/Demand)
+        const marketFluctuation = 0.9 + Math.random() * 0.4; // 0.9x to 1.3x
         
-        // As you get closer (ratio -> 0), price -> min. At start (ratio -> 1), price -> max
-        let calculatedFare = min + ((max - min) * distanceRemainingRatio);
-        calculatedFare = Math.ceil(calculatedFare / 10) * 10;
-        calculatedFare = Math.max(calculatedFare, min);
+        let calculatedFare = Math.ceil((idealFare * marketFluctuation) / 10) * 10; // Round to nearest 10
+        calculatedFare = Math.max(10, calculatedFare); // Minimum KES 10
 
         set({
           currentSpeed: 0,
@@ -378,8 +446,26 @@ export const useGameStore = create<GameStore>()(
         const currentStagePos = nextStageDistance;
         const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
         
+        // --- PASSENGER INFLUX LOGIC ---
+        // Predictability removal: Sometimes huge crowds, sometimes empty
         const happinessFactor = Math.max(0.1, happiness / 100);
-        const maxPotentialPassengers = Math.floor(8 * happinessFactor);
+        let maxPotentialPassengers = 0;
+        
+        const chance = Math.random();
+        if (chance > 0.8) {
+             // INFLUX (Peak Hours)
+             maxPotentialPassengers = limits.max; // Full bus waiting!
+        } else if (chance < 0.2) {
+             // DRY SPELL
+             maxPotentialPassengers = Math.floor(limits.legal * 0.1); // Almost empty
+        } else {
+             // NORMAL
+             maxPotentialPassengers = Math.floor(limits.legal * 0.6);
+        }
+
+        // Adjust for happiness
+        maxPotentialPassengers = Math.ceil(maxPotentialPassengers * happinessFactor);
+        
         const nextPax = Math.floor(Math.random() * (maxPotentialPassengers + 1));
 
         set({
@@ -398,8 +484,9 @@ export const useGameStore = create<GameStore>()(
       },
 
       triggerPoliceCheck: () => {
-        const { currentPassengers, maxPassengers, distanceTraveled } = get();
+        const { currentPassengers, maxPassengers, distanceTraveled, vehicleType } = get();
         const isOverloaded = currentPassengers > maxPassengers;
+        const isPersonalCar = vehicleType === 'personal-car';
         
         let shouldStop = false;
         let bribe = 0;
@@ -407,13 +494,21 @@ export const useGameStore = create<GameStore>()(
         
         if (isOverloaded) {
           shouldStop = true;
-          bribe = 1000 + Math.floor(Math.random() * 1500);
-          message = "Wewe! You are overloaded! This is a serious offence.";
+          // Extortion for offence
+          bribe = 2000 + Math.floor(Math.random() * 3000); 
+          message = "Wewe! You are overloaded! This is a serious offence. Leta kitu kubwa.";
         } else {
-          if (Math.random() > 0.6) {
+          // Routine Check Logic
+          if (Math.random() > 0.5) {
             shouldStop = true;
-            bribe = 100 + Math.floor(Math.random() * 200); 
-            message = "Routine check. The boys need some tea.";
+            // Routine Bribe Logic
+            if (isPersonalCar) {
+                bribe = 200;
+                message = "Niaje boss. Leta ya macho (200).";
+            } else {
+                bribe = 100;
+                message = "Routine check. Toa mia ya chai.";
+            }
           }
         }
         
@@ -449,7 +544,7 @@ export const useGameStore = create<GameStore>()(
             });
           }
         } else if (action === 'REFUSE') {
-          const arrestChance = policeData.isOverloaded ? 0.5 : 0.1;
+          const arrestChance = policeData.isOverloaded ? 0.8 : 0.2; // Higher risk if overloaded
           
           if (Math.random() < arrestChance) {
             set({
