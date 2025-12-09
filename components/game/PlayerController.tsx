@@ -12,6 +12,7 @@ import {
 
 const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
+const RONGAI_LANE_OFFSET = 3.2;
 
 // Simple Particle System for Brake Smoke
 const BrakeSmoke = ({ isEmitting }: { isEmitting: boolean }) => {
@@ -78,7 +79,7 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
   const isRongai = selectedRoute?.id === 'rongai-extreme';
 
   // Dynamic Lane Offset
-  const currentLaneOffset = isHighway ? HIGHWAY_LANE_OFFSET : CITY_LANE_OFFSET;
+  const currentLaneOffset = isHighway ? HIGHWAY_LANE_OFFSET : (isRongai ? RONGAI_LANE_OFFSET : CITY_LANE_OFFSET);
   
   // Brake Fade Visuals
   const isBrakeSmoking = brakeTemp > 60;
@@ -98,10 +99,10 @@ export const PlayerController = ({ type, setLaneCallback }: { type: VehicleType 
         meshRef.current.position.x = 0;
       } else {
         setLane(-1); 
-        meshRef.current.position.x = -CITY_LANE_OFFSET;
+        meshRef.current.position.x = -currentLaneOffset;
       }
     }
-  }, [gameStatus, isCrashing, isHighway]);
+  }, [gameStatus, isCrashing, isHighway, currentLaneOffset]);
 
   useEffect(() => {
     if (isCrashing) return; 

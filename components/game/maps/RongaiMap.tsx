@@ -12,14 +12,17 @@ const ScrollingTerrain = () => {
     const GAP = 15;
 
     // Stable generation of obstacles to prevent flickering during re-renders
+    // Updated spawn ranges to match new road width
+    // Lane -1 (Tarmac) x range approx: -1.5 to -4.5
+    // Lane -2 (Dirt) x range approx: -5.0 to -7.5
     const chunks = useMemo(() => Array.from({ length: COUNT }).map((_, i) => ({
         z: -i * GAP,
         pothole: Math.random() > 0.6 ? {
-            x: Math.random() * 6 - 3,
+            x: Math.random() > 0.5 ? (-3.2 + (Math.random() - 0.5)) : (-6.4 + (Math.random() - 0.5)),
             z: Math.random() * 10 - 5
         } : null,
         dirtPatch: Math.random() > 0.8 ? {
-            x: Math.random() * 6 - 3
+            x: -6.4 + (Math.random() - 0.5) * 2
         } : null
     })), []);
 

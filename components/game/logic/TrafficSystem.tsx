@@ -9,6 +9,7 @@ import * as THREE from 'three';
 
 const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
+const RONGAI_LANE_OFFSET = 3.2;
 
 // --- Independent Vehicle Component ---
 // Manages its own movement to avoid re-rendering the parent list every frame.
@@ -386,7 +387,7 @@ export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
                 id: Math.random(),
                 initialZ: -250, 
                 lane: -1, 
-                laneOffset: CITY_LANE_OFFSET,
+                laneOffset: RONGAI_LANE_OFFSET,
                 speed: 15 + Math.random() * 15, // Slow
                 type: 'CAR',
                 direction: 'SAME',
@@ -403,7 +404,7 @@ export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
                 id: Math.random(),
                 initialZ: -250, 
                 lane: 1, 
-                laneOffset: CITY_LANE_OFFSET,
+                laneOffset: RONGAI_LANE_OFFSET,
                 speed: 60 + Math.random() * 40,
                 type: 'MATATU',
                 direction: 'OPPOSITE',
@@ -420,7 +421,7 @@ export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
                 id: Math.random(),
                 initialZ: -300, 
                 lane: -2, 
-                laneOffset: CITY_LANE_OFFSET,
+                laneOffset: RONGAI_LANE_OFFSET,
                 speed: 70 + Math.random() * 20, // Fast overtaking on dirt
                 type: 'MATATU',
                 direction: 'SAME',
@@ -437,7 +438,7 @@ export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
                 id: Math.random(),
                 initialZ: -400, // Starts far
                 lane: -1, // IN YOUR LANE
-                laneOffset: CITY_LANE_OFFSET,
+                laneOffset: RONGAI_LANE_OFFSET,
                 speed: 80, // Coming fast
                 type: 'BUS', // Scary
                 direction: 'OPPOSITE', // Head on!

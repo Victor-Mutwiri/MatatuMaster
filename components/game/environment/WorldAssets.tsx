@@ -356,21 +356,21 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
     return (
         <group>
             {/* 1. Main Road (Tarmac) - Covering Lane -1 and Lane 1 */}
-            {/* Approx Width 8, centered slightly right */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.5, -0.05, 0]} receiveShadow>
-                <planeGeometry args={[8, 300]} />
+            {/* Approx Width 10, centered at 0 */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+                <planeGeometry args={[10, 300]} />
                 <meshStandardMaterial color={roadColor} roughness={0.8} />
             </mesh>
 
             {/* 2. Overlap Shoulder (Dirt) - Covering Lane -2 */}
             {/* Positioned left of main road */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-4.5, -0.04, 0]} receiveShadow>
-                <planeGeometry args={[4, 300]} />
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-8, -0.04, 0]} receiveShadow>
+                <planeGeometry args={[6, 300]} />
                 <meshStandardMaterial color="#5D4037" roughness={1} />
             </mesh>
 
             {/* 3. Sides (Grass/Rough) */}
-             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-11, -0.1, 0]}>
+             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-14, -0.1, 0]}>
                 <planeGeometry args={[10, 300]} />
                 <meshStandardMaterial color={sideColor} />
             </mesh>
@@ -384,14 +384,14 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
                  {Array.from({ length: STRIP_COUNT }).map((_, i) => (
                     <group key={i} position={[0, 0, -i * STRIP_GAP]}>
                          {/* Center Line (Yellow broken) */}
-                         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.5, 0.01, 0]}>
+                         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
                             <planeGeometry args={[0.15, 4]} />
                             <meshStandardMaterial color={stripColor} />
                          </mesh>
                          
                          {/* Shoulder Separator (Solid White Line) */}
-                         {/* Placed between Tarmac and Dirt */}
-                         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-2.5, 0.06, 0]}>
+                         {/* Placed between Tarmac and Dirt at x = -5 */}
+                         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-5, 0.06, 0]}>
                              <planeGeometry args={[0.2, STRIP_GAP]} />
                              <meshStandardMaterial color="#e2e8f0" />
                          </mesh>
@@ -490,7 +490,7 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'RO
   const isHighway = selectedRoute?.id === 'thika-highway';
   const isRongai = variant === 'RONGAI';
   
-  const BASE_OFFSET = isHighway ? 9 : (isRongai ? 8 : ROAD_WIDTH / 2 + 3); 
+  const BASE_OFFSET = isHighway ? 9 : (isRongai ? 12 : ROAD_WIDTH / 2 + 3); 
 
   const distRemaining = totalRouteDistance - distanceTraveled;
   const isCityApproaching = distRemaining < 800;
@@ -623,8 +623,8 @@ export const StageModel = ({ distance, passengerCount, isDeparting }: { distance
   const isRongai = selectedRoute?.id === 'rongai-extreme';
   
   // Position marker further out on highway/rongai to avoid collision
-  // Rongai has overlap lane -2, so stage needs to be way out at -10
-  const MARKER_X = isHighway ? -12 : (isRongai ? -10 : -(ROAD_WIDTH / 2 + 2.5));
+  // Rongai has overlap lane -2 (at x=-6.4), dirt edge at -11. Stage needs to be safe. -12 is good.
+  const MARKER_X = isHighway ? -12 : (isRongai ? -12 : -(ROAD_WIDTH / 2 + 2.5));
   
   const crowd = useMemo(() => {
     if (isDeparting || passengerCount <= 0) return [];
