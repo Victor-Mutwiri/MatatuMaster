@@ -11,6 +11,18 @@ const ScrollingTerrain = () => {
     const COUNT = 16;
     const GAP = 15;
 
+    // Stable generation of obstacles to prevent flickering during re-renders
+    const chunks = useMemo(() => Array.from({ length: COUNT }).map((_, i) => ({
+        z: -i * GAP,
+        pothole: Math.random() > 0.6 ? {
+            x: Math.random() * 6 - 3,
+            z: Math.random() * 10 - 5
+        } : null,
+        dirtPatch: Math.random() > 0.8 ? {
+            x: Math.random() * 6 - 3
+        } : null
+    })), []);
+
     useFrame((state, delta) => {
         if (!groupRef.current) return;
         if (speed > 0) {
@@ -23,23 +35,21 @@ const ScrollingTerrain = () => {
         }
     });
 
-    const chunks = useMemo(() => Array.from({ length: COUNT }).map((_, i) => -i * GAP), []);
-
     return (
         <group ref={groupRef}>
-            {chunks.map((z, i) => (
-                <group key={i} position={[0, 0, z]}>
+            {chunks.map((chunk, i) => (
+                <group key={i} position={[0, 0, chunk.z]}>
                     
                     {/* Visual Scenery is handled by Scenery Component but specific road decals here */}
                     
-                    {/* Potholes - Randomly placed on the road */}
-                    {Math.random() > 0.6 && (
-                        <Pothole position={[Math.random() * 6 - 3, 0.05, Math.random() * 10 - 5]} />
+                    {/* Potholes - Pre-calculated and raised slightly to prevent Z-fighting */}
+                    {chunk.pothole && (
+                        <Pothole position={[chunk.pothole.x, 0.07, chunk.pothole.z]} />
                     )}
                     
-                    {/* Dirt Patch Overlay (Visual only) */}
-                    {Math.random() > 0.8 && (
-                         <mesh position={[Math.random() * 6 - 3, 0.04, 0]} rotation={[-Math.PI/2, 0, 0]}>
+                    {/* Dirt Patch Overlay */}
+                    {chunk.dirtPatch && (
+                         <mesh position={[chunk.dirtPatch.x, 0.05, 0]} rotation={[-Math.PI/2, 0, 0]}>
                             <circleGeometry args={[1.5, 6]} />
                             <meshStandardMaterial color="#5D4037" transparent opacity={0.6} />
                          </mesh>
@@ -57,7 +67,7 @@ export const RongaiMap = () => {
       {/* Rongai has chaotic mix of buildings and rough terrain */}
       <Scenery variant="RONGAI" />
       
-      {/* Road with extra shoulder width for overlapping */}
+      {/* Road with extra shoulder width for overlapping and clear separation */}
       <Road variant="RONGAI" />
       
       {/* Dynamic Potholes and Dirt */}
