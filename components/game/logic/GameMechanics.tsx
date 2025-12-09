@@ -51,9 +51,10 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
   const FRICTION_RATE = 15;
   const CREEP_SPEED = 5;
   
-  // Escarpment Specifics
+  // Map Specifics
   const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
   const isRongai = selectedRoute?.id === 'rongai-extreme';
+  const isRiverRoad = selectedRoute?.id === 'river-road';
   
   const GRAVITY_ACCEL = 10; // Downhill roll speed
   const BRAKE_HEAT_RATE = 30; // Heat per second while braking
@@ -143,41 +144,40 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
         speedLimit = minCrawl + (factor * (MAX_SPEED - minCrawl));
     }
 
-    // --- OVERLAP PENALTY LOGIC (Rongai Only) ---
-    // If player is in Lane -2 (Overlap lane)
-    if (isRongai) {
-        if (playerLane === -2) {
-            const newTimer = overlapTimer + delta;
-            setOverlapTimer(newTimer);
-            
-            // Penalty: Happiness Drop (Passengers scared of bumps/police)
-            // Drop 5 happiness per second
-            const newHappiness = Math.max(0, happiness - (5 * delta));
-            
-            // Apply Happiness update immediately (dirty write to avoid re-renders or use a separate timer?)
-            // We can just set it via store action.
-            if (Math.floor(newTimer) > Math.floor(overlapTimer)) {
-                // Audio Warning
-                if (newTimer > 2) {
-                     playSfx('SIREN');
-                }
-            }
-            
-            // Only update happiness occasionally to save renders
-            if (state.clock.elapsedTime % 0.5 < delta) {
-                 useGameStore.setState({ happiness: newHappiness });
-            }
+    // --- ILLEGAL LANE LOGIC (Penalty System) ---
+    // Rongai: Lane -2 is the overlap/dirt lane.
+    // River Road: Lane 2 and -2 are the sidewalks.
+    const isIllegalDriving = (isRongai && playerLane === -2) || (isRiverRoad && Math.abs(playerLane) === 2);
 
-            // Punishment: Arrest
-            if (newTimer > OVERLAP_LIMIT_SECONDS) {
-                endGame('ARRESTED');
-            }
+    if (isIllegalDriving) {
+        const newTimer = overlapTimer + delta;
+        setOverlapTimer(newTimer);
+        
+        // Penalty: Happiness Drop (Passengers scared of bumps/police/sidewalks)
+        // Drop 5 happiness per second
+        const newHappiness = Math.max(0, happiness - (5 * delta));
+        
+        // Apply Happiness update immediately
+        if (state.clock.elapsedTime % 0.5 < delta) {
+             useGameStore.setState({ happiness: newHappiness });
+        }
 
-        } else {
-            // Cooldown if back on road
-            if (overlapTimer > 0) {
-                setOverlapTimer(Math.max(0, overlapTimer - delta * 2)); // Cools down 2x faster
+        // Warning Sound
+        if (Math.floor(newTimer) > Math.floor(overlapTimer)) {
+            if (newTimer > 2) {
+                 playSfx('SIREN');
             }
+        }
+
+        // Punishment: Arrest
+        if (newTimer > OVERLAP_LIMIT_SECONDS) {
+            endGame('ARRESTED');
+        }
+
+    } else {
+        // Cooldown if back on road
+        if (overlapTimer > 0) {
+            setOverlapTimer(Math.max(0, overlapTimer - delta * 2)); // Cools down 2x faster
         }
     }
 

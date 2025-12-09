@@ -57,7 +57,8 @@ export const HUD: React.FC = () => {
     fuel,
     pauseGame,
     vehicleType,
-    overlapTimer
+    overlapTimer,
+    selectedRoute
   } = useGameStore();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -108,6 +109,7 @@ export const HUD: React.FC = () => {
 
   // Warning logic
   const isOverlapWarning = overlapTimer > 2;
+  const isRiverRoad = selectedRoute?.id === 'river-road';
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
@@ -124,7 +126,9 @@ export const HUD: React.FC = () => {
                  <Siren size={32} className="animate-spin" />
                  <div className="text-center">
                     <h2 className="font-black text-xl uppercase tracking-wider leading-none">POLICE ALERT</h2>
-                    <p className="text-[10px] font-bold">ILLEGAL OVERLAP DETECTED</p>
+                    <p className="text-[10px] font-bold">
+                        {isRiverRoad ? "SIDEWALK VIOLATION" : "ILLEGAL OVERLAP DETECTED"}
+                    </p>
                  </div>
                  <Siren size={32} className="animate-spin" />
             </div>
