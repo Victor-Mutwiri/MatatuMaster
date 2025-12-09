@@ -84,7 +84,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         />
         
         {/* Game Logic */}
-        <PhysicsController />
+        <PhysicsController playerLane={playerLane} />
         <CameraRig />
 
         {/* Map Selection */}

@@ -71,6 +71,7 @@ export interface GameState {
   totalPassengersCarried: number; // Session total
   bribesPaid: number; // Session total
   brakeTemp: number; // 0-100, Brake Fade Mechanic
+  overlapTimer: number; // Time spent in overlap lane
   
   // Lifetime Tracking
   lifetimeStats: LifetimeStats;

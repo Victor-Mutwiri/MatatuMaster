@@ -132,6 +132,7 @@ interface GameStore extends GameState {
   updateDistance: (delta: number) => void;
   setCurrentSpeed: (speed: number) => void;
   setBrakeTemp: (temp: number) => void;
+  setOverlapTimer: (time: number) => void;
   
   // Progression
   registerUser: () => void;
@@ -186,6 +187,7 @@ export const useGameStore = create<GameStore>()(
       totalPassengersCarried: 0,
       bribesPaid: 0,
       brakeTemp: 0,
+      overlapTimer: 0, // NEW: Track time spent overlapping illegally
       
       lifetimeStats: INITIAL_LIFETIME,
 
@@ -226,6 +228,8 @@ export const useGameStore = create<GameStore>()(
       setCurrentSpeed: (speed) => set({ currentSpeed: speed }),
       
       setBrakeTemp: (temp) => set({ brakeTemp: temp }),
+
+      setOverlapTimer: (time) => set({ overlapTimer: time }),
 
       registerUser: () => set({ userMode: 'REGISTERED' }),
 
@@ -517,6 +521,7 @@ export const useGameStore = create<GameStore>()(
           totalPassengersCarried: 0,
           bribesPaid: 0,
           brakeTemp: 0,
+          overlapTimer: 0,
           currentPassengers: 0,
           maxPassengers: maxPax,
           nextStageDistance: 1500,
@@ -565,6 +570,7 @@ export const useGameStore = create<GameStore>()(
         policeData: null,
         stageData: null,
         brakeTemp: 0,
+        overlapTimer: 0,
         happiness: 100
       }),
 
@@ -669,6 +675,7 @@ export const useGameStore = create<GameStore>()(
         happiness: 100,
         isStereoOn: false,
         brakeTemp: 0,
+        overlapTimer: 0,
         timeOfDay: 'DAY',
         isAccelerating: false,
         isBraking: false

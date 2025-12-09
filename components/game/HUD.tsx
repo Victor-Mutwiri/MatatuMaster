@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause, Maximize, Minimize } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause, Maximize, Minimize, Siren } from 'lucide-react';
 import { useGameStore, VEHICLE_SPECS } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 
@@ -56,7 +56,8 @@ export const HUD: React.FC = () => {
     setControl,
     fuel,
     pauseGame,
-    vehicleType
+    vehicleType,
+    overlapTimer
   } = useGameStore();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -105,11 +106,33 @@ export const HUD: React.FC = () => {
   const handleBrakeStart = () => setControl('BRAKE', true);
   const handleBrakeEnd = () => setControl('BRAKE', false);
 
+  // Warning logic
+  const isOverlapWarning = overlapTimer > 2;
+
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
       
+      {/* POLICE ATTENTION WARNING (Visual Screen Overlay) */}
+      {isOverlapWarning && (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            {/* Flashing Borders */}
+            <div className="absolute inset-0 border-[20px] border-red-500/30 animate-pulse"></div>
+            <div className="absolute inset-0 border-[20px] border-blue-500/30 animate-pulse delay-75"></div>
+            
+            {/* Text Alert */}
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 text-white px-4 py-2 rounded-lg shadow-xl animate-bounce flex items-center gap-3 border-2 border-white">
+                 <Siren size={32} className="animate-spin" />
+                 <div className="text-center">
+                    <h2 className="font-black text-xl uppercase tracking-wider leading-none">POLICE ALERT</h2>
+                    <p className="text-[10px] font-bold">ILLEGAL OVERLAP DETECTED</p>
+                 </div>
+                 <Siren size={32} className="animate-spin" />
+            </div>
+        </div>
+      )}
+
       {/* Top Bar Area */}
-      <div className="flex justify-between items-start gap-2">
+      <div className="flex justify-between items-start gap-2 relative z-10">
         <div className="flex flex-col gap-2 pointer-events-auto">
             {/* Control Buttons Group */}
             <div className="flex items-center gap-2 mb-1">
@@ -192,7 +215,7 @@ export const HUD: React.FC = () => {
       </div>
 
       {/* Bottom Area - Pedals and Stats */}
-      <div className="mt-auto flex justify-between items-end pb-2">
+      <div className="mt-auto flex justify-between items-end pb-2 relative z-10">
         
         {/* Left: Brake Pedal & Passengers */}
         <div className="flex items-end gap-3 pointer-events-auto">

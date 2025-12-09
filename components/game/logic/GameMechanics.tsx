@@ -2,12 +2,26 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGameStore, VEHICLE_SPECS } from '../../../store/gameStore';
-import { EngineSynthesizer } from '../../../utils/audio';
+import { EngineSynthesizer, playSfx } from '../../../utils/audio';
 import * as THREE from 'three';
+import { PlayerController } from '../PlayerController';
 
 const CAMERA_POS = new THREE.Vector3(0, 8, 15);
 
-export const PhysicsController = () => {
+// To avoid circular dependency or passing props too deeply, we can't easily get the player lane directly from store 
+// because PlayerController manages it locally in a useState. 
+// However, PlayerController updates the parent. But GameMechanics is a sibling.
+// Solution: We will pass a ref or callback from GameScene to GameMechanics, OR
+// Since this is a simple state, we can lift the currentLane to the store, but that triggers too many re-renders.
+// BETTER: GameMechanics can just check the player position if we had access to the mesh.
+// EASIEST: Let PlayerController update a ref in the store or a mutable variable? No.
+// Let's implement a small "Lane Tracker" inside PlayerController that reports to store "onSlowUpdate" (every 0.5s)?
+// Actually, for this specific mechanic, accurate lane tracking is vital.
+// Let's add `currentPlayerLane` to the store, but only update it when it changes. 
+// PlayerController already calls `setLaneCallback`. We can hook that up in GameScene to update a ref, 
+// and pass that ref to PhysicsController.
+
+export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
   const { 
     gameStatus, 
     setCurrentSpeed, 
@@ -18,7 +32,12 @@ export const PhysicsController = () => {
     vehicleType,
     selectedRoute,
     setBrakeTemp,
-    brakeTemp
+    brakeTemp,
+    overlapTimer,
+    setOverlapTimer,
+    endGame,
+    happiness,
+    isCrashing
   } = useGameStore();
 
   const engineRef = useRef<EngineSynthesizer | null>(null);
@@ -34,10 +53,15 @@ export const PhysicsController = () => {
   
   // Escarpment Specifics
   const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
+  const isRongai = selectedRoute?.id === 'rongai-extreme';
+  
   const GRAVITY_ACCEL = 10; // Downhill roll speed
   const BRAKE_HEAT_RATE = 30; // Heat per second while braking
   const BRAKE_COOL_RATE = 10; // Cool per second while not braking
   const BRAKE_FADE_THRESHOLD = 70; // Temperature where brakes start failing
+  
+  // Overlap Mechanics
+  const OVERLAP_LIMIT_SECONDS = 8;
 
   // Listen for keyboard controls
   useEffect(() => {
@@ -87,7 +111,7 @@ export const PhysicsController = () => {
   }, [gameStatus, isEngineSoundOn]);
 
   useFrame((state, delta) => {
-    if (gameStatus !== 'PLAYING' || activeModal !== 'NONE') {
+    if (gameStatus !== 'PLAYING' || activeModal !== 'NONE' || isCrashing) {
         if (engineRef.current) engineRef.current.setSpeed(0);
         return;
     }
@@ -118,6 +142,45 @@ export const PhysicsController = () => {
         const minCrawl = closestStopDist < 5 ? 2 : 15; 
         speedLimit = minCrawl + (factor * (MAX_SPEED - minCrawl));
     }
+
+    // --- OVERLAP PENALTY LOGIC (Rongai Only) ---
+    // If player is in Lane -2 (Overlap lane)
+    if (isRongai) {
+        if (playerLane === -2) {
+            const newTimer = overlapTimer + delta;
+            setOverlapTimer(newTimer);
+            
+            // Penalty: Happiness Drop (Passengers scared of bumps/police)
+            // Drop 5 happiness per second
+            const newHappiness = Math.max(0, happiness - (5 * delta));
+            
+            // Apply Happiness update immediately (dirty write to avoid re-renders or use a separate timer?)
+            // We can just set it via store action.
+            if (Math.floor(newTimer) > Math.floor(overlapTimer)) {
+                // Audio Warning
+                if (newTimer > 2) {
+                     playSfx('SIREN');
+                }
+            }
+            
+            // Only update happiness occasionally to save renders
+            if (state.clock.elapsedTime % 0.5 < delta) {
+                 useGameStore.setState({ happiness: newHappiness });
+            }
+
+            // Punishment: Arrest
+            if (newTimer > OVERLAP_LIMIT_SECONDS) {
+                endGame('ARRESTED');
+            }
+
+        } else {
+            // Cooldown if back on road
+            if (overlapTimer > 0) {
+                setOverlapTimer(Math.max(0, overlapTimer - delta * 2)); // Cools down 2x faster
+            }
+        }
+    }
+
 
     // --- Physics Update ---
 
@@ -225,8 +288,6 @@ export const CameraRig = () => {
     // Normally lookAt overrides rotation, but if we don't use lookAt every frame or use a target object:
     // Actually R3F LookAt is cleaner. Let's just adjust the lookAt target Y
     const targetY = isEscarpment ? -4 : 0;
-    const currentTargetY = -5; // Default from original code (lookAt(0,0,-5))
-    // We can't easily lerp lookAt target without a ref, so we'll just stick to standard
     camera.lookAt(0, targetY, -5);
   });
 
