@@ -82,7 +82,8 @@ const MAPS: Route[] = [
     trafficLevel: 'Gridlock',
     dangerLevel: 'No-Go Zone',
     timeLimit: '2h 00m',
-    isLocked: true
+    description: 'The Wild West. Potholes, overlapping Nganyas, and head-on collision risks. Drive on the shoulder to survive.',
+    isLocked: false
   }
 ];
 
@@ -96,8 +97,8 @@ export const MapSelectionScreen: React.FC = () => {
   }, []);
 
   const handleRouteSelect = (map: Route) => {
-    // Guest check logic - allow first few maps
-    const freeMaps = ['kiambu-route', 'rural-dirt', 'river-road', 'thika-highway', 'limuru-drive', 'maimahiu-escarpment'];
+    // Guest check logic - allow most maps but maybe lock special ones later
+    const freeMaps = ['kiambu-route', 'rural-dirt', 'river-road', 'thika-highway', 'limuru-drive', 'maimahiu-escarpment', 'rongai-extreme'];
     
     if (userMode === 'GUEST' && !freeMaps.includes(map.id)) {
         setShowAuthGate(true);

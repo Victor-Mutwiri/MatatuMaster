@@ -57,14 +57,9 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
     // --- Collision Logic ---
     if (!isCrashing && Math.abs(currentZ) < 3.0) {
         // Collision box
-        // For gridlock, collisions happen if lateral distance is small too
-        const vehX = groupRef.current.position.x;
-        // Player is roughly at playerLane * laneOffset
-        // Since player moves smoothly, we need accurate Player X?
-        // Approx: Player is at playerLane * laneOffset
-        const playerX = playerLane * laneOffset;
         
         // Simple Lane Check: If vehicle is in player's lane ID
+        // Note: For overlapping logic (Lane -2), we match player lane directly
         if (lane === playerLane) {
             triggerCrash();
         }
@@ -341,6 +336,116 @@ export const GridlockTraffic = ({ playerLane }: { playerLane: number }) => {
             setVehicleList(prev => [...prev, newVehicle]);
             // Dense spawn rate
             nextSpawnRef.current = state.clock.elapsedTime + (1 + Math.random() * 1.5);
+        }
+    });
+
+    return (
+        <>
+        {vehicleList.map(v => (
+            <TrafficVehicle key={v.id} {...v} playerLane={playerLane} onRemove={removeVehicle} />
+        ))}
+        </>
+    );
+}
+
+// --- Rongai Traffic (Chaos: Overlappers + Bullies) ---
+export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
+    const { gameStatus, isCrashing, currentSpeed } = useGameStore();
+    const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
+    
+    const nextMainSpawn = useRef(0);
+    const nextOncomingSpawn = useRef(0);
+    const nextOverlapSpawn = useRef(0);
+    const nextBullySpawn = useRef(0); // Oncoming car in YOUR lane
+
+    useEffect(() => {
+        if (gameStatus === 'IDLE') {
+            setVehicleList([]);
+            nextMainSpawn.current = 0;
+            nextOncomingSpawn.current = 0;
+            nextOverlapSpawn.current = 0;
+            nextBullySpawn.current = 0;
+        }
+    }, [gameStatus]);
+
+    const removeVehicle = (id: number) => {
+        setVehicleList(prev => prev.filter(v => v.id !== id));
+    };
+
+    useFrame((state) => {
+        if (gameStatus !== 'PLAYING' || isCrashing) return;
+        const t = state.clock.elapsedTime;
+        
+        // 1. Slow Gridlock in Main Lane (Lane -1, since player uses -1 as main)
+        // Wait, player is usually at -1. Let's assume standard 2-way road setup.
+        // Lane -1: Forward. Lane 1: Oncoming.
+        // Lane -2: Left Shoulder (Overlapping).
+        
+        if (t > nextMainSpawn.current) {
+             const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -250, 
+                lane: -1, 
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 15 + Math.random() * 15, // Slow
+                type: 'CAR',
+                direction: 'SAME',
+                playerLane,
+                onRemove: removeVehicle
+            };
+            setVehicleList(prev => [...prev, newVehicle]);
+            nextMainSpawn.current = t + 2 + Math.random() * 2;
+        }
+
+        // 2. Fast Oncoming in Lane 1
+        if (t > nextOncomingSpawn.current) {
+             const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -250, 
+                lane: 1, 
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 60 + Math.random() * 40,
+                type: 'MATATU',
+                direction: 'OPPOSITE',
+                playerLane,
+                onRemove: removeVehicle
+            };
+            setVehicleList(prev => [...prev, newVehicle]);
+            nextOncomingSpawn.current = t + 1 + Math.random() * 2;
+        }
+
+        // 3. "Overlappers" - Cars in Lane -2 (Shoulder) going FAST
+        if (t > nextOverlapSpawn.current) {
+             const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -300, 
+                lane: -2, 
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 70 + Math.random() * 20, // Fast overtaking on dirt
+                type: 'MATATU',
+                direction: 'SAME',
+                playerLane,
+                onRemove: removeVehicle
+            };
+            setVehicleList(prev => [...prev, newVehicle]);
+            nextOverlapSpawn.current = t + 5 + Math.random() * 5;
+        }
+
+        // 4. "The Bully" - Oncoming car overtaking into Lane -1 (Player's Lane)
+        if (t > nextBullySpawn.current) {
+             const newVehicle: TrafficVehicleProps = {
+                id: Math.random(),
+                initialZ: -400, // Starts far
+                lane: -1, // IN YOUR LANE
+                laneOffset: CITY_LANE_OFFSET,
+                speed: 80, // Coming fast
+                type: 'BUS', // Scary
+                direction: 'OPPOSITE', // Head on!
+                playerLane,
+                onRemove: removeVehicle
+            };
+            setVehicleList(prev => [...prev, newVehicle]);
+            nextBullySpawn.current = t + 10 + Math.random() * 10; // Rare event
         }
     });
 

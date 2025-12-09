@@ -7,7 +7,7 @@ import { Wheel, VehicleHeadlight, LicensePlate } from '../vehicles/VehicleParts'
 
 const ROAD_WIDTH = 8;
 const HIGHWAY_WIDTH = 15; 
-const RIVER_ROAD_WIDTH = 7; // Narrower
+const RIVER_ROAD_WIDTH = 7; 
 
 // --- Buildings & Landmarks ---
 
@@ -80,6 +80,36 @@ export const ModernBuilding = ({ height, color, position }: { height: number, co
   );
 };
 
+export const ApartmentBlock = ({ position, color = "#d4d4d8" }: { position: [number, number, number], color?: string }) => {
+  // Rongai style apartment blocks - not too tall, concrete, balconies
+  return (
+    <group position={position}>
+        <mesh position={[0, 6, 0]}>
+             <boxGeometry args={[6, 12, 6]} />
+             <meshStandardMaterial color={color} />
+        </mesh>
+        {/* Balconies */}
+        {Array.from({length: 4}).map((_, i) => (
+             <group key={i} position={[0, i * 2.5 + 2, 3.1]}>
+                 <mesh position={[0, 0, 0]}>
+                    <boxGeometry args={[5, 1, 0.5]} />
+                    <meshStandardMaterial color="#52525b" />
+                 </mesh>
+             </group>
+        ))}
+        {/* Shop on ground floor */}
+        <mesh position={[0, 1, 3.1]}>
+             <planeGeometry args={[5, 2]} />
+             <meshStandardMaterial color="#0f172a" />
+        </mesh>
+        <mesh position={[0, 2.1, 3.2]}>
+             <boxGeometry args={[5.2, 0.4, 0.1]} />
+             <meshStandardMaterial color="red" />
+        </mesh>
+    </group>
+  );
+}
+
 export const Billboard = ({ position, rotation = [0,0,0] }: { position: [number, number, number], rotation?: [number, number, number] }) => {
     return (
         <group position={position} rotation={rotation as any}>
@@ -132,6 +162,16 @@ export const Rock = ({ scale = 1 }: { scale?: number }) => {
     </group>
   );
 };
+
+export const Pothole = ({ position }: { position: [number, number, number] }) => {
+    // A dark, slightly depressed circle to represent a pothole
+    return (
+        <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.6 + Math.random() * 0.4, 8]} />
+            <meshStandardMaterial color="#1f1f1f" roughness={1} opacity={0.8} transparent />
+        </mesh>
+    );
+}
 
 export const CliffFace = () => {
   return (
@@ -243,28 +283,7 @@ export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotati
 };
 
 export const CopOnFoot: React.FC<{ position: [number, number, number]; side: 'LEFT' | 'RIGHT'; playerLane: number }> = ({ position, side, playerLane }) => {
-    const { endGame, distanceTraveled } = useGameStore();
     const groupRef = useRef<THREE.Group>(null);
-
-    useFrame(() => {
-        if (!groupRef.current) return;
-        
-        // Simple collision check
-        // The cop moves towards player (which is at z=0 approx)
-        // If cop Z is ~0 and player is in the cop's lane (Sidewalk), arrest.
-        
-        const copZ = groupRef.current.position.z;
-        
-        // Cop z is relative to parent container usually, but let's assume world coords if scrolling in map.
-        // Actually, props like scrolling decorations have local Z relative to their container which moves.
-        // BUT, if we assume this component is placed in a scrolling group:
-        // We need world position.
-        // For simplicity, let's assume collision logic happens based on the passed prop if managed by parent
-        // OR rely on traffic system style checks.
-        
-        // Here we just render. Logic handled in RiverRoadMap via distance check if possible, or here if we trust Z.
-    });
-
     return (
         <group ref={groupRef} position={position} rotation={[0, side === 'LEFT' ? Math.PI/2 : -Math.PI/2, 0]} scale={[0.8, 0.8, 0.8]}>
             <mesh position={[0, 1.6, 0]}>
@@ -300,7 +319,7 @@ export const CopOnFoot: React.FC<{ position: [number, number, number]; side: 'LE
 
 // --- Infrastructure ---
 
-export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHWAY' | 'RIVER_ROAD' }) => {
+export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHWAY' | 'RIVER_ROAD' | 'RONGAI' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const STRIP_COUNT = 20;
   const STRIP_GAP = 10; 
@@ -309,15 +328,17 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
   const isRural = variant === 'RURAL';
   const isHighway = variant === 'HIGHWAY';
   const isRiverRoad = variant === 'RIVER_ROAD';
+  const isRongai = variant === 'RONGAI';
   
   let width = ROAD_WIDTH;
   if (isHighway) width = HIGHWAY_WIDTH;
   if (isRiverRoad) width = RIVER_ROAD_WIDTH;
+  if (isRongai) width = ROAD_WIDTH + 4; // Wider shoulder for overlap
 
   const GRASS_OFFSET = width / 2 + 5;
 
-  const roadColor = isRural ? "#5D4037" : (timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a");
-  const sideColor = isRural ? "#795548" : (timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b");
+  const roadColor = isRural ? "#5D4037" : (isRongai ? "#4b5563" : (timeOfDay === 'NIGHT' ? "#0a0a0a" : "#1a1a1a"));
+  const sideColor = isRural ? "#795548" : (isRongai ? "#5D4037" : (timeOfDay === 'NIGHT' ? "#022c22" : "#064e3b"));
   const stripColor = isRural ? "#8d6e63" : "#fbbf24"; 
 
   useFrame((state, delta) => {
@@ -335,7 +356,7 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
       {/* Main Road Surface */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
         <planeGeometry args={[width, 300]} />
-        <meshStandardMaterial color={roadColor} roughness={isHighway ? 0.4 : 1.0} />
+        <meshStandardMaterial color={roadColor} roughness={isHighway ? 0.4 : (isRongai ? 0.9 : 1.0)} />
       </mesh>
       
       {/* Moving Markings */}
@@ -365,7 +386,7 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
              ) : (
                 <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
                     <planeGeometry args={[isRural ? 0.4 : 0.15, isRural ? 2 : 4]} />
-                    <meshStandardMaterial color={stripColor} opacity={isRural ? 0.3 : 1} transparent={isRural} />
+                    <meshStandardMaterial color={stripColor} opacity={isRural || isRongai ? 0.5 : 1} transparent={isRural || isRongai} />
                 </mesh>
              )}
           </group>
@@ -384,7 +405,6 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
                 <planeGeometry args={[4, 300]} />
                 <meshStandardMaterial color="#64748b" roughness={0.8} />
             </mesh>
-            {/* Curbs */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-(width/2), 0.15, 0]}>
                 <boxGeometry args={[0.2, 300, 0.3]} />
                 <meshStandardMaterial color="#94a3b8" />
@@ -410,15 +430,16 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
   );
 };
 
-export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) => {
+export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'RONGAI' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const { timeOfDay, totalRouteDistance, distanceTraveled, selectedRoute } = useGameStore();
   
   const OBJECT_COUNT = 24;
   const GAP = 15;
   const isHighway = selectedRoute?.id === 'thika-highway';
-  // If Highway, push scenery further out because road is wider
-  const BASE_OFFSET = isHighway ? 9 : ROAD_WIDTH / 2 + 3; 
+  const isRongai = variant === 'RONGAI';
+  
+  const BASE_OFFSET = isHighway ? 9 : (isRongai ? 8 : ROAD_WIDTH / 2 + 3); 
 
   const distRemaining = totalRouteDistance - distanceTraveled;
   const isCityApproaching = distRemaining < 800;
@@ -434,6 +455,9 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
       let type = 'TREE';
       if (isRural) {
          type = Math.random() > 0.6 ? 'ROCK' : 'TREE';
+      } else if (isRongai) {
+         // Mix of Apartments and Trees
+         type = Math.random() > 0.7 ? 'APARTMENT' : 'TREE';
       } else {
          type = i % 6 === 0 ? 'SIGN' : i % 3 === 0 ? 'BUSH' : 'TREE';
       }
@@ -441,7 +465,7 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
       const scale = 0.8 + Math.random() * 0.4;
       return { x, z, type, side, scale };
     });
-  }, [isRural, BASE_OFFSET]);
+  }, [isRural, isRongai, BASE_OFFSET]);
 
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
@@ -470,6 +494,8 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' }) =>
                  <meshStandardMaterial color="#166534" />
                </mesh>
             </group>
+          ) : item.type === 'APARTMENT' ? (
+              <ApartmentBlock position={[0, 0, 0]} color={i % 2 === 0 ? "#cbd5e1" : "#e2e8f0"} />
           ) : item.type === 'BUSH' ? (
             <mesh position={[0, 0.5, 0]}>
               <dodecahedronGeometry args={[0.8, 0]} />

@@ -13,8 +13,9 @@ import { ThikaRoadMap } from './maps/ThikaRoadMap';
 import { LimuruRoadMap } from './maps/LimuruRoadMap';
 import { MaiMahiuMap } from './maps/MaiMahiuMap';
 import { RiverRoadMap } from './maps/RiverRoadMap';
+import { RongaiMap } from './maps/RongaiMap';
 import { PlayerController } from './PlayerController';
-import { OncomingTraffic, HighwayTraffic, TwoWayTraffic, EscarpmentTraffic, GridlockTraffic } from './logic/TrafficSystem';
+import { OncomingTraffic, HighwayTraffic, TwoWayTraffic, EscarpmentTraffic, GridlockTraffic, RongaiTraffic } from './logic/TrafficSystem';
 
 interface GameSceneProps {
   vehicleType: VehicleType | null;
@@ -32,6 +33,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   const isLimuru = selectedRoute?.id === 'limuru-drive';
   const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
   const isRiverRoad = selectedRoute?.id === 'river-road';
+  const isRongai = selectedRoute?.id === 'rongai-extreme';
 
   const bgClass = timeOfDay === 'NIGHT' 
     ? 'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-950'
@@ -44,7 +46,9 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         : isHighway
             ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400 via-indigo-300 to-slate-200' 
         : isRiverRoad
-            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-200 via-slate-300 to-slate-400' // Smoggy City
+            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-200 via-slate-300 to-slate-400' 
+        : isRongai
+            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-200 via-orange-100 to-slate-200' // Dusty Sunset vibe
             : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-400 via-blue-300 to-blue-200';
 
   const fogColor = timeOfDay === 'NIGHT' 
@@ -59,22 +63,24 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
             ? '#cbd5e1'
             : isRiverRoad
             ? '#e2e8f0'
+            : isRongai 
+            ? '#eecfa1' // Dusty fog
             : '#e0f2fe';
 
   // Fog "Far" Distance
-  const fogDensity = isLimuru ? 75 : (isHighway || isEscarpment ? 150 : (isRiverRoad ? 80 : 100));
+  const fogDensity = isLimuru ? 75 : (isHighway || isEscarpment ? 150 : (isRiverRoad ? 80 : (isRongai ? 90 : 100)));
 
   return (
     <div className={`w-full h-full ${bgClass}`}>
       <Canvas shadows camera={{ position: [CAMERA_POS.x, CAMERA_POS.y, CAMERA_POS.z], fov: 45 }}>
         {/* Adjusted Lighting for Visibility */}
-        <ambientLight intensity={isLimuru ? 0.4 : (timeOfDay === 'NIGHT' ? 0.5 : 0.6)} />
+        <ambientLight intensity={isLimuru ? 0.4 : (timeOfDay === 'NIGHT' ? 0.5 : (isRongai ? 0.7 : 0.6))} />
         <directionalLight 
           position={timeOfDay === 'NIGHT' ? [-20, 30, -10] : [20, 30, 10]} 
           intensity={timeOfDay === 'NIGHT' ? 0.8 : (isLimuru ? 0.8 : (isEscarpment ? 1.8 : 1.5))} 
           castShadow 
           shadow-mapSize={[1024, 1024]} 
-          color={timeOfDay === 'NIGHT' ? "#cbd5e1" : (isOffroad ? "#ffedd5" : "#ffffff")} 
+          color={timeOfDay === 'NIGHT' ? "#cbd5e1" : (isOffroad || isRongai ? "#ffedd5" : "#ffffff")} 
         />
         
         {/* Game Logic */}
@@ -87,6 +93,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
          isLimuru ? <LimuruRoadMap /> : 
          isEscarpment ? <MaiMahiuMap /> :
          isRiverRoad ? <RiverRoadMap playerLane={playerLane} /> :
+         isRongai ? <RongaiMap /> :
          <NairobiMap />}
 
         {/* Player & Traffic */}
@@ -101,6 +108,8 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
             <EscarpmentTraffic playerLane={playerLane} />
         ) : isRiverRoad ? (
             <GridlockTraffic playerLane={playerLane} />
+        ) : isRongai ? (
+            <RongaiTraffic playerLane={playerLane} />
         ) : (
             <OncomingTraffic playerLane={playerLane} />
         )}
@@ -108,7 +117,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
         <fog attach="fog" args={[fogColor, 10, fogDensity]} />
       </Canvas>
       <div className="absolute bottom-28 inset-x-0 flex justify-center pointer-events-none opacity-50">
-        <p className={`text-xs animate-pulse ${isOffroad ? 'text-orange-900/50' : 'text-white/50'}`}>
+        <p className={`text-xs animate-pulse ${isOffroad || isRongai ? 'text-orange-900/50' : 'text-white/50'}`}>
           <span className="hidden sm:inline">Use Arrow Keys to Accelerate/Brake & Switch Lanes</span>
           <span className="sm:hidden">Swipe Left/Right to Switch Lanes</span>
         </p>
