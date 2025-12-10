@@ -48,7 +48,7 @@ export const GameService = {
     }
   ) => {
     if (userMode === 'GUEST' || !userId) {
-      console.log('Skipping cloud sync (Guest Mode or No User ID)');
+      // console.log('Skipping cloud sync (Guest Mode or No User ID)');
       return { success: true, mode: 'LOCAL' };
     }
 
@@ -224,7 +224,7 @@ export const GameService = {
       // Logic: Try Update if we know it exists. Try Insert if we know it doesn't.
       
       if (existingProfile) {
-          console.log("Profile exists, updating...");
+          console.log("Profile found, syncing...");
           const { error: updateError } = await supabase
             .from('profiles')
             .update(profileData)
@@ -238,7 +238,7 @@ export const GameService = {
              }
           }
       } else {
-          console.log("Profile missing (or unreadable), inserting...");
+          console.log("Creating new profile on server...");
           // Explicitly include ID
           const { error: insertError } = await supabase
             .from('profiles')
@@ -251,7 +251,7 @@ export const GameService = {
               // FAILSAFE: If RLS (42501) blocks insert, we allow the app to proceed.
               // The user will have a "local" profile associated with their Auth ID.
               if (insertError.code === '42501') {
-                  console.warn("RLS Blocking Profile Creation. Falling back to local-only profile for this session.");
+                  console.warn("RLS Permission Error: The database rejected the profile creation. Ensure the SQL setup script was run in Supabase.");
                   return realUserId; // SUCCESS (Local)
               }
               
@@ -270,7 +270,7 @@ export const GameService = {
 
       if (progressError) {
           // Ignore RLS or Duplicate errors on progress init
-          console.log("Progress Init Status:", progressError.code);
+          // console.log("Progress Init Status:", progressError.code);
       }
 
       return realUserId;

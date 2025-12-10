@@ -1,0 +1,60 @@
+
+-- 1. Reset Policies (Drop existing ones to avoid conflicts)
+drop policy if exists "Public profiles are viewable by everyone." on profiles;
+drop policy if exists "Users can insert their own profile." on profiles;
+drop policy if exists "Users can update own profile." on profiles;
+
+drop policy if exists "Progress is viewable by everyone." on player_progress;
+drop policy if exists "Users can insert their own progress." on player_progress;
+drop policy if exists "Users can update own progress." on player_progress;
+
+-- 2. Ensure Tables Exist
+create table if not exists public.profiles (
+  id uuid references auth.users not null primary key,
+  username text unique,
+  sacco text,
+  updated_at timestamp with time zone
+);
+
+create table if not exists public.player_progress (
+  user_id uuid references auth.users not null primary key,
+  bank_balance bigint default 0,
+  total_distance float default 0,
+  total_bribes bigint default 0,
+  reputation int default 50,
+  lifetime_earnings bigint default 0,
+  unlocked_vehicles text[] default '{"boda"}',
+  updated_at timestamp with time zone
+);
+
+-- 3. Force Enable RLS
+alter table public.profiles enable row level security;
+alter table public.player_progress enable row level security;
+
+-- 4. Re-Apply Correct Policies
+
+-- PROFILES
+create policy "Public profiles are viewable by everyone." 
+  on profiles for select 
+  using ( true );
+
+create policy "Users can insert their own profile." 
+  on profiles for insert 
+  with check ( auth.uid() = id );
+
+create policy "Users can update own profile." 
+  on profiles for update 
+  using ( auth.uid() = id );
+
+-- PLAYER PROGRESS
+create policy "Progress is viewable by everyone." 
+  on player_progress for select 
+  using ( true );
+
+create policy "Users can insert their own progress." 
+  on player_progress for insert 
+  with check ( auth.uid() = user_id );
+
+create policy "Users can update own progress." 
+  on player_progress for update 
+  using ( auth.uid() = user_id );
