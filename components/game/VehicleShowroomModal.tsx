@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { VehicleType } from '../../types';
@@ -18,7 +17,7 @@ interface VehicleShowroomModalProps {
   onClose: () => void;
 }
 
-const RotatingPlatform = ({ children }: { children: React.ReactNode }) => {
+const RotatingPlatform = ({ children }: { children?: React.ReactNode }) => {
   const ref = useRef<THREE.Group>(null);
   useFrame((state, delta) => {
     if (ref.current) {

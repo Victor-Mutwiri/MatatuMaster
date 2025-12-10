@@ -8,6 +8,7 @@ import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
 import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
+import { RotatePrompt } from '../components/ui/RotatePrompt';
 
 export const GameLoopScreen: React.FC = () => {
   const { 
@@ -173,8 +174,10 @@ export const GameLoopScreen: React.FC = () => {
   );
 
   return (
-    <div className="relative w-full h-screen bg-slate-900 overflow-hidden">
+    <div className="relative w-full h-[100dvh] bg-slate-900 overflow-hidden touch-none">
       
+      <RotatePrompt />
+
       <AuthGateModal 
         isOpen={showAuthGate} 
         onClose={() => setShowAuthGate(false)}
