@@ -78,7 +78,7 @@ export const GameService = {
             if (error.code === '42501') {
                 console.warn('Cloud Sync Skipped: Database permissions (RLS) prevented saving.');
             } else {
-                console.error('Supabase Sync Error:', error);
+                console.error('Supabase Sync Error:', error.message);
             }
             return { success: false, mode: 'CLOUD' };
         }
@@ -113,7 +113,7 @@ export const GameService = {
             .limit(50);
 
         if (error) {
-            console.error('Leaderboard Fetch Error:', error);
+            console.error('Leaderboard Fetch Error:', error.message);
             return [];
         }
 
@@ -149,7 +149,7 @@ export const GameService = {
                 console.warn("Username check blocked by DB policy. Assuming available.");
                 return true; 
             }
-            console.error("Check Username Error:", error);
+            console.error("Check Username Error:", error.message);
             return false;
         }
         
@@ -174,7 +174,7 @@ export const GameService = {
         .limit(10);
 
       if (error) {
-          console.error("Search error", error);
+          console.error("Search error", error.message);
           return [];
       }
       return data;
@@ -187,8 +187,6 @@ export const GameService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Check if already friends? (Optional, DB constraint handles duplication usually)
-      
       const { error } = await supabase
         .from('friend_requests')
         .insert({
@@ -197,10 +195,12 @@ export const GameService = {
         });
 
       if (error) {
-          // If 23505 (unique_violation), they already sent a request
+          // If 23505 (unique_violation), they already sent a request.
+          // We throw a specific message so UI can handle it gracefully.
           if (error.code === '23505') {
               throw new Error("Request already sent.");
           }
+          console.error("Send request error details:", error);
           throw error;
       }
   },
@@ -212,6 +212,7 @@ export const GameService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
+      // Note: `sender:profiles!sender_id` tells Supabase to join 'profiles' using the foreign key on 'sender_id'
       const { data, error } = await supabase
         .from('friend_requests')
         .select(`
@@ -227,7 +228,7 @@ export const GameService = {
         .eq('receiver_id', user.id);
 
       if (error) {
-          console.error("Get requests error", error);
+          console.error("Get requests error:", error.message, error.details);
           return [];
       }
 
@@ -265,6 +266,7 @@ export const GameService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
+      // Note: `profile:profiles!friend_id` uses the foreign key on `friend_id`
       const { data, error } = await supabase
         .from('friendships')
         .select(`
@@ -277,7 +279,7 @@ export const GameService = {
         .eq('user_id', user.id);
 
       if (error) {
-          console.error("Get friends error", error);
+          console.error("Get friends error:", error.message, error.details);
           return [];
       }
 

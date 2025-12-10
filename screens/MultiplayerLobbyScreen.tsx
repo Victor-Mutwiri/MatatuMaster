@@ -130,9 +130,11 @@ export const MultiplayerLobbyScreen: React.FC = () => {
         await GameService.sendFriendRequest(user.id);
         setSentRequests(prev => [...prev, user.id]);
     } catch (e: any) {
-        console.error("Send request error", e);
-        if (e.message.includes("already")) {
+        // If it's a "Duplicate" error, treat it as success in UI (Request is already there)
+        if (e.message && e.message.includes("already")) {
             setSentRequests(prev => [...prev, user.id]);
+        } else {
+            console.error("Send request error", e);
         }
     }
   };

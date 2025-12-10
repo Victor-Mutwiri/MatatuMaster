@@ -1,0 +1,68 @@
+
+-- 1. Drop existing tables to rebuild them cleanly
+DROP TABLE IF EXISTS public.friend_requests;
+DROP TABLE IF EXISTS public.friendships;
+
+-- 2. Recreate Friendships (References public.profiles now)
+CREATE TABLE public.friendships (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  friend_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  UNIQUE(user_id, friend_id)
+);
+
+-- 3. Recreate Friend Requests (References public.profiles now)
+CREATE TABLE public.friend_requests (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  sender_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  receiver_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  status text DEFAULT 'pending',
+  created_at timestamp with time zone DEFAULT now(),
+  UNIQUE(sender_id, receiver_id)
+);
+
+-- 4. Enable RLS
+ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.friend_requests ENABLE ROW LEVEL SECURITY;
+
+-- 5. Re-apply Policies
+
+-- Friendships Policies
+CREATE POLICY "Users can view their own friendships."
+  ON friendships FOR SELECT
+  USING ( auth.uid() = user_id );
+
+-- Friend Requests Policies
+CREATE POLICY "Users can view relevant requests."
+  ON friend_requests FOR SELECT
+  USING ( auth.uid() = sender_id OR auth.uid() = receiver_id );
+
+CREATE POLICY "Users can send requests."
+  ON friend_requests FOR INSERT
+  WITH CHECK ( auth.uid() = sender_id );
+
+CREATE POLICY "Users can delete own requests."
+  ON friend_requests FOR DELETE
+  USING ( auth.uid() = sender_id OR auth.uid() = receiver_id );
+
+-- 6. Update the Accept Function
+CREATE OR REPLACE FUNCTION accept_friend_request(request_id uuid, friend_user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Create bidirectional friendship
+  INSERT INTO public.friendships (user_id, friend_id)
+  VALUES (auth.uid(), friend_user_id)
+  ON CONFLICT DO NOTHING;
+  
+  INSERT INTO public.friendships (user_id, friend_id)
+  VALUES (friend_user_id, auth.uid())
+  ON CONFLICT DO NOTHING;
+
+  -- Delete the request
+  DELETE FROM public.friend_requests WHERE id = request_id;
+END;
+$$;
