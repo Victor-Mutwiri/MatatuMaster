@@ -1,0 +1,29 @@
+
+-- 1. Create Friendships Table
+create table if not exists public.friendships (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users not null,
+  friend_id uuid references auth.users not null,
+  created_at timestamp with time zone default now(),
+  unique(user_id, friend_id) -- Prevent duplicate friendships
+);
+
+-- 2. Enable RLS
+alter table public.friendships enable row level security;
+
+-- 3. Policies
+
+-- Allow users to view their own friend list
+create policy "Users can view their own friendships."
+  on friendships for select
+  using ( auth.uid() = user_id );
+
+-- Allow users to add friends
+create policy "Users can add friends."
+  on friendships for insert
+  with check ( auth.uid() = user_id );
+
+-- Allow users to remove friends
+create policy "Users can remove friends."
+  on friendships for delete
+  using ( auth.uid() = user_id );

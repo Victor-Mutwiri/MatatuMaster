@@ -6,26 +6,22 @@ import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
 import { VehicleType } from '../types';
 import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X } from 'lucide-react';
 import { Card } from '../components/ui/Card';
+import { GameService } from '../services/gameService';
 
-// --- Mock Data Types ---
+// --- Types ---
 interface Friend {
   id: string;
   name: string;
   sacco: string;
-  isOnline: boolean;
-  cash: number;
-  distance: number;
   status: 'IDLE' | 'IN_GAME' | 'INVITED' | 'IN_ROOM';
+  isOnline: boolean; // Virtual property for now
 }
 
-// --- Mock "Global" Database for Search ---
-const MOCK_USER_DATABASE = [
-  { id: 'usr_01', name: 'Ma3_Killer', sacco: 'Super Metro', cash: 450000, distance: 1240 },
-  { id: 'usr_02', name: 'Nairobi_Drift', sacco: '2NK', cash: 120000, distance: 540 },
-  { id: 'usr_03', name: 'Sacco_King', sacco: 'Lopha', cash: 890000, distance: 3100 },
-  { id: 'usr_04', name: 'Shiro_Speed', sacco: 'Killeton', cash: 230000, distance: 890 },
-  { id: 'usr_05', name: 'Brayo_Turbo', sacco: 'Embassava', cash: 55000, distance: 120 },
-];
+interface SearchResult {
+  id: string;
+  username: string;
+  sacco: string;
+}
 
 const VEHICLE_ICONS: Record<VehicleType, React.ReactNode> = {
   'boda': <Bike />,
@@ -45,7 +41,10 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   // Local State for Social Features
   const [activeTab, setActiveTab] = useState<'FRIENDS' | 'ADD'>('FRIENDS');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<typeof MOCK_USER_DATABASE>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [friendsList, setFriendsList] = useState<Friend[]>([]);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false);
   
   // Room State
   const [activeOpponent, setActiveOpponent] = useState<Friend | null>(null);
@@ -55,25 +54,37 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   const [isOpponentReady, setIsOpponentReady] = useState(false);
   const [launchCountdown, setLaunchCountdown] = useState<number | null>(null);
 
-  // Initialize with one dummy friend
-  const [myFriends, setMyFriends] = useState<Friend[]>([
-    { 
-      id: 'usr_99', 
-      name: 'Oti_Master', 
-      sacco: 'Double M', 
-      isOnline: true, 
-      cash: 150000, 
-      distance: 420, 
-      status: 'IDLE' 
-    }
-  ]);
-
-  // Unique ID Simulation (Base64 of name)
+  // Unique ID (Visual)
   const uniqueId = btoa(playerName).substring(0, 8).toUpperCase();
+
+  // --- Effects ---
+
+  // 1. Load Friends on Mount
+  useEffect(() => {
+    fetchFriends();
+  }, []);
+
+  const fetchFriends = async () => {
+      setIsLoadingFriends(true);
+      try {
+          const rawFriends = await GameService.getFriends();
+          const processedFriends: Friend[] = rawFriends.map(f => ({
+              id: f.id,
+              name: f.username,
+              sacco: f.sacco,
+              status: 'IDLE',
+              isOnline: true // Optimistic online status for UX
+          }));
+          setFriendsList(processedFriends);
+      } catch (e) {
+          console.error("Failed to fetch friends", e);
+      } finally {
+          setIsLoadingFriends(false);
+      }
+  };
 
   const handleBack = () => {
     if (viewState === 'ROOM') {
-        // Leave room confirm? For now just go back to lobby
         setViewState('LOBBY');
         setActiveOpponent(null);
         setIsMyReady(false);
@@ -84,38 +95,55 @@ export const MultiplayerLobbyScreen: React.FC = () => {
     }
   };
 
-  const handleSearch = (query: string) => {
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-    const results = MOCK_USER_DATABASE.filter(u => 
-      u.name.toLowerCase().includes(query.toLowerCase()) && 
-      !myFriends.find(f => f.id === u.id)
-    );
-    setSearchResults(results);
+    
+    setIsSearching(true);
+    // Debounce usually goes here, but for simplicity calling direct with short delay check
+    const delayDebounceFn = setTimeout(async () => {
+        const results = await GameService.searchConductors(query);
+        // Filter out already added friends
+        const filtered = results.filter(r => !friendsList.find(f => f.id === r.id));
+        setSearchResults(results); // Showing all including friends but we can disable button
+        setIsSearching(false);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
   };
 
-  const addFriend = (user: typeof MOCK_USER_DATABASE[0]) => {
-    const newFriend: Friend = {
-      ...user,
-      isOnline: true,
-      status: 'IDLE'
-    };
-    setMyFriends([...myFriends, newFriend]);
-    setSearchResults(prev => prev.filter(p => p.id !== user.id));
-    setActiveTab('FRIENDS');
+  const addFriend = async (user: SearchResult) => {
+    try {
+        await GameService.addFriend(user.id);
+        // Optimistic UI Update
+        const newFriend: Friend = {
+            id: user.id,
+            name: user.username,
+            sacco: user.sacco,
+            status: 'IDLE',
+            isOnline: true
+        };
+        setFriendsList(prev => [...prev, newFriend]);
+        setActiveTab('FRIENDS');
+        setSearchQuery('');
+        setSearchResults([]);
+    } catch (e) {
+        console.error("Add friend error", e);
+        // Ideally show toast here
+    }
   };
 
   const inviteFriend = (id: string) => {
-    setMyFriends(prev => prev.map(f => 
+    setFriendsList(prev => prev.map(f => 
       f.id === id ? { ...f, status: 'INVITED' } : f
     ));
 
     // SIMULATION: Friend accepts invite after 1.5 seconds
     setTimeout(() => {
-        const friend = myFriends.find(f => f.id === id);
+        const friend = friendsList.find(f => f.id === id);
         if (friend) {
             setActiveOpponent(friend);
             setViewState('ROOM');
@@ -131,15 +159,12 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   // SIMULATION: Opponent Behavior in Room
   useEffect(() => {
     if (viewState === 'ROOM' && activeOpponent) {
-        
-        // 1. Opponent "Selecting..."
         const pickTime = setTimeout(() => {
             const options: VehicleType[] = ['boda', 'tuktuk', 'personal-car', '14-seater'];
             const randomPick = options[Math.floor(Math.random() * options.length)];
             setOpponentSelectedVehicle(randomPick);
         }, 3000);
 
-        // 2. Opponent "Ready" (Wait for player to pick first, or just ready up after picking)
         const readyTime = setTimeout(() => {
             setIsOpponentReady(true);
         }, 6000);
@@ -161,10 +186,9 @@ export const MultiplayerLobbyScreen: React.FC = () => {
             count--;
             if (count < 0) {
                 clearInterval(interval);
-                // LAUNCH GAME
                 if (mySelectedVehicle) {
                     setVehicleType(mySelectedVehicle);
-                    setScreen('MAP_SELECT'); // Host (Player) picks map
+                    setScreen('MAP_SELECT'); 
                 }
             } else {
                 setLaunchCountdown(count);
@@ -427,7 +451,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                             onClick={() => setActiveTab('FRIENDS')}
                             className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'FRIENDS' ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            Friends ({myFriends.length})
+                            Friends
                         </button>
                         <button 
                             onClick={() => setActiveTab('ADD')}
@@ -452,31 +476,37 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                                     onChange={(e) => handleSearch(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-matatu-yellow transition-colors placeholder:text-slate-600"
                                 />
+                                {isSearching && (
+                                    <Loader2 className="absolute right-4 top-3.5 text-slate-500 animate-spin" size={18} />
+                                )}
                             </div>
 
                             <div className="space-y-2">
                                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Search Results</h4>
                                 {searchResults.length === 0 ? (
                                     <div className="text-center py-8 text-slate-600 text-sm">
-                                        {searchQuery.length > 1 ? "No conductors found." : "Type a name to search."}
+                                        {searchQuery.length > 1 ? (isSearching ? "Searching..." : "No conductors found.") : "Type a name to search."}
                                     </div>
                                 ) : (
-                                    searchResults.map(user => (
-                                        <div key={user.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-display font-bold text-slate-400">
-                                                    {user.name.charAt(0)}
+                                    searchResults.map(user => {
+                                        const isAlreadyFriend = friendsList.some(f => f.id === user.id);
+                                        return (
+                                            <div key={user.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-display font-bold text-slate-400">
+                                                        {user.username.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-white font-bold text-sm">{user.username}</div>
+                                                        <div className="text-slate-500 text-xs">{user.sacco}</div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="text-white font-bold text-sm">{user.name}</div>
-                                                    <div className="text-slate-500 text-xs">{user.sacco}</div>
-                                                </div>
+                                                <Button size="sm" disabled={isAlreadyFriend} onClick={() => addFriend(user)}>
+                                                    {isAlreadyFriend ? <span className="flex gap-1"><Check size={16}/> Added</span> : <><UserPlus size={16}/> Add</>}
+                                                </Button>
                                             </div>
-                                            <Button size="sm" onClick={() => addFriend(user)}>
-                                                <UserPlus size={16} /> Add
-                                            </Button>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                         </div>
@@ -484,7 +514,11 @@ export const MultiplayerLobbyScreen: React.FC = () => {
 
                     {activeTab === 'FRIENDS' && (
                         <div className="space-y-2 animate-fade-in">
-                             {myFriends.length === 0 ? (
+                             {isLoadingFriends ? (
+                                <div className="text-center py-12 text-slate-500 flex items-center justify-center gap-2">
+                                    <Loader2 className="animate-spin" size={20} /> Loading friends...
+                                </div>
+                             ) : friendsList.length === 0 ? (
                                 <div className="text-center py-12">
                                     <Users size={48} className="text-slate-700 mx-auto mb-4" />
                                     <p className="text-slate-500">You haven't added any friends yet.</p>
@@ -493,7 +527,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                                     </Button>
                                 </div>
                              ) : (
-                                 myFriends.map(friend => (
+                                 friendsList.map(friend => (
                                     <div key={friend.id} className="group flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-800 hover:border-slate-600 transition-all">
                                         <div className="flex items-center gap-3">
                                             <div className="relative">
@@ -513,8 +547,6 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                                                 </div>
                                                 <div className="flex items-center gap-3 text-[10px] text-slate-500 mt-0.5">
                                                     <span>{friend.sacco}</span>
-                                                    <span>•</span>
-                                                    <span className="text-green-400">KES {friend.cash.toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>

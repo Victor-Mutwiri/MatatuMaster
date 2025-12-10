@@ -156,6 +156,77 @@ export const GameService = {
   },
 
   /**
+   * Search for conductors by username
+   */
+  searchConductors: async (query: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, sacco')
+        .ilike('username', `%${query}%`)
+        .neq('id', user.id) // Don't find self
+        .limit(10);
+
+      if (error) {
+          console.error("Search error", error);
+          return [];
+      }
+      return data;
+  },
+
+  /**
+   * Add a friend
+   */
+  addFriend: async (friendId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from('friendships')
+        .insert({
+            user_id: user.id,
+            friend_id: friendId
+        });
+
+      if (error) throw error;
+  },
+
+  /**
+   * Get my friends list
+   */
+  getFriends: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      // We select the friend_id and expand the 'profiles' table referenced by friend_id
+      // Note: This relies on Supabase detecting the FK on friend_id -> profiles.id
+      const { data, error } = await supabase
+        .from('friendships')
+        .select(`
+            friend_id,
+            profile:profiles!friend_id (
+                username,
+                sacco
+            )
+        `)
+        .eq('user_id', user.id);
+
+      if (error) {
+          console.error("Get friends error", error);
+          return [];
+      }
+
+      // Flatten structure
+      return data.map((item: any) => ({
+          id: item.friend_id,
+          username: item.profile?.username || 'Unknown',
+          sacco: item.profile?.sacco || 'Independent'
+      }));
+  },
+
+  /**
    * Sign Up Flow
    */
   signUp: async (email: string, password: string) => {
