@@ -3,37 +3,35 @@ import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
+import { GameService } from '../services/gameService';
 import { AlertTriangle, ArrowLeft, Ghost, LogIn, UserPlus, Mail, Lock, CheckCircle2, Loader2, Info } from 'lucide-react';
 
 type SetupView = 'CHOICE' | 'AUTH_SELECT' | 'LOGIN' | 'SIGNUP' | 'ONBOARDING';
 
-// Mock taken names to simulate the "Live Check"
-const TAKEN_NAMES = ['admin', 'kevo', 'test', 'ma3'];
-
 export const PlayerSetupScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName, userMode, registerUser, setPlayerInfo } = useGameStore();
+  const { setScreen, playerName, saccoName, userMode, registerUser, setPlayerInfo, loadUserData, userId } = useGameStore();
   
   const [view, setView] = useState<SetupView>('CHOICE');
   
   // Auth Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Onboarding Form State
   const [localName, setLocalName] = useState('');
   const [localSacco, setLocalSacco] = useState('');
   const [isCheckingName, setIsCheckingName] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
-  const [isCheckingSacco, setIsCheckingSacco] = useState(false);
-  const [saccoAvailable, setSaccoAvailable] = useState<boolean | null>(null);
+  
+  // Temporary storage for auth flow
+  const [tempUserId, setTempUserId] = useState<string | null>(userId);
 
   // If user is already registered AND has a profile, skip this screen
   useEffect(() => {
     if (userMode === 'REGISTERED' && playerName && saccoName) {
         setScreen('GAME_MODE');
-    } else if (userMode === 'REGISTERED' && (!playerName || !saccoName)) {
-        // Edge case: Authenticated but no profile (dropped off)
-        setView('ONBOARDING');
     }
   }, [userMode, playerName, saccoName, setScreen]);
 
@@ -41,9 +39,12 @@ export const PlayerSetupScreen: React.FC = () => {
 
   const handleBack = () => {
     if (view === 'AUTH_SELECT') setView('CHOICE');
-    else if (view === 'LOGIN' || view === 'SIGNUP') setView('AUTH_SELECT');
+    else if (view === 'LOGIN' || view === 'SIGNUP') {
+        setAuthError(null);
+        setView('AUTH_SELECT');
+    }
     else if (view === 'ONBOARDING') {
-        // If they just signed up, maybe warn them? For now go back to choice
+        // If they just signed up but cancel onboarding, they are technically authenticated but profile-less
         setView('CHOICE'); 
     }
     else setScreen('LANDING');
@@ -53,30 +54,57 @@ export const PlayerSetupScreen: React.FC = () => {
     setScreen('GAME_MODE');
   };
 
-  const handleAuthSubmit = (type: 'LOGIN' | 'SIGNUP') => {
-    // Simulate API Call delay
-    setTimeout(() => {
+  const handleAuthSubmit = async (type: 'LOGIN' | 'SIGNUP') => {
+    setIsLoading(true);
+    setAuthError(null);
+
+    try {
         if (type === 'SIGNUP') {
-            setView('ONBOARDING');
+            const { data, error } = await GameService.signUp(email, password);
+            if (error) throw error;
+            if (data.user) {
+                setTempUserId(data.user.id);
+                setView('ONBOARDING');
+            }
         } else {
-            // Login Logic Simulation
-            // If we had a real backend, we'd check if they have a profile
-            // For simulation: If they log in, we assume they might need to finish onboarding if local storage was empty
-            setView('ONBOARDING');
+            const { data, error } = await GameService.signIn(email, password);
+            if (error) throw error;
+            
+            if (data.user) {
+                const uid = data.user.id;
+                setTempUserId(uid);
+                
+                // Try to load existing profile
+                try {
+                    const { profile, progress } = await GameService.loadSave(uid);
+                    
+                    // If successful, update store and go to game
+                    setPlayerInfo(profile.username, profile.sacco);
+                    registerUser(uid);
+                    if (progress) loadUserData(progress);
+                    
+                    setScreen('GAME_MODE');
+                } catch (e) {
+                    // No profile found? Go to onboarding
+                    setView('ONBOARDING');
+                }
+            }
         }
-    }, 1000);
+    } catch (err: any) {
+        setAuthError(err.message || 'Authentication failed');
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   // Live Check Simulator
   useEffect(() => {
-    const checkName = setTimeout(() => {
+    const checkName = setTimeout(async () => {
         if (localName.length > 2) {
             setIsCheckingName(true);
-            setTimeout(() => {
-                const isTaken = TAKEN_NAMES.includes(localName.toLowerCase());
-                setNameAvailable(!isTaken);
-                setIsCheckingName(false);
-            }, 800); // 800ms simulated network latency
+            const isAvail = await GameService.checkUsernameAvailability(localName);
+            setNameAvailable(isAvail);
+            setIsCheckingName(false);
         } else {
             setNameAvailable(null);
         }
@@ -85,28 +113,27 @@ export const PlayerSetupScreen: React.FC = () => {
     return () => clearTimeout(checkName);
   }, [localName]);
 
-  useEffect(() => {
-    const checkSacco = setTimeout(() => {
-        if (localSacco.length > 2) {
-            setIsCheckingSacco(true);
-            setTimeout(() => {
-                setSaccoAvailable(true); // Saccos are easier to form
-                setIsCheckingSacco(false);
-            }, 800);
-        } else {
-            setSaccoAvailable(null);
+
+  const handleFinalRegistration = async () => {
+    if (!tempUserId) {
+        setAuthError("Session lost. Please login again.");
+        setView('LOGIN');
+        return;
+    }
+
+    if (nameAvailable && localSacco.length > 2) {
+        setIsLoading(true);
+        try {
+            await GameService.createProfile(tempUserId, localName, localSacco);
+            
+            setPlayerInfo(localName, localSacco);
+            registerUser(tempUserId); 
+            setScreen('GAME_MODE');
+        } catch (e: any) {
+            setAuthError(e.message || "Failed to create profile");
+        } finally {
+            setIsLoading(false);
         }
-    }, 500);
-
-    return () => clearTimeout(checkSacco);
-  }, [localSacco]);
-
-
-  const handleFinalRegistration = () => {
-    if (nameAvailable && saccoAvailable) {
-        setPlayerInfo(localName, localSacco);
-        registerUser(); // Sets mode to REGISTERED
-        setScreen('GAME_MODE');
     }
   };
 
@@ -243,11 +270,16 @@ export const PlayerSetupScreen: React.FC = () => {
                             />
                         </div>
                     </div>
+                    {authError && (
+                        <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-xs">
+                            {authError}
+                        </div>
+                    )}
                 </div>
 
                 <div className="w-full mt-6">
-                    <Button fullWidth size="lg" onClick={() => handleAuthSubmit(view)} disabled={!email || !password}>
-                        {isSignup ? 'Create Account' : 'Log In'}
+                    <Button fullWidth size="lg" onClick={() => handleAuthSubmit(view)} disabled={!email || !password || isLoading}>
+                        {isLoading ? 'Processing...' : (isSignup ? 'Create Account' : 'Log In')}
                     </Button>
                 </div>
            </div>
@@ -329,10 +361,6 @@ export const PlayerSetupScreen: React.FC = () => {
                                 placeholder="e.g. Number Nane Sacco, Super Metro"
                                 className="w-full bg-slate-950 border-2 border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-matatu-yellow focus:bg-slate-900 transition-all font-display tracking-wide"
                             />
-                             <div className="absolute right-4 top-4">
-                                {isCheckingSacco && <Loader2 className="animate-spin text-slate-500" size={20} />}
-                                {!isCheckingSacco && saccoAvailable === true && <CheckCircle2 className="text-green-500" size={20} />}
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -343,6 +371,12 @@ export const PlayerSetupScreen: React.FC = () => {
                         By clicking "Issue Badge", you agree to the Nairobi Hustle rules. Cheating or using offensive names leads to a permanent ban.
                     </div>
                 </div>
+                
+                {authError && (
+                    <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-xs">
+                        {authError}
+                    </div>
+                )}
 
              </div>
           </div>
@@ -352,11 +386,11 @@ export const PlayerSetupScreen: React.FC = () => {
              <Button 
                 size="lg" 
                 fullWidth
-                disabled={!nameAvailable || !saccoAvailable}
+                disabled={!nameAvailable || !localSacco || isLoading}
                 onClick={handleFinalRegistration}
                 className={`h-16 text-xl shadow-xl transition-all`}
               >
-                Issue Badge & Start
+                {isLoading ? 'Registering...' : 'Issue Badge & Start'}
               </Button>
           </div>
 

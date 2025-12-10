@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode } from '../types';
 import { playSfx } from '../utils/audio';
+import { GameService } from '../services/gameService';
 
 // --- Secure Storage Wrapper (Simple Obfuscation with UTF-8 Support) ---
 const secureStorage: StateStorage = {
@@ -176,6 +177,7 @@ export const EARNINGS_CAPS: Record<string, Record<VehicleType, number>> = {
 };
 
 interface GameStore extends GameState {
+  userId: string | null; // Supabase Auth UID
   setScreen: (screen: ScreenName) => void;
   setPlayerInfo: (name: string, sacco: string) => void;
   setVehicleType: (type: VehicleType) => void;
@@ -188,7 +190,8 @@ interface GameStore extends GameState {
   setOverlapTimer: (time: number) => void;
   
   // Progression
-  registerUser: () => void;
+  registerUser: (uid: string) => void;
+  loadUserData: (data: any) => void;
   unlockVehicle: (type: VehicleType) => void;
 
   // Controls
@@ -217,11 +220,15 @@ interface GameStore extends GameState {
   reportLaneChange: () => void;
   toggleSound: () => void;
   toggleEngineSound: () => void;
+  
+  // Cloud Sync
+  syncToCloud: () => void;
 }
 
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
+      userId: null,
       currentScreen: 'LANDING',
       userMode: 'GUEST',
       stats: INITIAL_STATS,
@@ -284,7 +291,26 @@ export const useGameStore = create<GameStore>()(
 
       setOverlapTimer: (time) => set({ overlapTimer: time }),
 
-      registerUser: () => set({ userMode: 'REGISTERED' }),
+      registerUser: (uid) => set({ userMode: 'REGISTERED', userId: uid }),
+
+      loadUserData: (data) => {
+        // Hydrate store from Supabase 'player_progress' data
+        if (!data) return;
+        set({
+            bankBalance: data.bank_balance || 0,
+            lifetimeStats: {
+                totalCashEarned: data.lifetime_earnings || 0,
+                totalDistanceKm: data.total_distance || 0,
+                totalBribesPaid: data.total_bribes || 0,
+                totalTripsCompleted: get().lifetimeStats.totalTripsCompleted // Not strictly tracked in DB schema provided, keep local or ignore
+            },
+            stats: {
+                ...get().stats,
+                reputation: data.reputation || 50
+            },
+            unlockedVehicles: data.unlocked_vehicles || ['boda']
+        });
+      },
 
       unlockVehicle: (type) => {
         const { bankBalance, unlockedVehicles } = get();
@@ -292,10 +318,16 @@ export const useGameStore = create<GameStore>()(
         
         if (bankBalance >= price && !unlockedVehicles.includes(type)) {
           playSfx('COIN');
+          const newUnlocked = [...unlockedVehicles, type];
+          const newBalance = bankBalance - price;
+          
           set({
-            bankBalance: bankBalance - price,
-            unlockedVehicles: [...unlockedVehicles, type]
+            bankBalance: newBalance,
+            unlockedVehicles: newUnlocked
           });
+          
+          // Trigger cloud sync
+          get().syncToCloud();
         }
       },
 
@@ -373,35 +405,23 @@ export const useGameStore = create<GameStore>()(
       },
       
       triggerStage: () => {
-        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute, totalRouteDistance } = get();
+        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute } = get();
         
         const waiting = nextStagePassengerCount; 
         const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
         
-        // --- REALISTIC FARE CALCULATION ---
-        // 1. Get the max earning potential for this map + vehicle combo
         const mapId = selectedRoute?.id || 'kiambu-route';
         const vType = vehicleType || '14-seater';
         const mapCaps = EARNINGS_CAPS[mapId] || EARNINGS_CAPS['kiambu-route'];
         const earningCap = mapCaps[vType] || 2000;
 
-        // 2. Estimate average stops for this route (Assuming stage every ~2.5km)
         const estimatedStops = Math.ceil(selectedRoute!.distance / 2.5) || 5;
-
-        // 3. Get Vehicle Capacity
         const legalCapacity = VEHICLE_CAPACITY[vType].legal;
-
-        // 4. Calculate Ideal Fare per Passenger per Stop to reach Cap if full 50% of time
-        // Formula: Cap / (Stops * AvgLoad)
-        // AvgLoad is usually 70% of legal capacity
         const avgLoad = Math.max(1, legalCapacity * 0.7);
         let idealFare = earningCap / (estimatedStops * avgLoad);
-        
-        // 5. Add Randomness (Supply/Demand)
-        const marketFluctuation = 0.9 + Math.random() * 0.4; // 0.9x to 1.3x
-        
-        let calculatedFare = Math.ceil((idealFare * marketFluctuation) / 10) * 10; // Round to nearest 10
-        calculatedFare = Math.max(10, calculatedFare); // Minimum KES 10
+        const marketFluctuation = 0.9 + Math.random() * 0.4;
+        let calculatedFare = Math.ceil((idealFare * marketFluctuation) / 10) * 10;
+        calculatedFare = Math.max(10, calculatedFare);
 
         set({
           currentSpeed: 0,
@@ -424,7 +444,6 @@ export const useGameStore = create<GameStore>()(
         let boarding = 0;
         
         const FARE_PER_PAX = stageData.ticketPrice;
-
         const limits = vehicleType ? VEHICLE_CAPACITY[vehicleType] : { legal: 14, max: 18 };
         const absoluteMax = limits.max;
 
@@ -446,26 +465,19 @@ export const useGameStore = create<GameStore>()(
         const currentStagePos = nextStageDistance;
         const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
         
-        // --- PASSENGER INFLUX LOGIC ---
-        // Predictability removal: Sometimes huge crowds, sometimes empty
         const happinessFactor = Math.max(0.1, happiness / 100);
         let maxPotentialPassengers = 0;
         
         const chance = Math.random();
         if (chance > 0.8) {
-             // INFLUX (Peak Hours)
-             maxPotentialPassengers = limits.max; // Full bus waiting!
+             maxPotentialPassengers = limits.max;
         } else if (chance < 0.2) {
-             // DRY SPELL
-             maxPotentialPassengers = Math.floor(limits.legal * 0.1); // Almost empty
+             maxPotentialPassengers = Math.floor(limits.legal * 0.1);
         } else {
-             // NORMAL
              maxPotentialPassengers = Math.floor(limits.legal * 0.6);
         }
 
-        // Adjust for happiness
         maxPotentialPassengers = Math.ceil(maxPotentialPassengers * happinessFactor);
-        
         const nextPax = Math.floor(Math.random() * (maxPotentialPassengers + 1));
 
         set({
@@ -494,14 +506,11 @@ export const useGameStore = create<GameStore>()(
         
         if (isOverloaded) {
           shouldStop = true;
-          // Extortion for offence
           bribe = 2000 + Math.floor(Math.random() * 3000); 
           message = "Wewe! You are overloaded! This is a serious offence. Leta kitu kubwa.";
         } else {
-          // Routine Check Logic
           if (Math.random() > 0.5) {
             shouldStop = true;
-            // Routine Bribe Logic
             if (isPersonalCar) {
                 bribe = 200;
                 message = "Niaje boss. Leta ya macho (200).";
@@ -544,7 +553,7 @@ export const useGameStore = create<GameStore>()(
             });
           }
         } else if (action === 'REFUSE') {
-          const arrestChance = policeData.isOverloaded ? 0.8 : 0.2; // Higher risk if overloaded
+          const arrestChance = policeData.isOverloaded ? 0.8 : 0.2;
           
           if (Math.random() < arrestChance) {
             set({
@@ -566,8 +575,7 @@ export const useGameStore = create<GameStore>()(
         const { selectedRoute, vehicleType, stats } = get();
         if (!selectedRoute) return;
 
-        // Calculate time based on vehicle capability and route length/difficulty
-        let seconds = 420; // Base time (7 mins)
+        let seconds = 420; 
         if (selectedRoute.timeLimit) {
           const timeStr = selectedRoute.timeLimit.toLowerCase();
           let loreMinutes = 0;
@@ -581,12 +589,10 @@ export const useGameStore = create<GameStore>()(
             loreMinutes = parseInt(timeStr);
           }
           if (loreMinutes > 0) {
-            // Adjust game seconds: roughly 10 game seconds per lore minute
             seconds = Math.ceil(loreMinutes * 9.3); 
           }
         }
 
-        // Apply Vehicle Time Multiplier (Slower vehicles get more time)
         const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
         seconds = Math.ceil(seconds * spec.timeMultiplier);
 
@@ -632,7 +638,7 @@ export const useGameStore = create<GameStore>()(
           happiness: 100,
           isStereoOn: false,
           timeOfDay,
-          stats: { ...stats, cash: 0, time: gameTime } // Reset session cash to 0
+          stats: { ...stats, cash: 0, time: gameTime }
         });
       },
 
@@ -684,18 +690,15 @@ export const useGameStore = create<GameStore>()(
         
         const newTime = state.gameTimeRemaining - 1;
         
-        // Happiness Logic
         let newHappiness = state.happiness;
         if (state.isStereoOn) {
           newHappiness = Math.min(100, state.happiness + 0.5);
         }
 
-        // Penalty for high speed (Driving recklessly)
         if (state.vehicleType && state.currentSpeed > 0) {
             const spec = VEHICLE_SPECS[state.vehicleType];
             const currentKmh = state.currentSpeed * 1.6;
             
-            // If driving > 90% max speed, passengers get scared
             if (currentKmh > spec.maxSpeedKmh * 0.9) {
                 newHappiness = Math.max(0, newHappiness - 0.5);
             }
@@ -714,11 +717,11 @@ export const useGameStore = create<GameStore>()(
         return { gameTimeRemaining: newTime, happiness: newHappiness };
       }),
 
-      endGame: (reason) => set((state) => {
+      endGame: (reason) => {
+        const state = get();
         const fuelPricePerLiter = 182;
         const fuelCost = Math.floor(state.fuelUsedLiters * fuelPricePerLiter);
         
-        // Calculate Net Profit
         const sessionEarnings = state.stats.cash;
         const profit = Math.max(0, sessionEarnings - fuelCost);
         
@@ -731,24 +734,38 @@ export const useGameStore = create<GameStore>()(
           totalTripsCompleted: state.lifetimeStats.totalTripsCompleted + (reason === 'COMPLETED' ? 1 : 0)
         };
 
-        // Bank the money if successful completion AND REGISTERED
         let newBankBalance = state.bankBalance;
         if (reason === 'COMPLETED' && state.userMode === 'REGISTERED') {
             newBankBalance += profit;
         }
 
-        return { 
+        set({ 
           gameStatus: 'GAME_OVER', 
           gameOverReason: reason,
           activeModal: 'GAME_OVER',
           isCrashing: false,
           lifetimeStats: newLifetime,
-          bankBalance: newBankBalance // Update global wealth
-        };
-      }),
+          bankBalance: newBankBalance
+        });
+
+        // Trigger Sync immediately after updating state
+        get().syncToCloud();
+      },
       
+      syncToCloud: async () => {
+        const state = get();
+        // Fire and forget sync (don't block UI)
+        await GameService.syncProgress(state.userMode, state.userId || undefined, {
+            bankBalance: state.bankBalance,
+            lifetimeStats: state.lifetimeStats,
+            reputation: state.stats.reputation,
+            unlockedVehicles: state.unlockedVehicles
+        });
+      },
+
       resetGame: () => set({
         currentScreen: 'LANDING',
+        userId: null,
         stats: INITIAL_STATS,
         selectedRoute: null,
         vehicleType: null,
@@ -777,8 +794,9 @@ export const useGameStore = create<GameStore>()(
       }),
 
       resetCareer: () => set({
+        userId: null,
         lifetimeStats: INITIAL_LIFETIME,
-        bankBalance: 0, // Reset Wealth
+        bankBalance: 0,
         userMode: 'GUEST',
         unlockedVehicles: ['boda'],
         playerName: '',
@@ -796,25 +814,21 @@ export const useGameStore = create<GameStore>()(
       toggleSound: () => {
         const newState = !get().isSoundOn;
         set({ isSoundOn: newState });
-        // Sync with audio util
-        import('../utils/audio').then(mod => {
-            // We can add a function to audio.ts to sync state if needed, 
-            // but audio.ts pulls from store directly in playSfx so it's fine.
-        });
       },
 
       toggleEngineSound: () => set((state) => ({ isEngineSoundOn: !state.isEngineSoundOn })),
     }),
     {
       name: 'matatu-master-storage',
-      storage: createJSONStorage(() => secureStorage), // Use our secure storage
+      storage: createJSONStorage(() => secureStorage),
       partialize: (state) => ({
         playerName: state.playerName,
         saccoName: state.saccoName,
         userMode: state.userMode,
+        userId: state.userId,
         unlockedVehicles: state.unlockedVehicles,
         lifetimeStats: state.lifetimeStats,
-        bankBalance: state.bankBalance, // Persist Bank Balance
+        bankBalance: state.bankBalance,
         isSoundOn: state.isSoundOn,
         isEngineSoundOn: state.isEngineSoundOn,
         currentScreen: state.currentScreen,
@@ -822,17 +836,13 @@ export const useGameStore = create<GameStore>()(
         selectedRoute: state.selectedRoute,
       }),
       onRehydrateStorage: () => (state) => {
-        // Hydration callback
         if (state) {
-            // Ensure backwards compatibility or missing fields init
             if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {
               state.unlockedVehicles = ['boda'];
             }
             if (!state.userMode) {
               state.userMode = 'GUEST';
             }
-
-            // Also ensure we aren't stuck in a weird game state
             if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
                 state.currentScreen = 'MAP_SELECT';
                 state.gameStatus = 'IDLE';

@@ -1,36 +1,33 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, Trophy, Coins, Map, ShieldAlert, AlertTriangle, User, Crown } from 'lucide-react';
+import { ArrowLeft, Trophy, Coins, Map, ShieldAlert, AlertTriangle, User, Crown, Loader2 } from 'lucide-react';
+import { GameService, LeaderboardEntry } from '../services/gameService';
 
 type RankingMetric = 'CASH' | 'DISTANCE' | 'BRIBES';
-
-// Mock Data Generator
-const generateMockData = (metric: RankingMetric) => {
-  const names = ['Kevo Ma-Coin', 'Brayo Turbo', 'Mama Mboga Express', 'Njoro The Boss', 'Shiro Speed', 'Oti Master', 'Kamau Transporters', 'Rashid 001'];
-  const saccos = ['Super Metro', 'Lopha', '2NK', 'Killeton', 'Embassava', 'Double M', 'Metro Trans'];
-  
-  return names.map((name, i) => {
-    // Generate realistic random stats
-    const cash = 50000 + Math.floor(Math.random() * 500000);
-    const dist = 500 + Math.floor(Math.random() * 2000);
-    const bribes = 1000 + Math.floor(Math.random() * 20000);
-
-    return {
-      id: `bot-${i}`,
-      name,
-      sacco: saccos[Math.floor(Math.random() * saccos.length)],
-      stat: metric === 'CASH' ? cash : metric === 'DISTANCE' ? dist : bribes,
-      rank: 0 // Will fill after sort
-    };
-  });
-};
 
 export const LeaderboardScreen: React.FC = () => {
   const { setScreen, lifetimeStats, playerName, saccoName } = useGameStore();
   const [activeMetric, setActiveMetric] = useState<RankingMetric>('CASH');
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch Data on Mount or Metric Change
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    
+    GameService.getLeaderboard(activeMetric).then(data => {
+        if (isMounted) {
+            setLeaderboardData(data);
+            setIsLoading(false);
+        }
+    });
+
+    return () => { isMounted = false; };
+  }, [activeMetric]);
 
   // Prepare Data
   const formatValue = (val: number, type: RankingMetric) => {
@@ -54,20 +51,23 @@ export const LeaderboardScreen: React.FC = () => {
     return '';
   };
 
-  // Combine Player + Bots and Sort
+  // Combine Player + Bots and Sort (Client side merge for now)
+  // In a real Supabase implementation, the player might already be in the list if synced
   const playerVal = activeMetric === 'CASH' ? lifetimeStats.totalCashEarned 
                   : activeMetric === 'DISTANCE' ? lifetimeStats.totalDistanceKm 
                   : lifetimeStats.totalBribesPaid;
 
-  const bots = generateMockData(activeMetric);
-  const allEntries = [
-    { id: 'player', name: playerName || 'You', sacco: saccoName || 'Freelancer', stat: playerVal },
-    ...bots
-  ].sort((a, b) => b.stat - a.stat).map((entry, index) => ({ ...entry, rank: index + 1 }));
-
-  const topThree = allEntries.slice(0, 3);
-  const restList = allEntries.slice(3);
-  const playerRank = allEntries.find(e => e.id === 'player')?.rank || 99;
+  // Insert current player into list if not present or just for visualization
+  // For simplicity in this mock-transition phase, we insert 'You' manually if not found by ID
+  const displayList = [...leaderboardData];
+  const playerEntry = { id: 'player', name: playerName || 'You', sacco: saccoName || 'Freelancer', stat: playerVal, rank: 0 };
+  
+  // Sort including player
+  const combined = [...displayList, playerEntry].sort((a, b) => b.stat - a.stat).map((e, i) => ({ ...e, rank: i + 1 }));
+  
+  const topThree = combined.slice(0, 3);
+  const restList = combined.slice(3);
+  const playerRank = combined.find(e => e.id === 'player')?.rank || 999;
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950 overflow-hidden">
@@ -122,7 +122,7 @@ export const LeaderboardScreen: React.FC = () => {
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-6 p-4 md:p-0">
            
            {/* Top 3 Podium (Desktop: Left, Mobile: Top) */}
-           <div className="md:w-1/3 flex flex-col items-center justify-center shrink-0">
+           <div className="md:w-1/3 flex flex-col items-center justify-center shrink-0 min-h-[250px]">
               <div className="text-center mb-6">
                  <h3 className={`font-display font-black text-3xl uppercase italic transform -rotate-2 
                     ${activeMetric === 'CASH' ? 'text-matatu-yellow' : activeMetric === 'BRIBES' ? 'text-red-500' : 'text-blue-400'}
@@ -132,56 +132,62 @@ export const LeaderboardScreen: React.FC = () => {
                  <p className="text-xs text-slate-400">{getMetricDesc(activeMetric)}</p>
               </div>
 
-              <div className="flex items-end justify-center gap-2 md:gap-4 w-full h-48 md:h-64">
-                 {/* 2nd Place */}
-                 {topThree[1] && (
-                    <div className="flex flex-col items-center w-1/3 animate-fade-in-up" style={{animationDelay: '0.1s'}}>
-                       <div className="mb-2 text-center">
-                          <span className="font-bold text-xs text-slate-300 block truncate max-w-[80px]">{topThree[1].name}</span>
-                          <span className="text-[10px] text-slate-500">{topThree[1].sacco}</span>
-                       </div>
-                       <div className="w-full bg-slate-700 h-24 md:h-32 rounded-t-lg border-t-4 border-slate-400 flex flex-col items-center justify-end p-2 relative">
-                          <div className="absolute -top-3 bg-slate-800 rounded-full p-1 border border-slate-400 shadow-lg">
-                             <span className="font-display font-bold text-slate-400 text-xs">#2</span>
-                          </div>
-                          <span className="font-mono font-bold text-white text-[10px] md:text-xs">{formatValue(topThree[1].stat, activeMetric)}</span>
-                       </div>
-                    </div>
-                 )}
+              {isLoading ? (
+                  <div className="flex items-center justify-center h-48">
+                      <Loader2 className="animate-spin text-slate-500" size={48} />
+                  </div>
+              ) : (
+                  <div className="flex items-end justify-center gap-2 md:gap-4 w-full h-48 md:h-64">
+                     {/* 2nd Place */}
+                     {topThree[1] && (
+                        <div className="flex flex-col items-center w-1/3 animate-fade-in-up" style={{animationDelay: '0.1s'}}>
+                           <div className="mb-2 text-center">
+                              <span className="font-bold text-xs text-slate-300 block truncate max-w-[80px]">{topThree[1].name}</span>
+                              <span className="text-[10px] text-slate-500">{topThree[1].sacco}</span>
+                           </div>
+                           <div className="w-full bg-slate-700 h-24 md:h-32 rounded-t-lg border-t-4 border-slate-400 flex flex-col items-center justify-end p-2 relative">
+                              <div className="absolute -top-3 bg-slate-800 rounded-full p-1 border border-slate-400 shadow-lg">
+                                 <span className="font-display font-bold text-slate-400 text-xs">#2</span>
+                              </div>
+                              <span className="font-mono font-bold text-white text-[10px] md:text-xs">{formatValue(topThree[1].stat, activeMetric)}</span>
+                           </div>
+                        </div>
+                     )}
 
-                 {/* 1st Place */}
-                 {topThree[0] && (
-                    <div className="flex flex-col items-center w-1/3 z-10 animate-fade-in-up">
-                       <Crown className="text-matatu-yellow mb-2 drop-shadow-[0_0_10px_rgba(255,215,0,0.5)] animate-bounce" size={32} />
-                       <div className="mb-2 text-center">
-                          <span className="font-bold text-sm text-matatu-yellow block truncate max-w-[100px]">{topThree[0].name}</span>
-                          <span className="text-[10px] text-slate-400">{topThree[0].sacco}</span>
-                       </div>
-                       <div className="w-full bg-slate-800 h-32 md:h-48 rounded-t-lg border-t-4 border-matatu-yellow flex flex-col items-center justify-end p-2 relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
-                          <div className="absolute -top-4 bg-slate-900 rounded-full p-2 border-2 border-matatu-yellow shadow-xl">
-                             <span className="font-display font-black text-matatu-yellow text-lg">#1</span>
-                          </div>
-                          <span className="font-mono font-bold text-white text-xs md:text-sm">{formatValue(topThree[0].stat, activeMetric)}</span>
-                       </div>
-                    </div>
-                 )}
+                     {/* 1st Place */}
+                     {topThree[0] && (
+                        <div className="flex flex-col items-center w-1/3 z-10 animate-fade-in-up">
+                           <Crown className="text-matatu-yellow mb-2 drop-shadow-[0_0_10px_rgba(255,215,0,0.5)] animate-bounce" size={32} />
+                           <div className="mb-2 text-center">
+                              <span className="font-bold text-sm text-matatu-yellow block truncate max-w-[100px]">{topThree[0].name}</span>
+                              <span className="text-[10px] text-slate-400">{topThree[0].sacco}</span>
+                           </div>
+                           <div className="w-full bg-slate-800 h-32 md:h-48 rounded-t-lg border-t-4 border-matatu-yellow flex flex-col items-center justify-end p-2 relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                              <div className="absolute -top-4 bg-slate-900 rounded-full p-2 border-2 border-matatu-yellow shadow-xl">
+                                 <span className="font-display font-black text-matatu-yellow text-lg">#1</span>
+                              </div>
+                              <span className="font-mono font-bold text-white text-xs md:text-sm">{formatValue(topThree[0].stat, activeMetric)}</span>
+                           </div>
+                        </div>
+                     )}
 
-                 {/* 3rd Place */}
-                 {topThree[2] && (
-                    <div className="flex flex-col items-center w-1/3 animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-                       <div className="mb-2 text-center">
-                          <span className="font-bold text-xs text-orange-300 block truncate max-w-[80px]">{topThree[2].name}</span>
-                          <span className="text-[10px] text-slate-500">{topThree[2].sacco}</span>
-                       </div>
-                       <div className="w-full bg-slate-700 h-20 md:h-24 rounded-t-lg border-t-4 border-orange-700 flex flex-col items-center justify-end p-2 relative">
-                          <div className="absolute -top-3 bg-slate-800 rounded-full p-1 border border-orange-700 shadow-lg">
-                             <span className="font-display font-bold text-orange-700 text-xs">#3</span>
-                          </div>
-                          <span className="font-mono font-bold text-white text-[10px] md:text-xs">{formatValue(topThree[2].stat, activeMetric)}</span>
-                       </div>
-                    </div>
-                 )}
-              </div>
+                     {/* 3rd Place */}
+                     {topThree[2] && (
+                        <div className="flex flex-col items-center w-1/3 animate-fade-in-up" style={{animationDelay: '0.2s'}}>
+                           <div className="mb-2 text-center">
+                              <span className="font-bold text-xs text-orange-300 block truncate max-w-[80px]">{topThree[2].name}</span>
+                              <span className="text-[10px] text-slate-500">{topThree[2].sacco}</span>
+                           </div>
+                           <div className="w-full bg-slate-700 h-20 md:h-24 rounded-t-lg border-t-4 border-orange-700 flex flex-col items-center justify-end p-2 relative">
+                              <div className="absolute -top-3 bg-slate-800 rounded-full p-1 border border-orange-700 shadow-lg">
+                                 <span className="font-display font-bold text-orange-700 text-xs">#3</span>
+                              </div>
+                              <span className="font-mono font-bold text-white text-[10px] md:text-xs">{formatValue(topThree[2].stat, activeMetric)}</span>
+                           </div>
+                        </div>
+                     )}
+                  </div>
+              )}
            </div>
 
            {/* The List (Scrollable) */}
@@ -193,20 +199,24 @@ export const LeaderboardScreen: React.FC = () => {
               </div>
               
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                 {restList.map((item) => (
-                    <div key={item.id} className={`flex items-center p-3 rounded-lg border ${item.id === 'player' ? 'bg-slate-800 border-matatu-yellow/50' : 'bg-transparent border-transparent hover:bg-slate-800/30'}`}>
-                       <div className="w-10 text-center font-display font-bold text-slate-500">#{item.rank}</div>
-                       <div className="flex-1">
-                          <div className={`font-bold text-sm ${item.id === 'player' ? 'text-matatu-yellow' : 'text-slate-300'}`}>
-                             {item.name} {item.id === 'player' && '(You)'}
-                          </div>
-                          <div className="text-[10px] text-slate-500 uppercase">{item.sacco}</div>
-                       </div>
-                       <div className="font-mono text-sm font-bold text-white">
-                          {formatValue(item.stat, activeMetric)}
-                       </div>
-                    </div>
-                 ))}
+                 {isLoading ? (
+                     <div className="p-8 text-center text-slate-500">Loading rankings...</div>
+                 ) : (
+                     restList.map((item) => (
+                        <div key={item.id} className={`flex items-center p-3 rounded-lg border ${item.id === 'player' ? 'bg-slate-800 border-matatu-yellow/50' : 'bg-transparent border-transparent hover:bg-slate-800/30'}`}>
+                           <div className="w-10 text-center font-display font-bold text-slate-500">#{item.rank}</div>
+                           <div className="flex-1">
+                              <div className={`font-bold text-sm ${item.id === 'player' ? 'text-matatu-yellow' : 'text-slate-300'}`}>
+                                 {item.name} {item.id === 'player' && '(You)'}
+                              </div>
+                              <div className="text-[10px] text-slate-500 uppercase">{item.sacco}</div>
+                           </div>
+                           <div className="font-mono text-sm font-bold text-white">
+                              {formatValue(item.stat, activeMetric)}
+                           </div>
+                        </div>
+                     ))
+                 )}
               </div>
 
               {/* Sticky Player Rank if not in view (Optional polish) */}
