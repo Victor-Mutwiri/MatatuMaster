@@ -25,8 +25,6 @@ export const PlayerSetupScreen: React.FC = () => {
   const [isCheckingName, setIsCheckingName] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
   
-  // No longer relying on state for UserID to avoid sync issues. We check session directly.
-
   // If user is already registered AND has a profile, skip this screen
   useEffect(() => {
     if (userMode === 'REGISTERED' && playerName && saccoName) {
@@ -65,12 +63,19 @@ export const PlayerSetupScreen: React.FC = () => {
               // Check if profile exists
               try {
                   const { profile, progress } = await GameService.loadSave(data.user.id);
-                  setPlayerInfo(profile.username, profile.sacco);
-                  registerUser(data.user.id);
-                  if (progress) loadUserData(progress);
-                  setScreen('GAME_MODE');
+                  
+                  if (profile) {
+                      setPlayerInfo(profile.username, profile.sacco);
+                      registerUser(data.user.id);
+                      if (progress) loadUserData(progress);
+                      setScreen('GAME_MODE');
+                  } else {
+                      // Login success, but no profile found -> Go to onboarding
+                      setView('ONBOARDING');
+                  }
               } catch (e) {
-                  // No profile, go to onboarding
+                  // Fallback
+                  console.error("Load save error", e);
                   setView('ONBOARDING');
               }
           } else {
@@ -104,12 +109,10 @@ export const PlayerSetupScreen: React.FC = () => {
             }
             
             if (data.session) {
-                // Session established immediately
+                // Session established immediately -> New User -> Onboarding
                 setView('ONBOARDING');
             } else if (data.user && !data.session) {
-                // Supabase quirk: If 'Confirm Email' is OFF, sometimes session is still null initially 
-                // OR if user existed but signup was called.
-                // Try immediate login to confirm session.
+                // Attempt immediate login to confirm session.
                 await attemptLogin();
             }
         } else {

@@ -63,7 +63,7 @@ export const GameService = {
             lifetime_earnings: data.lifetimeStats.totalCashEarned,
             reputation: data.reputation,
             unlocked_vehicles: data.unlockedVehicles,
-            updated_at: new Date()
+            updated_at: new Date().toISOString()
           });
 
         if (error) {
@@ -188,23 +188,40 @@ export const GameService = {
 
       const realUserId = user.id;
 
-      // 2. Upsert Profile
-      // We use upsert to handle cases where a profile might partially exist
-      const { error: profileError } = await supabase
+      const profileData = {
+          id: realUserId,
+          username,
+          sacco,
+          updated_at: new Date().toISOString()
+      };
+
+      // 2. Try INSERT first. This often bypasses ambiguous RLS 'Upsert' restrictions on new rows.
+      // We assume if they are creating a profile, one doesn't exist.
+      const { error: insertError } = await supabase
         .from('profiles')
-        .upsert({
-            id: realUserId,
-            username,
-            sacco,
-            updated_at: new Date()
-        });
+        .insert(profileData)
+        .select()
+        .single();
       
-      if (profileError) {
-          console.error("Profile Creation Error:", profileError);
-          if (profileError.code === '42501' || profileError.code === '23505') {
-               throw new Error("Could not create profile. If you already have an account, please try logging in.");
+      if (insertError) {
+          // If error is duplicate key (23505), we try Update/Upsert
+          // If error is RLS (42501), it might be that we have update rights but not insert? 
+          // (Rare for new user, but possible if phantom row exists).
+          console.warn("Insert Profile Failed, attempting Upsert fallback...", insertError.code);
+          
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert(profileData)
+            .select()
+            .single();
+
+          if (upsertError) {
+              console.error("Profile Creation Error:", upsertError);
+              if (upsertError.code === '42501') {
+                   throw new Error("Permission Denied: Cannot create profile. Database security policy blocked this action.");
+              }
+              throw new Error(`Database Error: ${upsertError.message}`);
           }
-          throw new Error(`Database Error: ${profileError.message}`);
       }
       
       // 3. Initialize progress entry
@@ -212,12 +229,12 @@ export const GameService = {
           user_id: realUserId,
           bank_balance: 0,
           unlocked_vehicles: ['boda'],
-          updated_at: new Date()
+          updated_at: new Date().toISOString()
       });
 
       if (progressError) {
           console.error("Progress Init Error:", progressError);
-          // Non-fatal, user can still play, sync will fix later
+          // Non-fatal
       }
 
       return realUserId;
@@ -227,15 +244,16 @@ export const GameService = {
    * Load Profile & Progress
    */
   loadSave: async (userId: string) => {
-      const profilePromise = supabase.from('profiles').select('*').eq('id', userId).single();
-      const progressPromise = supabase.from('player_progress').select('*').eq('user_id', userId).single();
+      // Use maybeSingle() to avoid 406 Not Acceptable errors if the user exists in Auth but has no Profile data yet.
+      const profilePromise = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      const progressPromise = supabase.from('player_progress').select('*').eq('user_id', userId).maybeSingle();
 
       const [profileRes, progressRes] = await Promise.all([profilePromise, progressPromise]);
 
       if (profileRes.error) throw profileRes.error;
       
       return {
-          profile: profileRes.data,
+          profile: profileRes.data, // Can be null now, handled by UI
           progress: progressRes.data
       };
   }
