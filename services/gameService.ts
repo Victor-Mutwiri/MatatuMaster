@@ -166,25 +166,61 @@ export const GameService = {
   },
 
   /**
-   * Create Profile (Post-Auth)
+   * Get Current User (Helper)
    */
-  createProfile: async (userId: string, username: string, sacco: string) => {
-      const { error } = await supabase
+  getCurrentUser: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user;
+  },
+
+  /**
+   * Create Profile (Post-Auth)
+   * IMPORTANT: This now ignores the passed userId argument for security,
+   * fetching the ID directly from the active session to satisfy RLS.
+   */
+  createProfile: async (username: string, sacco: string) => {
+      // 1. Get the TRUTH from the auth session
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+          throw new Error("No active session found. Please login again.");
+      }
+
+      const realUserId = user.id;
+
+      // 2. Upsert Profile
+      // We use upsert to handle cases where a profile might partially exist
+      const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-            id: userId,
+        .upsert({
+            id: realUserId,
             username,
-            sacco
+            sacco,
+            updated_at: new Date()
         });
       
-      if (error) throw error;
+      if (profileError) {
+          console.error("Profile Creation Error:", profileError);
+          if (profileError.code === '42501' || profileError.code === '23505') {
+               throw new Error("Could not create profile. If you already have an account, please try logging in.");
+          }
+          throw new Error(`Database Error: ${profileError.message}`);
+      }
       
-      // Initialize progress entry too
-      await supabase.from('player_progress').insert({
-          user_id: userId,
+      // 3. Initialize progress entry
+      const { error: progressError } = await supabase.from('player_progress').upsert({
+          user_id: realUserId,
           bank_balance: 0,
-          unlocked_vehicles: ['boda']
+          unlocked_vehicles: ['boda'],
+          updated_at: new Date()
       });
+
+      if (progressError) {
+          console.error("Progress Init Error:", progressError);
+          // Non-fatal, user can still play, sync will fix later
+      }
+
+      return realUserId;
   },
 
   /**
@@ -198,8 +234,6 @@ export const GameService = {
 
       if (profileRes.error) throw profileRes.error;
       
-      // Progress might not exist if it's a fresh user who crashed during onboarding? 
-      // But typically we create both. 
       return {
           profile: profileRes.data,
           progress: progressRes.data

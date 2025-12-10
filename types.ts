@@ -121,6 +121,7 @@ declare global {
       group: any;
       mesh: any;
       primitive: any;
+      color: any;
       
       // Lights
       ambientLight: any;
@@ -146,6 +147,39 @@ declare global {
       meshBasicMaterial: any;
 
       // Catch-all to prevent other R3F errors
+      [elemName: string]: any;
+    }
+  }
+}
+
+// Augment React's JSX namespace directly for environments where global JSX is not picked up
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      group: any;
+      mesh: any;
+      primitive: any;
+      color: any;
+      
+      ambientLight: any;
+      pointLight: any;
+      directionalLight: any;
+      spotLight: any;
+      
+      fog: any;
+      
+      boxGeometry: any;
+      planeGeometry: any;
+      sphereGeometry: any;
+      cylinderGeometry: any;
+      circleGeometry: any;
+      coneGeometry: any;
+      dodecahedronGeometry: any;
+      tetrahedronGeometry: any;
+      
+      meshStandardMaterial: any;
+      meshBasicMaterial: any;
+
       [elemName: string]: any;
     }
   }

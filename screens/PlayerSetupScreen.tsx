@@ -4,9 +4,9 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
 import { GameService } from '../services/gameService';
-import { AlertTriangle, ArrowLeft, Ghost, LogIn, UserPlus, Mail, Lock, CheckCircle2, Loader2, Info } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Ghost, LogIn, UserPlus, Mail, Lock, CheckCircle2, Loader2, Info, Send } from 'lucide-react';
 
-type SetupView = 'CHOICE' | 'AUTH_SELECT' | 'LOGIN' | 'SIGNUP' | 'ONBOARDING';
+type SetupView = 'CHOICE' | 'AUTH_SELECT' | 'LOGIN' | 'SIGNUP' | 'VERIFY_EMAIL' | 'ONBOARDING';
 
 export const PlayerSetupScreen: React.FC = () => {
   const { setScreen, playerName, saccoName, userMode, registerUser, setPlayerInfo, loadUserData, userId } = useGameStore();
@@ -25,8 +25,7 @@ export const PlayerSetupScreen: React.FC = () => {
   const [isCheckingName, setIsCheckingName] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
   
-  // Temporary storage for auth flow
-  const [tempUserId, setTempUserId] = useState<string | null>(userId);
+  // No longer relying on state for UserID to avoid sync issues. We check session directly.
 
   // If user is already registered AND has a profile, skip this screen
   useEffect(() => {
@@ -47,11 +46,43 @@ export const PlayerSetupScreen: React.FC = () => {
         // If they just signed up but cancel onboarding, they are technically authenticated but profile-less
         setView('CHOICE'); 
     }
+    else if (view === 'VERIFY_EMAIL') {
+        setView('LOGIN');
+    }
     else setScreen('LANDING');
   };
 
   const handleGuestPlay = () => {
     setScreen('GAME_MODE');
+  };
+
+  const attemptLogin = async () => {
+      try {
+          const { data, error } = await GameService.signIn(email, password);
+          if (error) throw error;
+
+          if (data.session) {
+              // Check if profile exists
+              try {
+                  const { profile, progress } = await GameService.loadSave(data.user.id);
+                  setPlayerInfo(profile.username, profile.sacco);
+                  registerUser(data.user.id);
+                  if (progress) loadUserData(progress);
+                  setScreen('GAME_MODE');
+              } catch (e) {
+                  // No profile, go to onboarding
+                  setView('ONBOARDING');
+              }
+          } else {
+              setAuthError("Login successful but no session created. Please try again.");
+          }
+      } catch (e: any) {
+          if (e.message.includes("Invalid login credentials")) {
+              setAuthError("Incorrect password or user does not exist.");
+          } else {
+              setAuthError(e.message);
+          }
+      }
   };
 
   const handleAuthSubmit = async (type: 'LOGIN' | 'SIGNUP') => {
@@ -61,34 +92,29 @@ export const PlayerSetupScreen: React.FC = () => {
     try {
         if (type === 'SIGNUP') {
             const { data, error } = await GameService.signUp(email, password);
-            if (error) throw error;
-            if (data.user) {
-                setTempUserId(data.user.id);
+            
+            if (error) {
+                // Smart Fallback: If user exists, try to log them in automatically or prompt them
+                if (error.message.includes("already registered") || error.status === 400) {
+                    console.log("User exists, attempting auto-login...");
+                    await attemptLogin();
+                    return; // Exit here, attemptLogin handles UI
+                }
+                throw error;
+            }
+            
+            if (data.session) {
+                // Session established immediately
                 setView('ONBOARDING');
+            } else if (data.user && !data.session) {
+                // Supabase quirk: If 'Confirm Email' is OFF, sometimes session is still null initially 
+                // OR if user existed but signup was called.
+                // Try immediate login to confirm session.
+                await attemptLogin();
             }
         } else {
-            const { data, error } = await GameService.signIn(email, password);
-            if (error) throw error;
-            
-            if (data.user) {
-                const uid = data.user.id;
-                setTempUserId(uid);
-                
-                // Try to load existing profile
-                try {
-                    const { profile, progress } = await GameService.loadSave(uid);
-                    
-                    // If successful, update store and go to game
-                    setPlayerInfo(profile.username, profile.sacco);
-                    registerUser(uid);
-                    if (progress) loadUserData(progress);
-                    
-                    setScreen('GAME_MODE');
-                } catch (e) {
-                    // No profile found? Go to onboarding
-                    setView('ONBOARDING');
-                }
-            }
+            // Manual Login
+            await attemptLogin();
         }
     } catch (err: any) {
         setAuthError(err.message || 'Authentication failed');
@@ -115,22 +141,25 @@ export const PlayerSetupScreen: React.FC = () => {
 
 
   const handleFinalRegistration = async () => {
-    if (!tempUserId) {
-        setAuthError("Session lost. Please login again.");
-        setView('LOGIN');
-        return;
-    }
-
     if (nameAvailable && localSacco.length > 2) {
         setIsLoading(true);
+        setAuthError(null);
         try {
-            await GameService.createProfile(tempUserId, localName, localSacco);
+            // We do not pass tempUserId anymore. 
+            // The service will look up the current authenticated session.
+            const confirmedUserId = await GameService.createProfile(localName, localSacco);
             
             setPlayerInfo(localName, localSacco);
-            registerUser(tempUserId); 
+            registerUser(confirmedUserId); 
             setScreen('GAME_MODE');
         } catch (e: any) {
-            setAuthError(e.message || "Failed to create profile");
+            console.error(e);
+            setAuthError(e.message || "Failed to create profile. Ensure you are logged in.");
+            
+            // If session expired, send back to login
+            if (e.message.includes("No active session")) {
+                setTimeout(() => setView('LOGIN'), 2000);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -193,6 +222,29 @@ export const PlayerSetupScreen: React.FC = () => {
                     </div>
                 </div>
             </div>
+        </GameLayout>
+      );
+  }
+
+  if (view === 'VERIFY_EMAIL') {
+      return (
+        <GameLayout noMaxWidth className="bg-slate-950">
+           <div className="flex flex-col items-center justify-center min-h-full w-full max-w-md mx-auto p-6">
+               <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center shadow-2xl">
+                   <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                       <Send size={40} className="text-blue-400" />
+                   </div>
+                   <h2 className="font-display text-2xl font-bold text-white uppercase mb-3">Check Your Email</h2>
+                   <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                       A verification link has been sent to <span className="text-white font-bold">{email}</span>.
+                       <br/><br/>
+                       Please check your inbox (and spam folder) and click the link to activate your conductor license.
+                   </p>
+                   <Button variant="primary" fullWidth onClick={() => setView('LOGIN')}>
+                       Back to Login
+                   </Button>
+               </div>
+           </div>
         </GameLayout>
       );
   }
