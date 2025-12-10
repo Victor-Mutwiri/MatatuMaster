@@ -29,13 +29,22 @@ export interface LeaderboardEntry {
   rank: number;
 }
 
+export interface FriendRequest {
+    id: string;
+    sender_id: string;
+    receiver_id: string;
+    created_at: string;
+    profile?: {
+        username: string;
+        sacco: string;
+    };
+}
+
 // --- Service Layer ---
 export const GameService = {
   
   /**
    * Syncs local progress to the cloud.
-   * If GUEST: Does nothing (Local persistence handled by Zustand).
-   * If REGISTERED: Pushes to Supabase.
    */
   syncProgress: async (
     userMode: UserMode,
@@ -48,7 +57,6 @@ export const GameService = {
     }
   ) => {
     if (userMode === 'GUEST' || !userId) {
-      // console.log('Skipping cloud sync (Guest Mode or No User ID)');
       return { success: true, mode: 'LOCAL' };
     }
 
@@ -67,7 +75,6 @@ export const GameService = {
           });
 
         if (error) {
-            // If RLS blocks sync, we just log it and continue locally
             if (error.code === '42501') {
                 console.warn('Cloud Sync Skipped: Database permissions (RLS) prevented saving.');
             } else {
@@ -85,7 +92,6 @@ export const GameService = {
 
   /**
    * Fetches the leaderboard.
-   * Joins 'player_progress' with 'profiles' to get names.
    */
   getLeaderboard: async (metric: 'CASH' | 'DISTANCE' | 'BRIBES'): Promise<LeaderboardEntry[]> => {
     try {
@@ -111,7 +117,6 @@ export const GameService = {
             return [];
         }
 
-        // Transform Supabase response to app format
         const entries: LeaderboardEntry[] = data.map((row: any, index: number) => ({
             id: row.user_id,
             name: row.profiles?.username || 'Unknown Conductor',
@@ -140,7 +145,6 @@ export const GameService = {
             .maybeSingle();
         
         if (error) {
-            // FAIL OPEN: If DB blocks read (RLS), assume name is free so user can play.
             if (error.code === '42501' || error.code === 'PGRST301') {
                 console.warn("Username check blocked by DB policy. Assuming available.");
                 return true; 
@@ -149,9 +153,9 @@ export const GameService = {
             return false;
         }
         
-        return !data; // Available if no data found
+        return !data;
     } catch (e) {
-        return true; // Fail open on network error
+        return true;
     }
   },
 
@@ -166,7 +170,7 @@ export const GameService = {
         .from('profiles')
         .select('id, username, sacco')
         .ilike('username', `%${query}%`)
-        .neq('id', user.id) // Don't find self
+        .neq('id', user.id)
         .limit(10);
 
       if (error) {
@@ -177,20 +181,81 @@ export const GameService = {
   },
 
   /**
-   * Add a friend
+   * 1. Send Friend Request
    */
-  addFriend: async (friendId: string) => {
+  sendFriendRequest: async (receiverId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Check if already friends? (Optional, DB constraint handles duplication usually)
+      
       const { error } = await supabase
-        .from('friendships')
+        .from('friend_requests')
         .insert({
-            user_id: user.id,
-            friend_id: friendId
+            sender_id: user.id,
+            receiver_id: receiverId
         });
 
-      if (error) throw error;
+      if (error) {
+          // If 23505 (unique_violation), they already sent a request
+          if (error.code === '23505') {
+              throw new Error("Request already sent.");
+          }
+          throw error;
+      }
+  },
+
+  /**
+   * 2. Get Incoming Friend Requests
+   */
+  getFriendRequests: async (): Promise<FriendRequest[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('friend_requests')
+        .select(`
+            id,
+            sender_id,
+            receiver_id,
+            created_at,
+            sender:profiles!sender_id (
+                username,
+                sacco
+            )
+        `)
+        .eq('receiver_id', user.id);
+
+      if (error) {
+          console.error("Get requests error", error);
+          return [];
+      }
+
+      // Map Supabase join format to cleaner object
+      return data.map((item: any) => ({
+          id: item.id,
+          sender_id: item.sender_id,
+          receiver_id: item.receiver_id,
+          created_at: item.created_at,
+          profile: item.sender
+      }));
+  },
+
+  /**
+   * 3. Respond to Request (Accept/Reject)
+   */
+  respondToFriendRequest: async (requestId: string, senderId: string, action: 'ACCEPT' | 'REJECT') => {
+      if (action === 'REJECT') {
+          // Just delete the request
+          await supabase.from('friend_requests').delete().eq('id', requestId);
+      } else {
+          // Accept: Call RPC to create friendship and delete request atomically
+          const { error } = await supabase.rpc('accept_friend_request', {
+              request_id: requestId,
+              friend_user_id: senderId
+          });
+          if (error) throw error;
+      }
   },
 
   /**
@@ -200,8 +265,6 @@ export const GameService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // We select the friend_id and expand the 'profiles' table referenced by friend_id
-      // Note: This relies on Supabase detecting the FK on friend_id -> profiles.id
       const { data, error } = await supabase
         .from('friendships')
         .select(`
@@ -218,7 +281,6 @@ export const GameService = {
           return [];
       }
 
-      // Flatten structure
       return data.map((item: any) => ({
           id: item.friend_id,
           username: item.profile?.username || 'Unknown',
@@ -227,7 +289,7 @@ export const GameService = {
   },
 
   /**
-   * Sign Up Flow
+   * Auth Methods
    */
   signUp: async (email: string, password: string) => {
       return await supabase.auth.signUp({
@@ -236,9 +298,6 @@ export const GameService = {
       });
   },
 
-  /**
-   * Sign In Flow
-   */
   signIn: async (email: string, password: string) => {
       return await supabase.auth.signInWithPassword({
           email,
@@ -246,139 +305,53 @@ export const GameService = {
       });
   },
 
-  /**
-   * Get Current User (Helper)
-   */
   getCurrentUser: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       return user;
   },
 
-  /**
-   * Create Profile (Post-Auth)
-   * IMPORTANT: This now ignores the passed userId argument for security,
-   * fetching the ID directly from the active session to satisfy RLS.
-   * 
-   * Strategy: SELECT first. If exists, UPDATE. If not, INSERT.
-   * This bypasses many RLS edge cases where INSERT fails on existing rows or UPSERT fails permissions.
-   * 
-   * FAILSAFE: If DB blocks write (RLS), we return success anyway to let the user play locally.
-   */
   createProfile: async (username: string, sacco: string) => {
-      // 1. Get the TRUTH from the auth session
       const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
           throw new Error("No active session found. Please login again.");
       }
-
       const realUserId = user.id;
+      const profileData = { username, sacco, updated_at: new Date().toISOString() };
 
-      const profileData = {
-          username,
-          sacco,
-          updated_at: new Date().toISOString()
-      };
-
-      // 2. Check existence
+      // Check existence
       const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', realUserId)
-        .maybeSingle();
+        .from('profiles').select('id').eq('id', realUserId).maybeSingle();
 
-      if (fetchError && fetchError.code !== '42501') {
-          console.warn("Error checking profile existence:", fetchError);
-      }
-
-      // If existing found OR we couldn't check (might be RLS blocked on select, so we try insert anyway or skip)
-      // Logic: Try Update if we know it exists. Try Insert if we know it doesn't.
-      
       if (existingProfile) {
-          console.log("Profile found, syncing...");
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update(profileData)
-            .eq('id', realUserId);
-            
-          if (updateError) {
-             if (updateError.code === '42501') {
-                 console.warn("RLS blocking profile update. Continuing locally.");
-             } else {
-                 throw new Error(`Failed to update existing profile: ${updateError.message}`);
-             }
-          }
+          const { error: updateError } = await supabase.from('profiles').update(profileData).eq('id', realUserId);
+          if (updateError && updateError.code !== '42501') throw new Error(`Failed to update: ${updateError.message}`);
       } else {
-          console.log("Creating new profile on server...");
-          // Explicitly include ID
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-                id: realUserId,
-                ...profileData
-            });
-            
-          if (insertError) {
-              // FAILSAFE: If RLS (42501) blocks insert, we allow the app to proceed.
-              // The user will have a "local" profile associated with their Auth ID.
-              if (insertError.code === '42501') {
-                  console.warn("RLS Permission Error: The database rejected the profile creation. Ensure the SQL setup script was run in Supabase.");
-                  return realUserId; // SUCCESS (Local)
-              }
-              
-              console.error("Profile Insert Error:", insertError);
-              throw new Error(`Permission Denied: ${insertError.message}`);
-          }
+          const { error: insertError } = await supabase.from('profiles').insert({ id: realUserId, ...profileData });
+          if (insertError && insertError.code !== '42501') throw new Error(`Permission Denied: ${insertError.message}`);
       }
       
-      // 3. Initialize progress entry
-      const { error: progressError } = await supabase.from('player_progress').insert({
+      // Initialize progress
+      await supabase.from('player_progress').insert({
           user_id: realUserId,
           bank_balance: 0,
           unlocked_vehicles: ['boda'],
           updated_at: new Date().toISOString()
       });
 
-      if (progressError) {
-          // Ignore RLS or Duplicate errors on progress init
-          // console.log("Progress Init Status:", progressError.code);
-      }
-
       return realUserId;
   },
 
-  /**
-   * Load Profile & Progress
-   */
   loadSave: async (userId: string) => {
-      // Use maybeSingle() to avoid 406 Not Acceptable errors if the user exists in Auth but has no Profile data yet.
       const profilePromise = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       const progressPromise = supabase.from('player_progress').select('*').eq('user_id', userId).maybeSingle();
-
       const [profileRes, progressRes] = await Promise.all([profilePromise, progressPromise]);
-
-      // If RLS blocks reads, we just return nulls effectively
       if (profileRes.error && profileRes.error.code !== '42501') throw profileRes.error;
-      
-      return {
-          profile: profileRes.data, // Can be null now, handled by UI
-          progress: progressRes.data
-      };
+      return { profile: profileRes.data, progress: progressRes.data };
   },
 
-  /**
-   * Permanently delete account
-   * Calls the security definer function 'delete_own_account'
-   */
   deleteAccount: async () => {
-    // 1. Call RPC to delete DB records and Auth record
     const { error } = await supabase.rpc('delete_own_account');
-    if (error) {
-      console.error("Account Deletion Error:", error);
-      throw error;
-    }
-    
-    // 2. Ensure client session is destroyed
+    if (error) throw error;
     await supabase.auth.signOut();
   }
 };
