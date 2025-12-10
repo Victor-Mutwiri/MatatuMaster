@@ -48,7 +48,7 @@ export const HUD: React.FC = () => {
     toggleStereo, 
     isSoundOn, 
     toggleSound, 
-    isEngineSoundOn,
+    isEngineSoundOn, 
     toggleEngineSound,
     currentSpeed,
     distanceTraveled,
@@ -136,18 +136,13 @@ export const HUD: React.FC = () => {
       )}
 
       {/* --- TOP HUD AREA --- */}
-      {/* 
-         Mobile Strategy: 
-         - Padding Top added to avoid browser URL bar collision if not full screen (pt-safe/mt-12)
-         - Horizontal Flex row for stats to save vertical space.
-         - Controls moved to right side.
-      */}
-      <div className="flex flex-col md:flex-row justify-between items-start gap-2 relative z-10 pt-12 md:pt-0">
+      {/* Reduced top padding (pt-2) to maximize vertical space in landscape */}
+      <div className="flex flex-col md:flex-row justify-between items-start gap-2 relative z-10 pt-2 md:pt-0">
         
         {/* Left Side: Stats (Mobile: Horizontal Row, Desktop: Vertical Stack) */}
         <div className="flex flex-row md:flex-col gap-2 pointer-events-auto w-full md:w-auto overflow-x-auto md:overflow-visible items-center md:items-start no-scrollbar">
             
-            {/* Control Buttons Group (Mobile: Integrated here or below. Let's keep separate) */}
+            {/* Control Buttons Group */}
             <div className="flex items-center gap-2 mr-2 md:mr-0 md:mb-1">
                 {/* Pause Button */}
                 <button 
@@ -232,12 +227,14 @@ export const HUD: React.FC = () => {
       </div>
 
       {/* --- BOTTOM AREA (Pedals and Stats) --- */}
+      {/* Reduced bottom padding to avoid cut-off on short mobile landscape screens */}
       <div className="mt-auto flex justify-between items-end pb-2 md:pb-4 relative z-10">
         
         {/* Left: Brake Pedal & Passengers */}
         <div className="flex items-end gap-2 md:gap-3 pointer-events-auto">
           <button className="group active:scale-95 transition-transform" onMouseDown={handleBrakeStart} onMouseUp={handleBrakeEnd} onMouseLeave={handleBrakeEnd} onTouchStart={handleBrakeStart} onTouchEnd={handleBrakeEnd}>
-            <div className="w-14 h-20 md:w-16 md:h-24 bg-red-900 border-4 border-red-600 rounded-lg flex flex-col justify-end p-2 shadow-lg relative overflow-hidden">
+            {/* Reduced Height for Mobile: h-20 (80px) instead of h-28 */}
+            <div className="w-14 h-20 md:w-16 md:h-24 bg-red-900 border-4 border-red-600 rounded-lg flex flex-col justify-end p-1.5 md:p-2 shadow-lg relative overflow-hidden">
                <span className="text-[8px] md:text-[10px] font-black text-red-400 uppercase text-center w-full z-10">Brake</span>
                <div className="absolute inset-0 bg-red-500 opacity-0 group-active:opacity-30 transition-opacity"></div>
                <div className="w-full h-1 bg-black/30 mb-1"></div>
@@ -246,7 +243,8 @@ export const HUD: React.FC = () => {
             </div>
           </button>
 
-          <div className="flex flex-col gap-2 pointer-events-none mb-1">
+          <div className="flex flex-col gap-1 md:gap-2 pointer-events-none mb-0.5 md:mb-1">
+            {/* Scaled down gauge for mobile */}
             <div className="bg-slate-900/90 backdrop-blur-md p-1 rounded-full border border-slate-700 shadow-2xl relative scale-75 md:scale-100 origin-bottom-left">
                <SpeedGauge speed={displaySpeed} maxSpeed={maxDisplaySpeed} />
             </div>
@@ -272,7 +270,7 @@ export const HUD: React.FC = () => {
              <Megaphone className="text-slate-400 group-active:text-yellow-400 group-active:scale-110 transition-all" size={20} />
            </button>
 
-           <div className="flex flex-col gap-2 items-end">
+           <div className="flex flex-col gap-1 md:gap-2 items-end">
               <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 md:px-4 md:py-2 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3 pointer-events-none">
                 <div className="text-right leading-none">
                   <span className="block text-[8px] md:text-[10px] text-matatu-yellow uppercase font-bold tracking-wider mb-0.5">Cash</span>
@@ -282,7 +280,8 @@ export const HUD: React.FC = () => {
               </div>
 
               <button className="group active:scale-95 transition-transform" onMouseDown={handleGasStart} onMouseUp={handleGasEnd} onMouseLeave={handleGasEnd} onTouchStart={handleGasStart} onTouchEnd={handleGasEnd}>
-                <div className="w-14 h-28 md:w-16 md:h-32 bg-slate-800 border-4 border-green-500 rounded-lg flex flex-col justify-end p-2 shadow-lg relative overflow-hidden">
+                {/* Reduced Height for Mobile: h-24 (96px) instead of h-32 */}
+                <div className="w-14 h-24 md:w-16 md:h-32 bg-slate-800 border-4 border-green-500 rounded-lg flex flex-col justify-end p-1.5 md:p-2 shadow-lg relative overflow-hidden">
                   <span className="text-[8px] md:text-[10px] font-black text-green-400 uppercase text-center w-full z-10">Gas</span>
                   <div className="absolute inset-0 bg-green-500 opacity-0 group-active:opacity-30 transition-opacity"></div>
                   <div className="w-full h-1 bg-black/30 mb-1"></div>
