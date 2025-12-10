@@ -34,7 +34,27 @@
         background-color: #0f172a; /* Slate 900 */
         color: white;
         overflow: hidden; /* Prevent scrolling on main body for app-like feel */
+        
+        /* Disable text selection globally */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+
+        /* Disable long-press context menu (Copy/Paste/Select) */
+        -webkit-touch-callout: none;
+
+        /* Remove tap highlight color on mobile */
+        -webkit-tap-highlight-color: transparent;
       }
+      
+      /* Ensure buttons don't trigger selection */
+      button {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;

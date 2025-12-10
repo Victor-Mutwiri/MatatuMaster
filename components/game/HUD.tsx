@@ -107,6 +107,12 @@ export const HUD: React.FC = () => {
   const handleBrakeStart = () => setControl('BRAKE', true);
   const handleBrakeEnd = () => setControl('BRAKE', false);
 
+  // Prevent context menu on long press
+  const preventContextMenu = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   // Warning logic
   const isOverlapWarning = overlapTimer > 2;
   const isRiverRoad = selectedRoute?.id === 'river-road';
@@ -232,7 +238,15 @@ export const HUD: React.FC = () => {
         
         {/* Left: Brake Pedal & Passengers */}
         <div className="flex items-end gap-2 lg:gap-3 pointer-events-auto">
-          <button className="group active:scale-95 transition-transform" onMouseDown={handleBrakeStart} onMouseUp={handleBrakeEnd} onMouseLeave={handleBrakeEnd} onTouchStart={handleBrakeStart} onTouchEnd={handleBrakeEnd}>
+          <button 
+            className="group active:scale-95 transition-transform touch-none select-none" 
+            onMouseDown={handleBrakeStart} 
+            onMouseUp={handleBrakeEnd} 
+            onMouseLeave={handleBrakeEnd} 
+            onTouchStart={handleBrakeStart} 
+            onTouchEnd={handleBrakeEnd}
+            onContextMenu={preventContextMenu}
+          >
             {/* Reduced Height for Mobile: h-20 (80px) -> LG: h-32 */}
             <div className="w-14 h-20 lg:w-16 lg:h-32 bg-red-900 border-4 border-red-600 rounded-lg flex flex-col justify-end p-1.5 lg:p-2 shadow-lg relative overflow-hidden">
                <span className="text-[8px] lg:text-[10px] font-black text-red-400 uppercase text-center w-full z-10">Brake</span>
@@ -264,8 +278,9 @@ export const HUD: React.FC = () => {
            
            {/* Horn Button */}
            <button 
-             className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center shadow-lg active:scale-95 active:bg-slate-700 active:border-slate-500 transition-all group"
+             className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center shadow-lg active:scale-95 active:bg-slate-700 active:border-slate-500 transition-all group touch-none select-none"
              onClick={() => playSfx('HORN')}
+             onContextMenu={preventContextMenu}
            >
              <Megaphone className="text-slate-400 group-active:text-yellow-400 group-active:scale-110 transition-all" size={20} />
            </button>
@@ -279,7 +294,15 @@ export const HUD: React.FC = () => {
                 <Wallet className="text-green-400" size={16} />
               </div>
 
-              <button className="group active:scale-95 transition-transform" onMouseDown={handleGasStart} onMouseUp={handleGasEnd} onMouseLeave={handleGasEnd} onTouchStart={handleGasStart} onTouchEnd={handleGasEnd}>
+              <button 
+                className="group active:scale-95 transition-transform touch-none select-none" 
+                onMouseDown={handleGasStart} 
+                onMouseUp={handleGasEnd} 
+                onMouseLeave={handleGasEnd} 
+                onTouchStart={handleGasStart} 
+                onTouchEnd={handleGasEnd}
+                onContextMenu={preventContextMenu}
+              >
                 {/* Reduced Height for Mobile: h-24 (96px) -> LG: h-32 */}
                 <div className="w-14 h-24 lg:w-16 lg:h-32 bg-slate-800 border-4 border-green-500 rounded-lg flex flex-col justify-end p-1.5 lg:p-2 shadow-lg relative overflow-hidden">
                   <span className="text-[8px] lg:text-[10px] font-black text-green-400 uppercase text-center w-full z-10">Gas</span>
