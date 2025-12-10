@@ -3,14 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, User, Settings as SettingsIcon, Volume2, VolumeX, Save, Trash2, Lock, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowLeft, User, Settings as SettingsIcon, Volume2, VolumeX, Save, Trash2, Lock, ShieldCheck, UserPlus, AlertTriangle } from 'lucide-react';
 
 export const SettingsScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName, setPlayerInfo, isSoundOn, toggleSound, resetCareer, userMode } = useGameStore();
+  const { setScreen, playerName, saccoName, setPlayerInfo, isSoundOn, toggleSound, resetCareer, deleteAccount, userMode } = useGameStore();
   
   const [name, setName] = useState('');
   const [sacco, setSacco] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isGuest = userMode === 'GUEST';
 
@@ -20,14 +21,6 @@ export const SettingsScreen: React.FC = () => {
       setSacco(saccoName);
     }
   }, [playerName, saccoName, isGuest]);
-
-  const handleSave = () => {
-    // Should not be reachable by guests or locked profiles, but safety check
-    if (!isGuest && userMode !== 'REGISTERED') {
-        setPlayerInfo(name, sacco);
-    }
-    setScreen('SETUP');
-  };
 
   const handleBack = () => {
     setScreen('SETUP'); 
@@ -42,6 +35,11 @@ export const SettingsScreen: React.FC = () => {
     setName('');
     setSacco('');
     setShowResetConfirm(false);
+  };
+
+  const handleDeleteAccount = async () => {
+      await deleteAccount();
+      setShowDeleteConfirm(false);
   };
 
   return (
@@ -162,18 +160,49 @@ export const SettingsScreen: React.FC = () => {
                     <h3 className="font-display text-lg font-bold text-red-500">Danger Zone</h3>
                 </div>
                 
-                {!showResetConfirm ? (
-                    <Button variant="outline" className="border-red-600 text-red-500 hover:bg-red-900/20 w-full" onClick={() => setShowResetConfirm(true)}>
-                        Reset Career Progress
-                    </Button>
-                ) : (
-                    <div className="bg-red-900/20 p-4 rounded-lg text-center border border-red-900/50">
-                        <p className="text-red-200 text-sm mb-4 font-bold">Are you sure? This will delete all your earnings and leaderboard stats.</p>
-                        <div className="flex gap-2">
-                            <Button variant="danger" fullWidth onClick={handleReset}>Yes, Delete</Button>
-                            <Button variant="secondary" fullWidth onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+                {/* Logic for Guest vs Registered */}
+                {isGuest ? (
+                     !showResetConfirm ? (
+                        <Button variant="outline" className="border-red-600 text-red-500 hover:bg-red-900/20 w-full" onClick={() => setShowResetConfirm(true)}>
+                            Reset Local Progress
+                        </Button>
+                    ) : (
+                        <div className="bg-red-900/20 p-4 rounded-lg text-center border border-red-900/50">
+                            <p className="text-red-200 text-sm mb-4 font-bold">Are you sure? This will delete your local save.</p>
+                            <div className="flex gap-2">
+                                <Button variant="danger" fullWidth onClick={handleReset}>Yes, Wipe Data</Button>
+                                <Button variant="secondary" fullWidth onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+                            </div>
                         </div>
-                    </div>
+                    )
+                ) : (
+                     <div className="space-y-4">
+                        <Button 
+                            variant="outline" 
+                            className="border-slate-600 text-slate-300 hover:bg-slate-800 w-full" 
+                            onClick={handleReset}
+                        >
+                            Log Out (Clear Local Data)
+                        </Button>
+
+                        {!showDeleteConfirm ? (
+                             <Button variant="danger" className="w-full" onClick={() => setShowDeleteConfirm(true)}>
+                                Delete Account Permanently
+                            </Button>
+                        ) : (
+                            <div className="bg-red-900/20 p-4 rounded-lg text-center border border-red-900/50">
+                                <AlertTriangle className="mx-auto text-red-500 mb-2" size={32} />
+                                <p className="text-white font-bold text-lg mb-1">Delete Account?</p>
+                                <p className="text-red-200 text-xs mb-4">
+                                    This action is IRREVERSIBLE. It will delete your profile, leaderboard rank, and all game progress from the server.
+                                </p>
+                                <div className="flex gap-2">
+                                    <Button variant="danger" fullWidth onClick={handleDeleteAccount}>Confirm Delete</Button>
+                                    <Button variant="secondary" fullWidth onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+                                </div>
+                            </div>
+                        )}
+                     </div>
                 )}
             </section>
 

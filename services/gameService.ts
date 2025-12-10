@@ -293,5 +293,21 @@ export const GameService = {
           profile: profileRes.data, // Can be null now, handled by UI
           progress: progressRes.data
       };
+  },
+
+  /**
+   * Permanently delete account
+   * Calls the security definer function 'delete_own_account'
+   */
+  deleteAccount: async () => {
+    // 1. Call RPC to delete DB records and Auth record
+    const { error } = await supabase.rpc('delete_own_account');
+    if (error) {
+      console.error("Account Deletion Error:", error);
+      throw error;
+    }
+    
+    // 2. Ensure client session is destroyed
+    await supabase.auth.signOut();
   }
 };

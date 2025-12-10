@@ -184,6 +184,7 @@ interface GameStore extends GameState {
   selectRoute: (route: Route) => void;
   resetGame: () => void;
   resetCareer: () => void; 
+  deleteAccount: () => Promise<void>; // New action
   updateDistance: (delta: number) => void;
   setCurrentSpeed: (speed: number) => void;
   setBrakeTemp: (temp: number) => void;
@@ -761,6 +762,20 @@ export const useGameStore = create<GameStore>()(
             reputation: state.stats.reputation,
             unlockedVehicles: state.unlockedVehicles
         });
+      },
+
+      deleteAccount: async () => {
+          try {
+              if (get().userMode === 'REGISTERED') {
+                 await GameService.deleteAccount();
+              }
+              // Clear local state
+              get().resetCareer(); 
+          } catch (e) {
+              console.error("Failed to delete account fully", e);
+              // Force local wipe anyway if backend fails or if it was guest
+              get().resetCareer();
+          }
       },
 
       resetGame: () => set({
