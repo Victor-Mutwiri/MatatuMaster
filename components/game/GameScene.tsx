@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { VehicleType } from '../../types';
 import { useGameStore } from '../../store/gameStore';
@@ -30,6 +30,14 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
   const timeOfDay = useGameStore(state => state.timeOfDay);
   const selectedRoute = useGameStore(state => state.selectedRoute);
   
+  // LOGGING FOR DEBUGGING
+  useEffect(() => {
+      console.log("[GameScene] Initializing...");
+      console.log("[GameScene] Vehicle Type:", vehicleType);
+      console.log("[GameScene] Selected Route:", selectedRoute?.id);
+      console.log("[GameScene] TimeOfDay:", timeOfDay);
+  }, [vehicleType, selectedRoute, timeOfDay]);
+
   // Hustle Maps
   const isOffroad = selectedRoute?.id === 'rural-dirt';
   const isHighway = selectedRoute?.id === 'thika-highway';

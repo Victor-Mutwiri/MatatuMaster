@@ -1,25 +1,11 @@
 
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGameStore, VEHICLE_SPECS } from '../../../store/gameStore';
 import { EngineSynthesizer, playSfx } from '../../../utils/audio';
 import * as THREE from 'three';
-import { PlayerController } from '../PlayerController';
 
 const CAMERA_POS = new THREE.Vector3(0, 8, 15);
-
-// To avoid circular dependency or passing props too deeply, we can't easily get the player lane directly from store 
-// because PlayerController manages it locally in a useState. 
-// However, PlayerController updates the parent. But GameMechanics is a sibling.
-// Solution: We will pass a ref or callback from GameScene to GameMechanics, OR
-// Since this is a simple state, we can lift the currentLane to the store, but that triggers too many re-renders.
-// BETTER: GameMechanics can just check the player position if we had access to the mesh.
-// EASIEST: Let PlayerController update a ref in the store or a mutable variable? No.
-// Let's implement a small "Lane Tracker" inside PlayerController that reports to store "onSlowUpdate" (every 0.5s)?
-// Actually, for this specific mechanic, accurate lane tracking is vital.
-// Let's add `currentPlayerLane` to the store, but only update it when it changes. 
-// PlayerController already calls `setLaneCallback`. We can hook that up in GameScene to update a ref, 
-// and pass that ref to PhysicsController.
 
 export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
   const { 
@@ -30,6 +16,7 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
     setControl,
     isEngineSoundOn,
     vehicleType,
+    vehicleUpgrades,
     selectedRoute,
     setBrakeTemp,
     brakeTemp,
@@ -42,29 +29,38 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
 
   const engineRef = useRef<EngineSynthesizer | null>(null);
 
-  // Convert KMH to Game Units (Approx 1.6 ratio based on original logic)
-  const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
-  const MAX_SPEED = spec.maxSpeedKmh / 1.6; 
+  // LOGGING
+  useEffect(() => {
+      console.log("[PhysicsController] Mounted.");
+  }, []);
+
+  // --- SPEED CALCULATION WITH UPGRADES ---
+  const vType = vehicleType || '14-seater';
+  const spec = VEHICLE_SPECS[vType];
   
-  const ACCEL_RATE = 40;
+  const upgrades = (vehicleUpgrades && vehicleUpgrades[vType]) 
+      ? vehicleUpgrades[vType] 
+      : { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 };
+  
+  const speedMultiplier = 1 + (upgrades.engineLevel * 0.15);
+  const maxSpeedKmh = spec.maxSpeedKmh * speedMultiplier;
+  const MAX_SPEED = maxSpeedKmh / 1.6; 
+  
+  const ACCEL_RATE = 40 * (1 + (upgrades.engineLevel * 0.1));
   const BRAKE_RATE = 80;
   const FRICTION_RATE = 15;
   const CREEP_SPEED = 5;
   
-  // Map Specifics
   const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
   const isRongai = selectedRoute?.id === 'rongai-extreme';
   const isRiverRoad = selectedRoute?.id === 'river-road';
   
-  const GRAVITY_ACCEL = 10; // Downhill roll speed
-  const BRAKE_HEAT_RATE = 30; // Heat per second while braking
-  const BRAKE_COOL_RATE = 10; // Cool per second while not braking
-  const BRAKE_FADE_THRESHOLD = 70; // Temperature where brakes start failing
-  
-  // Overlap Mechanics
+  const GRAVITY_ACCEL = 10;
+  const BRAKE_HEAT_RATE = 30;
+  const BRAKE_COOL_RATE = 10;
+  const BRAKE_FADE_THRESHOLD = 70;
   const OVERLAP_LIMIT_SECONDS = 8;
 
-  // Listen for keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (gameStatus !== 'PLAYING') return;
@@ -84,7 +80,6 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
     };
   }, [gameStatus, setControl]);
 
-  // Audio Engine Lifecycle
   useEffect(() => {
     if (gameStatus === 'PLAYING') {
       if (isEngineSoundOn) {
@@ -129,7 +124,6 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
     let newSpeed = currentSpeed;
     let newBrakeTemp = brakeTemp;
 
-    // --- Auto Deceleration Logic ---
     const distToStage = nextStageDistance - distanceTraveled;
     const distToPolice = nextPoliceDistance - distanceTraveled;
     
@@ -144,71 +138,49 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
         speedLimit = minCrawl + (factor * (MAX_SPEED - minCrawl));
     }
 
-    // --- ILLEGAL LANE LOGIC (Penalty System) ---
-    // Rongai: Lane -2 is the overlap/dirt lane.
-    // River Road: Lane 2 and -2 are the sidewalks.
     const isIllegalDriving = (isRongai && playerLane === -2) || (isRiverRoad && Math.abs(playerLane) === 2);
 
     if (isIllegalDriving) {
         const newTimer = overlapTimer + delta;
         setOverlapTimer(newTimer);
         
-        // Penalty: Happiness Drop (Passengers scared of bumps/police/sidewalks)
-        // Drop 5 happiness per second
         const newHappiness = Math.max(0, happiness - (5 * delta));
         
-        // Apply Happiness update immediately
         if (state.clock.elapsedTime % 0.5 < delta) {
              useGameStore.setState({ happiness: newHappiness });
         }
 
-        // Warning Sound
         if (Math.floor(newTimer) > Math.floor(overlapTimer)) {
             if (newTimer > 2) {
                  playSfx('SIREN');
             }
         }
 
-        // Punishment: Arrest
         if (newTimer > OVERLAP_LIMIT_SECONDS) {
             endGame('ARRESTED');
         }
 
     } else {
-        // Cooldown if back on road
         if (overlapTimer > 0) {
-            setOverlapTimer(Math.max(0, overlapTimer - delta * 2)); // Cools down 2x faster
+            setOverlapTimer(Math.max(0, overlapTimer - delta * 2));
         }
     }
 
-
-    // --- Physics Update ---
-
     if (isAccelerating) {
       newSpeed += ACCEL_RATE * delta;
-      
-      // Cooling brakes while accelerating
       newBrakeTemp = Math.max(0, newBrakeTemp - BRAKE_COOL_RATE * delta);
-
     } else if (isBraking) {
-      // Calculate Brake Efficiency based on Temp
       let efficiency = 1.0;
       if (isEscarpment) {
         newBrakeTemp = Math.min(100, newBrakeTemp + BRAKE_HEAT_RATE * delta);
         if (newBrakeTemp > BRAKE_FADE_THRESHOLD) {
-           // Efficiency drops from 100% to 20% as temp goes from 70 to 100
            const overheatFactor = (newBrakeTemp - BRAKE_FADE_THRESHOLD) / (100 - BRAKE_FADE_THRESHOLD);
            efficiency = 1.0 - (overheatFactor * 0.8);
         }
       }
-      
       newSpeed -= BRAKE_RATE * efficiency * delta;
-    
     } else {
-      // Friction / Coasting
-      
       if (isEscarpment) {
-         // Gravity pull downhill overrides friction if moving
          newSpeed += GRAVITY_ACCEL * delta;
          newBrakeTemp = Math.max(0, newBrakeTemp - BRAKE_COOL_RATE * delta);
       } else {
@@ -221,7 +193,6 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
       }
     }
     
-    // Update global brake temp
     if (brakeTemp !== newBrakeTemp) {
         setBrakeTemp(newBrakeTemp);
     }
@@ -233,7 +204,6 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
 
     if (newSpeed < 0) newSpeed = 0;
     
-    // Allow overspeeding on escarpment due to gravity, but cap absolute max to avoid glitching
     const absoluteMax = isEscarpment ? MAX_SPEED * 1.3 : MAX_SPEED;
     if (newSpeed > absoluteMax) newSpeed = absoluteMax;
 
@@ -253,10 +223,10 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
 
 export const CameraRig = () => {
   const { camera } = useThree();
-  const startPos = useMemo(() => CAMERA_POS.clone(), []);
+  // Using useState initializer instead of useMemo to be safer
+  const [startPos] = useState(() => CAMERA_POS.clone());
   const selectedRoute = useGameStore(state => state.selectedRoute);
   
-  // Tilt camera slightly down for Escarpment to simulate downhill view
   const isEscarpment = selectedRoute?.id === 'maimahiu-escarpment';
   const baseRotationX = isEscarpment ? -0.1 : 0; 
 
@@ -282,11 +252,7 @@ export const CameraRig = () => {
        camera.position.z = THREE.MathUtils.lerp(camera.position.z, startPos.z + (currentSpeed * 0.02), 0.05);
     }
     
-    // Look at slightly modified target
     camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, baseRotationX, 0.05);
-    
-    // Normally lookAt overrides rotation, but if we don't use lookAt every frame or use a target object:
-    // Actually R3F LookAt is cleaner. Let's just adjust the lookAt target Y
     const targetY = isEscarpment ? -4 : 0;
     camera.lookAt(0, targetY, -5);
   });

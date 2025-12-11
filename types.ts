@@ -1,6 +1,4 @@
 
-import React from 'react';
-
 export type ScreenName = 'LANDING' | 'SETUP' | 'GAME_MODE' | 'VEHICLE_SELECT' | 'MULTIPLAYER_LOBBY' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD' | 'SETTINGS';
 
 export type VehicleType = 'boda' | 'tuktuk' | 'personal-car' | '14-seater' | '32-seater' | '52-seater';
@@ -53,6 +51,13 @@ export interface PoliceData {
   message: string;
 }
 
+// New Interface for Upgrades
+export interface VehicleUpgrades {
+  engineLevel: number; // 0 to 3 (Speed)
+  licenseLevel: number; // 0 to 3 (Earnings)
+  suspensionLevel: number; // 0 to 3 (Handling/Happiness)
+}
+
 export interface GameState {
   currentScreen: ScreenName;
   userMode: UserMode; // Guest or Registered
@@ -63,6 +68,10 @@ export interface GameState {
   saccoName: string;
   vehicleType: VehicleType | null;
   unlockedVehicles: VehicleType[]; // List of owned vehicles
+  
+  // Upgrades: Map of vehicle type to upgrade stats
+  vehicleUpgrades: Record<VehicleType, VehicleUpgrades>;
+
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
   totalRouteDistance: number; // Total length of route in Game units
@@ -152,13 +161,6 @@ interface R3FIntrinsicElements {
 
 // Global augmentation for React Three Fiber elements
 declare global {
-  namespace JSX {
-    interface IntrinsicElements extends R3FIntrinsicElements {}
-  }
-}
-
-// Module augmentation for React (necessary for some setups)
-declare module 'react' {
   namespace JSX {
     interface IntrinsicElements extends R3FIntrinsicElements {}
   }

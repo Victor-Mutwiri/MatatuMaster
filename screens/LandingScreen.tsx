@@ -2,7 +2,7 @@
 import React from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { BusFront, Play, ShieldAlert, Coins, Map, Trophy } from 'lucide-react';
+import { Bus, Play, ShieldAlert, Coins, Map, Trophy } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 
 interface LandingScreenProps {
@@ -53,7 +53,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onStart }) => {
                <span className="text-matatu-yellow drop-shadow-[0_0_15px_rgba(255,215,0,0.6)]">MASTER</span>
              </h1>
              <div className="absolute -top-4 -right-4 md:-top-8 md:-right-8 text-matatu-yellow opacity-20 hidden sm:block">
-                <BusFront className="w-20 h-20 md:w-[120px] md:h-[120px]" />
+                <Bus className="w-20 h-20 md:w-[120px] md:h-[120px]" />
              </div>
           </div>
 

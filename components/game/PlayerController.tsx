@@ -14,43 +14,77 @@ const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
 const RONGAI_LANE_OFFSET = 3.2;
 
-// Simple Particle System for Brake Smoke
+// Optimized Particle System using InstancedMesh for performance
 const BrakeSmoke = ({ isEmitting }: { isEmitting: boolean }) => {
-    const groupRef = useRef<THREE.Group>(null);
-    const [particles, setParticles] = useState<{id: number, x: number, y: number, z: number, scale: number, opacity: number}[]>([]);
-    
-    useFrame((state, delta) => {
-        // Emit
-        if (isEmitting && Math.random() > 0.8) {
-             setParticles(prev => [...prev, {
-                 id: Math.random(),
-                 x: (Math.random() - 0.5) * 0.5,
-                 y: 0,
-                 z: 0,
-                 scale: 0.2,
-                 opacity: 0.8
-             }]);
+    const meshRef = useRef<THREE.InstancedMesh>(null);
+    const particles = useRef<{x: number, y: number, z: number, scale: number, opacity: number, active: boolean}[]>([]);
+    const dummy = new THREE.Object3D();
+    const MAX_PARTICLES = 50;
+
+    // Initialize pool
+    if (particles.current.length === 0) {
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            particles.current.push({ x:0, y:0, z:0, scale:0, opacity:0, active:false });
         }
-        
-        // Update
-        setParticles(prev => prev.map(p => ({
-            ...p,
-            y: p.y + delta * 2,
-            z: p.z + delta * 5, // Move back relative to car
-            scale: p.scale + delta * 2,
-            opacity: p.opacity - delta * 1.5
-        })).filter(p => p.opacity > 0));
+    }
+
+    useFrame((state, delta) => {
+        if (!meshRef.current) return;
+
+        // Emit new particle
+        if (isEmitting && Math.random() > 0.8) {
+            const p = particles.current.find(p => !p.active);
+            if (p) {
+                p.active = true;
+                p.x = (Math.random() - 0.5) * 0.5;
+                p.y = 0;
+                p.z = 0;
+                p.scale = 0.2;
+                p.opacity = 0.8;
+            }
+        }
+
+        let activeCount = 0;
+        particles.current.forEach((p, i) => {
+            if (p.active) {
+                // Update Physics
+                p.y += delta * 2;
+                p.z += delta * 5;
+                p.scale += delta * 2;
+                p.opacity -= delta * 1.5;
+
+                if (p.opacity <= 0) {
+                    p.active = false;
+                    p.scale = 0; // Hide
+                } else {
+                    activeCount++;
+                }
+
+                // Update Instance Matrix
+                dummy.position.set(p.x, p.y, p.z);
+                dummy.scale.set(p.scale, p.scale, p.scale);
+                dummy.updateMatrix();
+                meshRef.current!.setMatrixAt(i, dummy.matrix);
+                
+                // Note: InstancedMesh doesn't support individual opacity easily without custom shaders.
+                // We simulate fading by shrinking to 0, which we do via scale.
+            } else {
+                // Reset inactive
+                dummy.position.set(0, -1000, 0);
+                dummy.scale.set(0, 0, 0);
+                dummy.updateMatrix();
+                meshRef.current!.setMatrixAt(i, dummy.matrix);
+            }
+        });
+
+        meshRef.current.instanceMatrix.needsUpdate = true;
     });
 
     return (
-        <group ref={groupRef}>
-             {particles.map(p => (
-                 <mesh key={p.id} position={[p.x, p.y, p.z]} scale={[p.scale, p.scale, p.scale]}>
-                     <sphereGeometry args={[1, 6, 6]} />
-                     <meshBasicMaterial color="#555" transparent opacity={p.opacity} />
-                 </mesh>
-             ))}
-        </group>
+        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_PARTICLES]}>
+            <sphereGeometry args={[1, 6, 6]} />
+            <meshBasicMaterial color="#555" transparent opacity={0.5} depthWrite={false} />
+        </instancedMesh>
     )
 }
 

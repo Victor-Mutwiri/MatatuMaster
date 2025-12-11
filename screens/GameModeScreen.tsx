@@ -3,22 +3,33 @@ import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, Users, Trophy, Zap, Globe } from 'lucide-react';
+import { ArrowLeft, Users, Trophy, Zap, Globe, Lock } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const GameModeScreen: React.FC = () => {
-  const { setScreen, userMode } = useGameStore();
+  const { setScreen, userMode, playerName } = useGameStore();
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [showBetaGate, setShowBetaGate] = useState(false);
 
   const handleBack = () => {
-    // If user is guest, back goes to Landing. If registered, back goes to Landing (logging out effectively or just back)
     setScreen('LANDING'); 
   };
 
   const handleMultiplayerClick = () => {
+    // Stage 1: Soft Launch - Only specific users or "Coming Soon"
+    // To enable for yourself for testing, you can add a simple name check logic
+    // const isDev = playerName?.toLowerCase().includes("dev") || playerName?.toLowerCase().includes("admin");
+    
+    // For now, we will gate it completely as "Coming Soon" for the public release strategy
+    // Or allow it only if Registered.
+    
     if (userMode === 'GUEST') {
         setShowAuthGate(true);
     } else {
+        // UNCOMMENT THIS TO LOCK EVERYONE OUT FOR "COMING SOON" STRATEGY
+        // setShowBetaGate(true);
+        
+        // FOR NOW: Let registered users play
         setScreen('MULTIPLAYER_LOBBY');
     }
   };
@@ -31,6 +42,22 @@ export const GameModeScreen: React.FC = () => {
         featureName="Multiplayer"
         message="You need a registered profile to be discoverable by friends and join online lobbies."
       />
+
+      {/* Beta / Coming Soon Gate */}
+      {showBetaGate && (
+          <div className="absolute inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
+            <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl relative text-center">
+                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-600">
+                    <Lock className="text-slate-400" size={32} />
+                </div>
+                <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider mb-2">Coming Soon</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                    Multiplayer Racing is currently in closed beta testing. It will be rolling out to all registered conductors soon!
+                </p>
+                <Button variant="secondary" fullWidth onClick={() => setShowBetaGate(false)}>Got it</Button>
+            </div>
+          </div>
+      )}
 
       <div className="flex flex-col h-full w-full max-w-6xl mx-auto p-6 relative">
         
