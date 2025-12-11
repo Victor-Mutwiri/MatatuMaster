@@ -4,7 +4,7 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore, VEHICLE_SPECS, MAP_DEFINITIONS } from '../store/gameStore';
 import { VehicleType, Route } from '../types';
-import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X, Bell, UserCheck, Gamepad2, Timer, Map, ThumbsUp, ThumbsDown, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X, Bell, UserCheck, Gamepad2, Timer, Map, ThumbsUp, ThumbsDown, ChevronLeft, ChevronRight, AlertCircle, Hourglass } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { GameService, FriendRequest, GameRoom } from '../services/gameService';
 
@@ -390,12 +390,58 @@ export const MultiplayerLobbyScreen: React.FC = () => {
       
       const opponentName = myRole === 'HOST' ? roomState?.guest?.username : roomState?.host?.username;
       
-      // Map Selection Renderer
+      // 1. HOST WAITING SCREEN (Before Map Select)
+      if (myRole === 'HOST' && roomState?.status === 'INVITED') {
+          return (
+            <GameLayout noMaxWidth className="bg-slate-950">
+               <div className="flex flex-col h-full w-full max-w-lg mx-auto p-6 items-center justify-center relative">
+                  
+                  <div className="absolute top-4 left-4 z-20">
+                      <button onClick={handleBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-700 shadow-lg"><ArrowLeft size={20} /></button>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 w-full shadow-2xl text-center space-y-6">
+                      <div className="w-20 h-20 mx-auto bg-slate-800 rounded-full flex items-center justify-center animate-pulse border border-slate-600">
+                          <Hourglass className="text-matatu-yellow" size={40} />
+                      </div>
+                      
+                      <div>
+                          <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider mb-2">Invite Sent</h2>
+                          <p className="text-slate-400">Waiting for <span className="text-white font-bold">{opponentName || 'Player'}</span> to accept...</p>
+                      </div>
+
+                      <div className="bg-black/30 rounded-lg p-3 inline-flex items-center gap-2 border border-slate-800">
+                          <Timer size={16} className="text-orange-400" />
+                          <span className="font-mono text-white">{roomTimeRemaining}s</span>
+                      </div>
+
+                      <div className="text-xs text-slate-500">
+                          Room will expire automatically if they don't join.
+                      </div>
+                      
+                      <Button variant="danger" size="sm" onClick={handleBack}>Cancel Invite</Button>
+                  </div>
+               </div>
+            </GameLayout>
+          );
+      }
+
+      // 2. MAP SELECTION PHASE
       if (isMapPhase) {
           const hostMap = MAP_DEFINITIONS[hostSelectedMapIndex];
           const selectedMapId = roomState?.selected_map;
-          const mapToDisplay = selectedMapId ? MAP_DEFINITIONS.find(m => m.id === selectedMapId) : hostMap;
           const voteStatus = roomState?.map_vote;
+          
+          // Determine which map to show
+          // If voteStatus is REJECTED, host sees their LOCAL selection (to allow picking a new one)
+          // Otherwise (PENDING or nothing selected yet), show the DB selection or host local if nothing in DB
+          let mapToDisplay = hostMap; 
+          
+          if (selectedMapId && voteStatus !== 'REJECT') {
+              mapToDisplay = MAP_DEFINITIONS.find(m => m.id === selectedMapId) || hostMap;
+          }
+
+          const canInteractWithArrows = myRole === 'HOST' && (voteStatus === 'REJECT' || !selectedMapId);
 
           return (
             <GameLayout noMaxWidth className="bg-slate-950">
@@ -407,15 +453,15 @@ export const MultiplayerLobbyScreen: React.FC = () => {
 
                   <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider mb-8 flex items-center gap-3">
                       <Map className="text-matatu-yellow" size={24} /> 
-                      {myRole === 'HOST' ? "Select a Track" : "Map Voting"}
+                      {myRole === 'HOST' ? (voteStatus === 'REJECT' ? "Select New Track" : "Select a Track") : "Map Voting"}
                   </h2>
 
                   {/* MAP CARD */}
                   <div className="relative w-full max-w-md bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl mb-8">
                       <div className="h-40 bg-slate-800 relative">
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#64748b_1px,transparent_1px)] bg-[size:20px_20px] opacity-20"></div>
-                          {/* Navigation Arrows for Host */}
-                          {myRole === 'HOST' && (
+                          {/* Navigation Arrows for Host - Only clickable if interaction allowed */}
+                          {canInteractWithArrows && (
                               <>
                                 <button onClick={() => handleMapCycle(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-matatu-yellow hover:text-black transition-colors z-10"><ChevronLeft size={24} /></button>
                                 <button onClick={() => handleMapCycle(1)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-matatu-yellow hover:text-black transition-colors z-10"><ChevronRight size={24} /></button>
@@ -430,12 +476,12 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                           <p className="text-slate-300 text-sm leading-relaxed mb-4">{mapToDisplay?.description || "Waiting for host..."}</p>
                           
                           {/* FEEDBACK STATUS AREA */}
-                          <div className="bg-black/30 rounded-xl p-4 flex items-center justify-between border border-slate-800">
+                          <div className={`bg-black/30 rounded-xl p-4 flex items-center justify-between border border-slate-800 ${voteStatus === 'REJECT' ? 'border-red-500/50 bg-red-900/10' : ''}`}>
                               <div className="flex items-center gap-3">
                                   <div className={`w-3 h-3 rounded-full ${voteStatus === 'REJECT' ? 'bg-red-500 animate-pulse' : voteStatus === 'APPROVE' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                                  <span className="text-xs font-bold uppercase text-slate-400">
+                                  <span className={`text-xs font-bold uppercase ${voteStatus === 'REJECT' ? 'text-red-300' : 'text-slate-400'}`}>
                                       {voteStatus === 'PENDING' ? (selectedMapId ? "Vote Pending..." : "Selection Pending") : 
-                                       voteStatus === 'REJECT' ? "Opponent Rejected" : "Map Approved"}
+                                       voteStatus === 'REJECT' ? "Opponent Rejected - Pick Another" : "Map Approved"}
                                   </span>
                               </div>
                               {voteStatus === 'REJECT' && <AlertCircle className="text-red-500" size={20} />}
@@ -453,7 +499,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                             disabled={isMapConfirming || (voteStatus === 'PENDING' && selectedMapId === mapToDisplay?.id)}
                             className={voteStatus === 'REJECT' ? "border-red-500" : ""}
                           >
-                              {voteStatus === 'REJECT' ? "Pick Different Map" : 
+                              {voteStatus === 'REJECT' ? "Propose New Map" : 
                                selectedMapId === mapToDisplay?.id ? "Waiting for Vote..." : "Propose Map"}
                           </Button>
                       ) : (

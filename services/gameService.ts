@@ -132,7 +132,7 @@ export const GameService = {
             .limit(50);
 
         if (error) {
-            console.error('Leaderboard Fetch Error:', error.message);
+            // console.error('Leaderboard Fetch Error:', error.message);
             return [];
         }
 
@@ -147,7 +147,7 @@ export const GameService = {
         return entries;
 
     } catch (e) {
-        console.error('Leaderboard Exception:', e);
+        // console.error('Leaderboard Exception:', e);
         return [];
     }
   },
@@ -165,10 +165,8 @@ export const GameService = {
         
         if (error) {
             if (error.code === '42501' || error.code === 'PGRST301') {
-                console.warn("Username check blocked by DB policy. Assuming available.");
                 return true; 
             }
-            console.error("Check Username Error:", error.message);
             return false;
         }
         
@@ -182,42 +180,45 @@ export const GameService = {
    * Search for conductors by username
    */
   searchConductors: async (query: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, sacco')
-        .ilike('username', `%${query}%`)
-        .neq('id', user.id)
-        .limit(10);
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, sacco')
+            .ilike('username', `%${query}%`)
+            .neq('id', user.id)
+            .limit(10);
 
-      if (error) {
-          console.error("Search error", error.message);
+        if (error) throw error;
+        return data;
+      } catch (e) {
+          console.error("Search error", e);
           return [];
       }
-      return data;
   },
 
   /**
    * 1. Send Friend Request
    */
   sendFriendRequest: async (receiverId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from('friend_requests')
-        .insert({
-            sender_id: user.id,
-            receiver_id: receiverId
-        });
+        const { error } = await supabase
+            .from('friend_requests')
+            .insert({
+                sender_id: user.id,
+                receiver_id: receiverId
+            });
 
-      if (error) {
+        if (error) throw error;
+      } catch (error: any) {
           if (error.code === '23505') {
               throw new Error("Request already sent.");
           }
-          console.error("Send request error details:", error);
           throw error;
       }
   },
@@ -226,49 +227,54 @@ export const GameService = {
    * 2. Get Incoming Friend Requests
    */
   getFriendRequests: async (): Promise<FriendRequest[]> => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('friend_requests')
-        .select(`
-            id,
-            sender_id,
-            receiver_id,
-            created_at,
-            sender:profiles!sender_id (
-                username,
-                sacco
-            )
-        `)
-        .eq('receiver_id', user.id);
+        const { data, error } = await supabase
+            .from('friend_requests')
+            .select(`
+                id,
+                sender_id,
+                receiver_id,
+                created_at,
+                sender:profiles!sender_id (
+                    username,
+                    sacco
+                )
+            `)
+            .eq('receiver_id', user.id);
 
-      if (error) {
-          console.error("Get requests error:", error.message, error.details);
+        if (error) throw error;
+
+        return data.map((item: any) => ({
+            id: item.id,
+            sender_id: item.sender_id,
+            receiver_id: item.receiver_id,
+            created_at: item.created_at,
+            profile: item.sender
+        }));
+      } catch (e) {
           return [];
       }
-
-      return data.map((item: any) => ({
-          id: item.id,
-          sender_id: item.sender_id,
-          receiver_id: item.receiver_id,
-          created_at: item.created_at,
-          profile: item.sender
-      }));
   },
 
   /**
    * 3. Respond to Request (Accept/Reject)
    */
   respondToFriendRequest: async (requestId: string, senderId: string, action: 'ACCEPT' | 'REJECT') => {
-      if (action === 'REJECT') {
-          await supabase.from('friend_requests').delete().eq('id', requestId);
-      } else {
-          const { error } = await supabase.rpc('accept_friend_request', {
-              request_id: requestId,
-              friend_user_id: senderId
-          });
-          if (error) throw error;
+      try {
+        if (action === 'REJECT') {
+            await supabase.from('friend_requests').delete().eq('id', requestId);
+        } else {
+            const { error } = await supabase.rpc('accept_friend_request', {
+                request_id: requestId,
+                friend_user_id: senderId
+            });
+            if (error) throw error;
+        }
+      } catch (e) {
+          console.error("Response error", e);
       }
   },
 
@@ -276,30 +282,31 @@ export const GameService = {
    * Get my friends list
    */
   getFriends: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('friendships')
-        .select(`
-            friend_id,
-            profile:profiles!friend_id (
-                username,
-                sacco
-            )
-        `)
-        .eq('user_id', user.id);
+        const { data, error } = await supabase
+            .from('friendships')
+            .select(`
+                friend_id,
+                profile:profiles!friend_id (
+                    username,
+                    sacco
+                )
+            `)
+            .eq('user_id', user.id);
 
-      if (error) {
-          console.error("Get friends error:", error.message, error.details);
+        if (error) throw error;
+
+        return data.map((item: any) => ({
+            id: item.friend_id,
+            username: item.profile?.username || 'Unknown',
+            sacco: item.profile?.sacco || 'Independent'
+        }));
+      } catch (e) {
           return [];
       }
-
-      return data.map((item: any) => ({
-          id: item.friend_id,
-          username: item.profile?.username || 'Unknown',
-          sacco: item.profile?.sacco || 'Independent'
-      }));
   },
 
   // --- MULTIPLAYER ROOMS ---
@@ -308,61 +315,68 @@ export const GameService = {
    * Invite a friend (Create Room)
    */
   inviteFriendToGame: async (friendId: string): Promise<string> => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase
-        .from('game_rooms')
-        .insert({
-            host_id: user.id,
-            guest_id: friendId,
-            status: 'INVITED',
-            selected_map: null,
-            map_vote: 'PENDING'
-        })
-        .select('id')
-        .single();
+        const { data, error } = await supabase
+            .from('game_rooms')
+            .insert({
+                host_id: user.id,
+                guest_id: friendId,
+                status: 'INVITED',
+                selected_map: null,
+                map_vote: 'PENDING'
+            })
+            .select('id')
+            .single();
 
-      if (error) throw error;
-      return data.id;
+        if (error) throw error;
+        return data.id;
+      } catch (e) {
+          throw e;
+      }
   },
 
   /**
    * Get pending invites for current user
    */
   getPendingGameInvites: async (): Promise<GameRoom[]> => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-      // Fetch pending invites where I am the guest
-      // Filter out invites older than 2 minutes to prevent ghost invites
-      const cutoff = new Date(Date.now() - 120000).toISOString(); 
+        const cutoff = new Date(Date.now() - 120000).toISOString(); 
 
-      const { data, error } = await supabase
-        .from('game_rooms')
-        .select(`
-            *,
-            host:profiles!host_id (username, sacco)
-        `)
-        .eq('guest_id', user.id)
-        .eq('status', 'INVITED')
-        .gt('created_at', cutoff);
+        const { data, error } = await supabase
+            .from('game_rooms')
+            .select(`
+                *,
+                host:profiles!host_id (username, sacco)
+            `)
+            .eq('guest_id', user.id)
+            .eq('status', 'INVITED')
+            .gt('created_at', cutoff);
 
-      if (error) {
-          console.error("Poll invites error", error);
+        if (error) throw error;
+        return data as GameRoom[];
+      } catch (e) {
           return [];
       }
-      return data as GameRoom[];
   },
 
   /**
    * Accept or Decline Invite
    */
   respondToGameInvite: async (roomId: string, action: 'ACCEPT' | 'DECLINE') => {
-      if (action === 'DECLINE') {
-          await supabase.from('game_rooms').update({ status: 'CANCELLED' }).eq('id', roomId);
-      } else {
-          await supabase.from('game_rooms').update({ status: 'STAGING' }).eq('id', roomId);
+      try {
+        if (action === 'DECLINE') {
+            await supabase.from('game_rooms').update({ status: 'CANCELLED' }).eq('id', roomId);
+        } else {
+            await supabase.from('game_rooms').update({ status: 'STAGING' }).eq('id', roomId);
+        }
+      } catch (e) {
+          console.error("Respond invite error", e);
       }
   },
 
@@ -370,65 +384,83 @@ export const GameService = {
    * Cancel Room (Host side)
    */
   cancelGameRoom: async (roomId: string) => {
-      await supabase.from('game_rooms').update({ status: 'EXPIRED' }).eq('id', roomId);
+      try {
+        await supabase.from('game_rooms').update({ status: 'EXPIRED' }).eq('id', roomId);
+      } catch (e) {
+          console.error("Cancel room error", e);
+      }
   },
 
   /**
    * Select Map (Host Only)
-   * Resets vote to PENDING so guest has to vote again on change.
    */
   selectMap: async (roomId: string, mapId: string) => {
-      await supabase.from('game_rooms').update({
-          selected_map: mapId,
-          map_vote: 'PENDING',
-          updated_at: new Date().toISOString()
-      }).eq('id', roomId);
+      try {
+        await supabase.from('game_rooms').update({
+            selected_map: mapId,
+            map_vote: 'PENDING',
+            updated_at: new Date().toISOString()
+        }).eq('id', roomId);
+      } catch (e) {
+          console.error("Select map error", e);
+      }
   },
 
   /**
    * Vote on Map (Guest Only)
    */
   voteMap: async (roomId: string, vote: 'APPROVE' | 'REJECT') => {
-      await supabase.from('game_rooms').update({
-          map_vote: vote,
-          updated_at: new Date().toISOString()
-      }).eq('id', roomId);
+      try {
+        await supabase.from('game_rooms').update({
+            map_vote: vote,
+            updated_at: new Date().toISOString()
+        }).eq('id', roomId);
+      } catch (e) {
+          console.error("Vote map error", e);
+      }
   },
 
   /**
    * Get Room State (For Staging)
    */
   getRoomState: async (roomId: string): Promise<GameRoom | null> => {
-      const { data, error } = await supabase
-        .from('game_rooms')
-        .select(`
-            *,
-            host:profiles!host_id (username, sacco),
-            guest:profiles!guest_id (username, sacco)
-        `)
-        .eq('id', roomId)
-        .single();
+      try {
+        const { data, error } = await supabase
+            .from('game_rooms')
+            .select(`
+                *,
+                host:profiles!host_id (username, sacco),
+                guest:profiles!guest_id (username, sacco)
+            `)
+            .eq('id', roomId)
+            .single();
 
-      if (error) return null;
-      return data as GameRoom;
+        if (error) throw error;
+        return data as GameRoom;
+      } catch (e) {
+          return null;
+      }
   },
 
   /**
    * Update Player State in Room
    */
   updateRoomPlayerState: async (roomId: string, role: 'HOST' | 'GUEST', vehicle: VehicleType | null, ready: boolean) => {
-      const updates: any = {};
-      if (role === 'HOST') {
-          updates.host_vehicle = vehicle;
-          updates.host_ready = ready;
-      } else {
-          updates.guest_vehicle = vehicle;
-          updates.guest_ready = ready;
-      }
-      updates.updated_at = new Date().toISOString();
+      try {
+        const updates: any = {};
+        if (role === 'HOST') {
+            updates.host_vehicle = vehicle;
+            updates.host_ready = ready;
+        } else {
+            updates.guest_vehicle = vehicle;
+            updates.guest_ready = ready;
+        }
+        updates.updated_at = new Date().toISOString();
 
-      const { error } = await supabase.from('game_rooms').update(updates).eq('id', roomId);
-      if (error) console.error("Room update error", error);
+        await supabase.from('game_rooms').update(updates).eq('id', roomId);
+      } catch (e) {
+          console.error("Room update error", e);
+      }
   },
 
   /**
