@@ -6,12 +6,11 @@ import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
-import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause, Timer, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause, Timer, AlertTriangle } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 import { RotatePrompt } from '../components/ui/RotatePrompt';
 import { GameService, PlayerStatePacket } from '../services/gameService';
 import { supabase } from '../services/supabaseClient';
-import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
@@ -55,21 +54,6 @@ export const GameLoopScreen: React.FC = () => {
   const broadcastInterval = useRef<any>(null);
   const channelRef = useRef<any>(null);
 
-  // FAILSAFE: If no route is selected, don't try to render the scene (Avoids black screen)
-  if (!selectedRoute) {
-      return (
-          <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-              <Loader2 className="text-matatu-yellow animate-spin mb-4" size={48} />
-              <h2 className="text-white font-bold text-xl uppercase tracking-widest">Loading Route Data...</h2>
-              <p className="text-slate-400 text-sm mt-2">Connecting to game server.</p>
-              
-              <Button variant="secondary" className="mt-8" onClick={exitToMapSelection}>
-                  Cancel / Return to Lobby
-              </Button>
-          </div>
-      )
-  }
-
   // Timer Effect
   useEffect(() => {
     if (gameStatus !== 'PLAYING') return;
@@ -95,21 +79,14 @@ export const GameLoopScreen: React.FC = () => {
   // Multiplayer Logic: Setup & Broadcast
   useEffect(() => {
       if (activeRoomId && gameStatus === 'PLAYING') {
-          console.log("📡 Multiplayer Active. Room:", activeRoomId);
-          
           // Subscribe
           channelRef.current = GameService.subscribeToRoom(activeRoomId, (packet) => {
               setOpponentState(packet);
           });
 
-          // Start Broadcast Loop (200ms = 5 updates/sec to reduce fallback spam)
+          // Start Broadcast Loop (100ms = 10 updates/sec)
           broadcastInterval.current = setInterval(() => {
               
-              // Only send if channel is ready to avoid "falling back to REST" spam which freezes UI
-              if (!channelRef.current || channelRef.current.state !== 'joined') {
-                  return;
-              }
-
               // Calculate visual X based on map type
               let laneOffset = CITY_LANE_OFFSET;
               const isHighway = selectedRoute?.id === 'thika-highway' || selectedRoute?.id === 'thika-race';
@@ -129,11 +106,11 @@ export const GameLoopScreen: React.FC = () => {
                   isCrashed: isCrashing
               };
               
-              GameService.broadcastPlayerState(channelRef.current, packet).catch(err => {
-                  console.warn("Broadcast failed:", err);
-              });
+              if (channelRef.current) {
+                  GameService.broadcastPlayerState(channelRef.current, packet);
+              }
 
-          }, 200); 
+          }, 100);
       }
 
       return () => {
@@ -277,7 +254,7 @@ export const GameLoopScreen: React.FC = () => {
   );
 
   return (
-    <div className="w-screen h-screen relative bg-black overflow-hidden">
+    <div className="w-full h-full relative bg-black overflow-hidden">
       
       {/* 1. Mobile Rotation Prompt */}
       <RotatePrompt />
@@ -348,22 +325,16 @@ export const GameLoopScreen: React.FC = () => {
       {activeModal === 'POLICE' && <PoliceModal />}
       {activeModal === 'GAME_OVER' && (gameOverReason === 'COMPLETED' ? renderSuccessModal() : renderGameOverModal())}
 
-      {/* 7. HUD Layer - Always rendered on top of 3D */}
-      <div className="absolute inset-0 z-20 pointer-events-none">
-          <div className="w-full h-full pointer-events-auto">
-             <HUD />
-          </div>
-      </div>
+      {/* 7. HUD Layer */}
+      <HUD />
 
-      {/* 8. 3D Scene Layer with Error Boundary */}
+      {/* 8. 3D Scene Layer */}
       <div className="absolute inset-0 z-0">
-        <ErrorBoundary>
-            <GameScene 
-                vehicleType={vehicleType} 
-                playerLane={playerLane}
-                setPlayerLane={setPlayerLane}
-            />
-        </ErrorBoundary>
+        <GameScene 
+            vehicleType={vehicleType} 
+            playerLane={playerLane}
+            setPlayerLane={setPlayerLane}
+        />
       </div>
 
     </div>
