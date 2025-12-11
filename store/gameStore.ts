@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode } from '../types';
 import { playSfx } from '../utils/audio';
-import { GameService, PlayerStatePacket } from '../services/gameService';
+import { GameService } from '../services/gameService';
 
 // --- SHARED MAP DEFINITIONS ---
 export const MAP_DEFINITIONS: Route[] = [
@@ -342,16 +342,6 @@ interface GameStore extends GameState {
   
   // Cloud Sync
   syncToCloud: () => void;
-
-  // Multiplayer
-  activeRoomId: string | null;
-  setActiveRoomId: (id: string | null) => void;
-  opponentState: PlayerStatePacket | null;
-  opponentVehicleType: VehicleType | null;
-  setOpponentState: (data: PlayerStatePacket) => void;
-  setOpponentVehicle: (type: VehicleType) => void;
-  multiplayerWastedTimer: number; // 3s penalty
-  setMultiplayerWastedTimer: (time: number) => void;
 }
 
 export const useGameStore = create<GameStore>()(
@@ -405,17 +395,6 @@ export const useGameStore = create<GameStore>()(
       isEngineSoundOn: true,
       
       timeOfDay: 'DAY',
-
-      // Multiplayer Init
-      activeRoomId: null,
-      opponentState: null,
-      opponentVehicleType: null,
-      multiplayerWastedTimer: 0,
-
-      setActiveRoomId: (id) => set({ activeRoomId: id }),
-      setOpponentState: (data) => set({ opponentState: data }),
-      setOpponentVehicle: (type) => set({ opponentVehicleType: type }),
-      setMultiplayerWastedTimer: (time) => set({ multiplayerWastedTimer: time }),
 
       setScreen: (screen) => set({ currentScreen: screen }),
       
@@ -782,10 +761,7 @@ export const useGameStore = create<GameStore>()(
           happiness: 100,
           isStereoOn: false,
           timeOfDay,
-          stats: { ...stats, cash: 0, time: gameTime },
-          // Reset multiplayer vars
-          opponentState: null,
-          multiplayerWastedTimer: 0
+          stats: { ...stats, cash: 0, time: gameTime }
         });
       },
 
@@ -819,52 +795,22 @@ export const useGameStore = create<GameStore>()(
         stageData: null,
         brakeTemp: 0,
         overlapTimer: 0,
-        happiness: 100,
-        activeRoomId: null,
-        opponentState: null
+        happiness: 100
       }),
 
       triggerCrash: () => {
         playSfx('CRASH');
-        const state = get();
-        
-        // Multiplayer Logic: No Game Over, just 3s freeze
-        if (state.activeRoomId) {
-            set({
-                gameStatus: 'CRASHING',
-                isCrashing: true,
-                currentSpeed: 0, 
-                isAccelerating: false,
-                multiplayerWastedTimer: 3 // 3 Seconds
-            });
-        } else {
-            // Single Player Logic
-            set({
-              gameStatus: 'CRASHING',
-              isCrashing: true,
-              currentSpeed: 0, 
-              isAccelerating: false
-            });
-        }
+        set({
+          gameStatus: 'CRASHING',
+          isCrashing: true,
+          currentSpeed: 0, 
+          isAccelerating: false
+        });
       },
 
       tickTimer: () => set((state) => {
         if (state.gameStatus !== 'PLAYING') return {};
         
-        // --- Multiplayer Wasted Timer Logic ---
-        if (state.activeRoomId && state.isCrashing && state.multiplayerWastedTimer > 0) {
-            const newWasted = state.multiplayerWastedTimer - 1;
-            if (newWasted <= 0) {
-                // Respawn
-                return {
-                    multiplayerWastedTimer: 0,
-                    isCrashing: false,
-                    gameStatus: 'PLAYING'
-                };
-            }
-            return { multiplayerWastedTimer: newWasted };
-        }
-
         const newTime = state.gameTimeRemaining - 1;
         
         let newHappiness = state.happiness;
@@ -992,9 +938,7 @@ export const useGameStore = create<GameStore>()(
         overlapTimer: 0,
         timeOfDay: 'DAY',
         isAccelerating: false,
-        isBraking: false,
-        activeRoomId: null,
-        opponentState: null
+        isBraking: false
       }),
 
       resetCareer: () => set({
@@ -1006,9 +950,7 @@ export const useGameStore = create<GameStore>()(
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
-        stats: INITIAL_STATS,
-        activeRoomId: null,
-        opponentState: null
+        stats: INITIAL_STATS
       }),
       
       toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),
@@ -1040,8 +982,6 @@ export const useGameStore = create<GameStore>()(
         currentScreen: state.currentScreen,
         vehicleType: state.vehicleType,
         selectedRoute: state.selectedRoute,
-        activeRoomId: state.activeRoomId, // Persist for rejoin? (Maybe not needed for ephemeral rooms)
-        opponentVehicleType: state.opponentVehicleType
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -1051,14 +991,12 @@ export const useGameStore = create<GameStore>()(
             if (!state.userMode) {
               state.userMode = 'GUEST';
             }
-            // Always reset active game state on reload
             if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
                 state.currentScreen = 'MAP_SELECT';
                 state.gameStatus = 'IDLE';
                 state.activeModal = 'NONE';
                 state.currentSpeed = 0;
                 state.isCrashing = false;
-                state.activeRoomId = null;
             }
         }
       }

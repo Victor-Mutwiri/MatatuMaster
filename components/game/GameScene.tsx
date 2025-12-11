@@ -18,20 +18,17 @@ import { MultiplayerThikaMap } from './maps/MultiplayerThikaMap';
 import { MultiplayerRongaiMap } from './maps/MultiplayerRongaiMap';
 import { PlayerController } from './PlayerController';
 import { OncomingTraffic, HighwayTraffic, TwoWayTraffic, EscarpmentTraffic, GridlockTraffic, RongaiTraffic } from './logic/TrafficSystem';
-import { GhostCar } from './vehicles/GhostCar';
 
 interface GameSceneProps {
   vehicleType: VehicleType | null;
-  playerLane: number;
-  setPlayerLane: (lane: number) => void;
 }
 
 const CAMERA_POS = new THREE.Vector3(0, 8, 15);
 
-export const GameScene: React.FC<GameSceneProps> = ({ vehicleType, playerLane, setPlayerLane }) => {
+export const GameScene: React.FC<GameSceneProps> = ({ vehicleType }) => {
+  const [playerLane, setPlayerLane] = useState(-1);
   const timeOfDay = useGameStore(state => state.timeOfDay);
   const selectedRoute = useGameStore(state => state.selectedRoute);
-  const activeRoomId = useGameStore(state => state.activeRoomId);
   
   // Hustle Maps
   const isOffroad = selectedRoute?.id === 'rural-dirt';
@@ -115,9 +112,6 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType, playerLane, s
         {/* Player & Traffic */}
         <PlayerController type={vehicleType || '14-seater'} setLaneCallback={setPlayerLane} />
         
-        {/* Multiplayer Ghost */}
-        {activeRoomId && <GhostCar />}
-
         {/* Traffic System Selection */}
         {shouldUseHighwayTraffic ? (
             <HighwayTraffic playerLane={playerLane} />

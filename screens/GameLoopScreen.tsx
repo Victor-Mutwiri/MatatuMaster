@@ -1,20 +1,14 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
+import React, { useEffect, useState } from 'react';
+import { useGameStore } from '../store/gameStore';
 import { Button } from '../components/ui/Button';
 import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
-import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause, Timer, AlertTriangle } from 'lucide-react';
+import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 import { RotatePrompt } from '../components/ui/RotatePrompt';
-import { GameService, PlayerStatePacket } from '../services/gameService';
-import { supabase } from '../services/supabaseClient';
-
-const CITY_LANE_OFFSET = 2.2;
-const HIGHWAY_LANE_OFFSET = 3.5;
-const RONGAI_LANE_OFFSET = 3.2;
 
 export const GameLoopScreen: React.FC = () => {
   const { 
@@ -38,21 +32,11 @@ export const GameLoopScreen: React.FC = () => {
     selectedRoute,
     resumeGame,
     setQuitConfirmation,
-    userMode,
-    activeRoomId,
-    setOpponentState,
-    distanceTraveled,
-    currentSpeed,
-    multiplayerWastedTimer
+    userMode
   } = useGameStore();
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
-  const [playerLane, setPlayerLane] = useState(-1);
-  
-  // Refs for Broadcast
-  const broadcastInterval = useRef<any>(null);
-  const channelRef = useRef<any>(null);
 
   // Timer Effect
   useEffect(() => {
@@ -65,60 +49,16 @@ export const GameLoopScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [gameStatus, tickTimer]);
 
-  // Crash Sequence Handler (Single Player Only)
+  // Crash Sequence Handler
   useEffect(() => {
-    if (gameStatus === 'CRASHING' && !activeRoomId) {
+    if (gameStatus === 'CRASHING') {
       // Wait for dramatic pause before showing modal
       const crashTimer = setTimeout(() => {
         endGame('CRASH');
       }, 2500); // 2.5 seconds of chaos
       return () => clearTimeout(crashTimer);
     }
-  }, [gameStatus, endGame, activeRoomId]);
-
-  // Multiplayer Logic: Setup & Broadcast
-  useEffect(() => {
-      if (activeRoomId && gameStatus === 'PLAYING') {
-          // Subscribe
-          channelRef.current = GameService.subscribeToRoom(activeRoomId, (packet) => {
-              setOpponentState(packet);
-          });
-
-          // Start Broadcast Loop (100ms = 10 updates/sec)
-          broadcastInterval.current = setInterval(() => {
-              
-              // Calculate visual X based on map type
-              let laneOffset = CITY_LANE_OFFSET;
-              const isHighway = selectedRoute?.id === 'thika-highway' || selectedRoute?.id === 'thika-race';
-              const isRongai = selectedRoute?.id === 'rongai-extreme' || selectedRoute?.id === 'rongai-race';
-              
-              if (isHighway) laneOffset = HIGHWAY_LANE_OFFSET;
-              else if (isRongai) laneOffset = RONGAI_LANE_OFFSET;
-
-              const visualX = playerLane * laneOffset;
-
-              const packet: PlayerStatePacket = {
-                  x: visualX,
-                  z: 0, // Relative Z logic handled by receiver
-                  dist: distanceTraveled, 
-                  rotZ: 0, // Simplified for now
-                  speed: currentSpeed,
-                  isCrashed: isCrashing
-              };
-              
-              if (channelRef.current) {
-                  GameService.broadcastPlayerState(channelRef.current, packet);
-              }
-
-          }, 100);
-      }
-
-      return () => {
-          if (broadcastInterval.current) clearInterval(broadcastInterval.current);
-          if (channelRef.current) supabase.removeChannel(channelRef.current);
-      }
-  }, [activeRoomId, gameStatus, distanceTraveled, currentSpeed, isCrashing, playerLane, selectedRoute]);
-
+  }, [gameStatus, endGame]);
 
   // Countdown Logic
   useEffect(() => {
@@ -176,166 +116,223 @@ export const GameLoopScreen: React.FC = () => {
             <div className="bg-green-500/20 p-4 rounded-full mb-3 animate-bounce">
               <CheckCircle2 size={48} className="text-green-400" />
             </div>
-            <h2 className="font-display font-black text-3xl text-white uppercase italic tracking-tighter">ROUTE COMPLETE</h2>
-            <p className="text-slate-400 text-sm">Safe Arrival at Destination</p>
+            <h2 className="font-display text-3xl font-black text-white uppercase tracking-tighter drop-shadow-lg">
+              ARRIVAL
+            </h2>
+            <p className="text-slate-400 text-sm uppercase tracking-widest">Route Completed</p>
          </div>
 
-         <div className="space-y-4 mb-8">
-            <div className="flex justify-between items-center bg-slate-900 p-3 rounded-lg border border-slate-700">
-               <span className="text-slate-400 text-xs uppercase font-bold">Gross Earnings</span>
-               <span className="text-white font-mono font-bold">KES {stats.cash}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-900 p-3 rounded-lg border border-slate-700">
-               <span className="text-slate-400 text-xs uppercase font-bold flex items-center gap-1"><TrendingDown size={14} className="text-red-400"/> Fuel Cost</span>
-               <span className="text-red-400 font-mono font-bold">- KES {fuelCost}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-900 p-3 rounded-lg border border-slate-700">
-               <span className="text-slate-400 text-xs uppercase font-bold flex items-center gap-1"><AlertOctagon size={14} className="text-red-400"/> Bribes</span>
-               <span className="text-red-400 font-mono font-bold">- KES {bribesPaid}</span>
+         {/* Score Card */}
+         <div className="bg-slate-900/50 rounded-lg p-4 space-y-3 mb-6 border border-slate-700">
+            <div className="flex justify-between items-center text-sm border-b border-slate-700 pb-2">
+               <span className="text-slate-400">Total Pax Carried</span>
+               <span className="text-white font-bold">{totalPassengersCarried}</span>
             </div>
             
-            <div className="border-t border-slate-700 pt-4 flex justify-between items-center">
-               <span className="text-matatu-yellow text-sm uppercase font-black">Net Profit</span>
-               <span className="text-green-400 font-display font-black text-2xl">KES {finalScore}</span>
+            <div className="flex justify-between items-center text-sm text-green-400">
+               <span>Base Earnings</span>
+               <span className="font-mono">+ KES {stats.cash}</span>
+            </div>
+            
+            {bribesPaid > 0 && (
+              <div className="flex justify-between items-center text-sm text-red-400">
+                 <span>Bribes Paid</span>
+                 <span className="font-mono">- KES {bribesPaid}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center text-sm text-orange-400">
+               <span className="flex items-center gap-1">Fuel ({fuelUsedLiters.toFixed(1)}L @ 182)</span>
+               <span className="font-mono">- KES {fuelCost}</span>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-slate-700 mt-2">
+               <span className="font-bold text-white uppercase">Net Profit</span>
+               <div className="text-right">
+                 <span className="block font-display text-xl font-bold text-matatu-yellow">
+                   KES {Math.max(0, finalScore)}
+                 </span>
+                 <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
+                    Vibe: {Math.round(happiness)}%
+                 </span>
+               </div>
             </div>
          </div>
 
          <div className="space-y-3">
-            <Button variant="primary" fullWidth size="lg" onClick={handleBankAndContinue}>
-               <span className="flex items-center justify-center gap-2">
-                  <Coins size={20} /> Bank & Continue
-               </span>
+            <Button variant="primary" fullWidth onClick={handleBankAndContinue}>
+              <span className="flex items-center justify-center gap-2">
+                 <Coins size={18} /> Bank & Continue
+              </span>
             </Button>
-            <Button variant="secondary" fullWidth onClick={exitToMapSelection}>
-               Exit to Map
+            <Button variant="secondary" fullWidth onClick={startGameLoop}>
+              <span className="flex items-center justify-center gap-2">
+                 <RotateCcw size={18} /> Replay Route
+              </span>
             </Button>
-         </div>
-      </div>
-    </div>
-  );
-
-  // Render Game Over Modal
-  const renderGameOverModal = () => (
-    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-red-950/90 backdrop-blur-md p-4 animate-fade-in">
-      <div className="bg-slate-900 border-2 border-red-600 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center relative overflow-hidden">
-         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
-         
-         <div className="relative z-10">
-            <div className="inline-block bg-red-600/20 p-4 rounded-full mb-4 animate-pulse">
-                <AlertOctagon size={48} className="text-red-500" />
-            </div>
-            
-            <h2 className="font-display font-black text-4xl text-white uppercase italic tracking-tighter mb-2 drop-shadow-lg">
-              {gameOverReason === 'CRASH' ? 'MAANGAMIZI!' : gameOverReason === 'ARRESTED' ? 'SHIKWA!' : 'TIME UP!'}
-            </h2>
-            
-            <p className="text-red-200 text-sm mb-8 font-bold uppercase tracking-widest">
-              {gameOverReason === 'CRASH' ? 'Fatal Collision' : gameOverReason === 'ARRESTED' ? 'Vehicle Impounded' : 'Schedule Failed'}
-            </p>
-
-            <div className="bg-black/40 p-4 rounded-xl border border-red-900/30 mb-8">
-               <p className="text-slate-400 text-xs mb-1">Session Earnings Lost</p>
-               <p className="text-white font-mono text-xl line-through decoration-red-500 decoration-2">KES {stats.cash}</p>
-            </div>
-
-            <div className="space-y-3">
-               <Button variant="danger" fullWidth size="lg" onClick={startGameLoop}>
-                  <span className="flex items-center justify-center gap-2">
-                     <RotateCcw size={20} /> Try Again
-                  </span>
-               </Button>
-               <Button variant="secondary" fullWidth onClick={exitToMapSelection}>
-                  Return to Garage
-               </Button>
-            </div>
          </div>
       </div>
     </div>
   );
 
   return (
-    <div className="w-full h-full relative bg-black overflow-hidden">
+    <div className="relative w-full h-[100dvh] bg-slate-900 overflow-hidden touch-none">
       
-      {/* 1. Mobile Rotation Prompt */}
       <RotatePrompt />
 
-      {/* 2. Auth Gate Modal (Contextual) */}
       <AuthGateModal 
         isOpen={showAuthGate} 
         onClose={() => setShowAuthGate(false)}
-        featureName="Banking"
-        message="To save your earnings and climb the leaderboard, you need a registered Conductor Profile."
+        featureName="Banking Earnings"
+        message="Your cash is burning a hole in your pocket! Create a profile to deposit earnings and climb the wealth leaderboard."
       />
 
-      {/* 3. Quit Confirmation Overlay */}
-      {activeModal === 'QUIT_CONFIRM' && (
-        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-fade-in">
-           <div className="bg-slate-900 border border-slate-600 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl">
-              <h3 className="font-display font-bold text-white text-xl uppercase mb-2">Abandon Route?</h3>
-              <p className="text-slate-400 text-sm mb-6">Current progress and earnings will be lost.</p>
-              <div className="flex gap-3">
-                 <Button variant="danger" fullWidth onClick={handleConfirmQuit}>Quit</Button>
-                 <Button variant="secondary" fullWidth onClick={handleCancelQuit}>Cancel</Button>
+      {/* 3D Game World */}
+      <div className="absolute inset-0 z-0">
+        <GameScene vehicleType={vehicleType} />
+      </div>
+
+      {/* Heads Up Display - Now visible during Modals (Stage/Police) to show timer */}
+      {gameStatus === 'PLAYING' && <HUD />}
+
+      {/* Crash Overlay - GTA Style */}
+      {isCrashing && (
+        <div className="absolute inset-0 z-40 pointer-events-none overflow-hidden">
+          {/* Blood Vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle,_transparent_30%,_rgba(180,0,0,0.6)_90%)] animate-pulse"></div>
+          
+          {/* Red Flash */}
+          <div className="absolute inset-0 bg-red-600/30 mix-blend-overlay animate-[ping_0.5s_ease-out_infinite]"></div>
+          
+          {/* Text Animation */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <h1 className="font-display font-black text-6xl sm:text-8xl text-red-600 uppercase tracking-tighter scale-150 animate-[ping_0.2s_ease-out_reverse]">
+              WASTED
+            </h1>
+          </div>
+        </div>
+      )}
+
+      {/* Countdown Overlay */}
+      {countdown !== null && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+           <h1 className="font-display font-black text-9xl text-white animate-pulse drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">
+             {countdown === 0 ? "GO!" : countdown}
+           </h1>
+        </div>
+      )}
+
+      {/* Pause Menu Overlay */}
+      {gameStatus === 'PAUSED' && activeModal === 'NONE' && countdown === null && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-6 animate-fade-in">
+           <div className="flex flex-col items-center max-w-md w-full space-y-8">
+              <div className="flex flex-col items-center">
+                 <div className="w-20 h-20 rounded-full border-4 border-white/20 flex items-center justify-center mb-4">
+                    <Pause size={40} className="text-white" fill="currentColor" />
+                 </div>
+                 <h2 className="font-display font-black text-4xl text-white uppercase tracking-widest">Paused</h2>
+                 <p className="text-slate-400 text-sm uppercase tracking-wide mt-2">Take a breather</p>
+              </div>
+
+              <div className="w-full space-y-4">
+                 <Button variant="primary" fullWidth size="lg" onClick={handleStartResume}>
+                    <span className="flex items-center justify-center gap-3">
+                       <Play size={24} fill="currentColor" /> Resume Shift
+                    </span>
+                 </Button>
+                 <Button variant="danger" fullWidth size="lg" onClick={() => setQuitConfirmation(true)}>
+                    <span className="flex items-center justify-center gap-3">
+                       <LogOut size={24} /> Quit Game
+                    </span>
+                 </Button>
               </div>
            </div>
         </div>
       )}
 
-      {/* 4. Pause Menu Overlay */}
-      {gameStatus === 'PAUSED' && activeModal === 'NONE' && (
-         <div className="absolute inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
-            <div className="flex flex-col gap-4 w-full max-w-xs">
-                <div className="text-center mb-4">
-                    <h2 className="font-display font-black text-4xl text-white uppercase tracking-widest italic">PAUSED</h2>
-                </div>
-                {countdown === null ? (
-                    <>
-                        <Button variant="primary" size="lg" fullWidth onClick={handleStartResume}>
-                            <span className="flex items-center justify-center gap-2"><Play size={20} /> Resume</span>
-                        </Button>
-                        <Button variant="secondary" size="lg" fullWidth onClick={() => setQuitConfirmation(true)}>
-                            <span className="flex items-center justify-center gap-2"><LogOut size={20} /> Quit Route</span>
-                        </Button>
-                    </>
-                ) : (
-                    <div className="text-center">
-                        <div className="font-display font-black text-8xl text-matatu-yellow animate-ping">{countdown}</div>
-                    </div>
-                )}
-            </div>
-         </div>
-      )}
-
-      {/* 5. MULTIPLAYER WASTED OVERLAY */}
-      {activeRoomId && isCrashing && (
-          <div className="absolute inset-0 z-[80] flex flex-col items-center justify-center bg-red-900/40 backdrop-blur-sm animate-pulse">
-              <h1 className="font-display font-black text-6xl md:text-8xl text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] tracking-tighter italic transform -rotate-6">
-                  WASTED
-              </h1>
-              <div className="mt-8 bg-black/50 px-6 py-2 rounded-full border border-red-500/50">
-                  <p className="text-white font-mono font-bold text-xl flex items-center gap-3">
-                      RESPAWN IN <span className="text-3xl text-red-400">{multiplayerWastedTimer}</span>
-                  </p>
+      {/* Quit Confirmation Modal */}
+      {activeModal === 'QUIT_CONFIRM' && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+           <div className="bg-slate-800 border-2 border-red-500 w-full max-w-sm rounded-xl p-6 text-center shadow-2xl">
+              <div className="flex justify-center mb-4">
+                 <div className="bg-red-500/20 p-4 rounded-full animate-pulse">
+                    <AlertOctagon size={48} className="text-red-500" />
+                 </div>
               </div>
-          </div>
+              <h3 className="font-display text-2xl font-bold text-white uppercase mb-2">End Shift?</h3>
+              <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                 Are you sure you want to quit? <br/>
+                 <span className="text-red-400 font-bold">All progress for this trip will be lost.</span>
+              </p>
+              
+              <div className="space-y-3">
+                 <Button variant="danger" fullWidth onClick={handleConfirmQuit}>
+                    Yes, Quit Game
+                 </Button>
+                 <Button variant="secondary" fullWidth onClick={handleCancelQuit}>
+                    Cancel
+                 </Button>
+              </div>
+           </div>
+        </div>
       )}
 
-      {/* 6. Game Logic Modals */}
+      {/* Stage Modal Overlay */}
       {activeModal === 'STAGE' && <StageModal />}
+      
+      {/* Police Modal Overlay */}
       {activeModal === 'POLICE' && <PoliceModal />}
-      {activeModal === 'GAME_OVER' && (gameOverReason === 'COMPLETED' ? renderSuccessModal() : renderGameOverModal())}
 
-      {/* 7. HUD Layer */}
-      <HUD />
+      {/* Game Over Modal */}
+      {activeModal === 'GAME_OVER' && (
+        gameOverReason === 'COMPLETED' ? renderSuccessModal() : (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-slate-800 border-2 border-slate-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center relative overflow-hidden">
+              
+              {/* Background Accent */}
+              <div className="absolute top-0 left-0 w-full h-2 bg-red-500 animate-pulse"></div>
 
-      {/* 8. 3D Scene Layer */}
-      <div className="absolute inset-0 z-0">
-        <GameScene 
-            vehicleType={vehicleType} 
-            playerLane={playerLane}
-            setPlayerLane={setPlayerLane}
-        />
-      </div>
+              <div className="flex justify-center mb-4">
+                <div className="bg-red-500/20 p-4 rounded-full">
+                  <AlertOctagon size={48} className="text-red-500" />
+                </div>
+              </div>
+
+              <h2 className="font-display text-3xl font-black text-white uppercase mb-2 tracking-tighter">
+                {gameOverReason === 'TIME_UP' ? 'Time Up!' : 
+                gameOverReason === 'ARRESTED' ? 'BUSTED!' : 'WASTED!'}
+              </h2>
+              
+              <p className="text-slate-400 text-sm mb-8">
+                {gameOverReason === 'TIME_UP' 
+                  ? "You ran out of time. The passengers are furious and the trip is cancelled." 
+                  : gameOverReason === 'ARRESTED' 
+                  ? "You've been arrested for corruption and traffic violations. Bail is expensive."
+                  : "Fatal crash! The vehicle is totaled and passengers are injured."}
+              </p>
+
+              <div className="space-y-3">
+                <Button variant="primary" fullWidth onClick={startGameLoop}>
+                  <span className="flex items-center justify-center gap-2">
+                    <RotateCcw size={18} /> Retry Route
+                  </span>
+                </Button>
+                
+                <Button variant="secondary" fullWidth onClick={exitToMapSelection}>
+                  <span className="flex items-center justify-center gap-2">
+                    <Map size={18} /> Return to Maps
+                  </span>
+                </Button>
+                
+                <Button variant="danger" fullWidth onClick={resetGame}>
+                  End Shift (Logout)
+                </Button>
+              </div>
+
+            </div>
+          </div>
+        )
+      )}
 
     </div>
   );

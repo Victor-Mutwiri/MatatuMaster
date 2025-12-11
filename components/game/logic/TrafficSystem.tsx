@@ -1,18 +1,18 @@
 
-import React, { useState, useRef, useEffect, memo, useMemo } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import { playSfx } from '../../../utils/audio';
 import { Motorbike, SmallCar, Matatu14Seater, Matatu52Seater, Matatu32Seater, PlayerPersonalCar } from '../vehicles/VehicleModels';
 import { HeavyTruck } from '../environment/WorldAssets';
 import * as THREE from 'three';
-import { SeededRNG } from '../../../utils/random';
 
 const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
 const RONGAI_LANE_OFFSET = 3.2;
 
 // --- Independent Vehicle Component ---
+// Manages its own movement to avoid re-rendering the parent list every frame.
 interface TrafficVehicleProps {
   id: number;
   initialZ: number;
@@ -57,7 +57,10 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
 
     // --- Collision Logic ---
     if (!isCrashing && Math.abs(currentZ) < 3.0) {
-        // Simple Lane Check
+        // Collision box
+        
+        // Simple Lane Check: If vehicle is in player's lane ID
+        // Note: For overlapping logic (Lane -2), we match player lane directly
         if (lane === playerLane) {
             triggerCrash();
         }
@@ -96,31 +99,11 @@ const TrafficVehicle = memo(({ id, initialZ, lane, laneOffset, speed, type, dire
   );
 });
 
-// Helper to get RNG
-const useRNG = () => {
-    const { activeRoomId } = useGameStore();
-    return useMemo(() => {
-        if (activeRoomId) {
-            // Multiplayer: Deterministic
-            return new SeededRNG(activeRoomId);
-        } else {
-            // Single Player: Random
-            return {
-                next: () => Math.random(),
-                chance: (p: number) => Math.random() < p,
-                range: (min: number, max: number) => min + Math.random() * (max - min),
-                pick: (arr: any[]) => arr[Math.floor(Math.random() * arr.length)]
-            };
-        }
-    }, [activeRoomId]);
-};
-
-// --- City / Rural Traffic System ---
+// --- City / Rural Traffic System (Simple Oncoming) ---
 export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
   const { gameStatus, isCrashing } = useGameStore();
   const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
   const nextSpawnRef = useRef(0);
-  const rng = useRNG();
 
   useEffect(() => {
     if (gameStatus === 'IDLE') setVehicleList([]);
@@ -135,14 +118,14 @@ export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
     
     if (state.clock.elapsedTime > nextSpawnRef.current) {
         const types: any[] = ['BIKE', 'CAR', 'CAR', 'MATATU', 'BUS'];
-        const type = rng.pick(types);
+        const type = types[Math.floor(Math.random() * types.length)];
         
         const newVehicle: TrafficVehicleProps = {
-            id: Math.random(), // ID can be random, used for keys
+            id: Math.random(),
             initialZ: -150,
             lane: 1, 
             laneOffset: CITY_LANE_OFFSET,
-            speed: rng.range(30, 50),
+            speed: 30 + Math.random() * 20,
             type,
             direction: 'OPPOSITE',
             playerLane,
@@ -150,7 +133,7 @@ export const OncomingTraffic = ({ playerLane }: { playerLane: number }) => {
         };
 
         setVehicleList(prev => [...prev, newVehicle]);
-        nextSpawnRef.current = state.clock.elapsedTime + rng.range(1, 3);
+        nextSpawnRef.current = state.clock.elapsedTime + (1 + Math.random() * 2);
     }
   });
 
@@ -170,7 +153,6 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
     
     const nextOncomingSpawnRef = useRef(0);
     const nextSameDirSpawnRef = useRef(0);
-    const rng = useRNG();
 
     useEffect(() => {
         if (gameStatus === 'IDLE') {
@@ -189,9 +171,9 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
         
         if (currentSpeed > 10 && state.clock.elapsedTime > nextSameDirSpawnRef.current) {
             const types: any[] = ['BUS', 'MATATU', 'CAR']; 
-            const type = rng.pick(types);
+            const type = types[Math.floor(Math.random() * types.length)];
             
-            const trafficSpeed = Math.max(30, currentSpeed * rng.range(0.6, 0.8)); 
+            const trafficSpeed = Math.max(30, currentSpeed * (0.6 + Math.random() * 0.2)); 
 
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
@@ -207,19 +189,19 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
     
             setVehicleList(prev => [...prev, newVehicle]);
             
-            nextSameDirSpawnRef.current = state.clock.elapsedTime + rng.range(3, 7);
+            nextSameDirSpawnRef.current = state.clock.elapsedTime + (3 + Math.random() * 4);
         }
 
         if (state.clock.elapsedTime > nextOncomingSpawnRef.current) {
             const types: any[] = ['CAR', 'SUV', 'MATATU'];
-            const type = rng.pick(types);
+            const type = types[Math.floor(Math.random() * types.length)];
             
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
                 lane: 1, 
                 laneOffset: CITY_LANE_OFFSET,
-                speed: rng.range(60, 90), 
+                speed: 60 + Math.random() * 30, 
                 type,
                 direction: 'OPPOSITE',
                 playerLane,
@@ -227,7 +209,7 @@ export const TwoWayTraffic = ({ playerLane }: { playerLane: number }) => {
             };
     
             setVehicleList(prev => [...prev, newVehicle]);
-            nextOncomingSpawnRef.current = state.clock.elapsedTime + rng.range(2, 5);
+            nextOncomingSpawnRef.current = state.clock.elapsedTime + (2 + Math.random() * 3);
         }
     });
   
@@ -246,7 +228,6 @@ export const EscarpmentTraffic = ({ playerLane }: { playerLane: number }) => {
     const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
     const nextOncomingSpawnRef = useRef(0);
     const nextHeavySpawnRef = useRef(0);
-    const rng = useRNG();
 
     useEffect(() => {
         if (gameStatus === 'IDLE') {
@@ -276,26 +257,26 @@ export const EscarpmentTraffic = ({ playerLane }: { playerLane: number }) => {
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            nextHeavySpawnRef.current = state.clock.elapsedTime + rng.range(3, 6);
+            nextHeavySpawnRef.current = state.clock.elapsedTime + (3 + Math.random() * 3);
         }
 
         if (state.clock.elapsedTime > nextOncomingSpawnRef.current) {
              const types: any[] = ['CAR', 'SUV', 'MATATU'];
-             const type = rng.pick(types);
+             const type = types[Math.floor(Math.random() * types.length)];
              
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
                 lane: 1, 
                 laneOffset: CITY_LANE_OFFSET,
-                speed: rng.range(70, 100), 
+                speed: 70 + Math.random() * 30, 
                 type,
                 direction: 'OPPOSITE',
                 playerLane,
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            nextOncomingSpawnRef.current = state.clock.elapsedTime + rng.range(1.5, 3.5);
+            nextOncomingSpawnRef.current = state.clock.elapsedTime + (1.5 + Math.random() * 2);
         }
     });
 
@@ -313,7 +294,6 @@ export const GridlockTraffic = ({ playerLane }: { playerLane: number }) => {
     const { gameStatus, isCrashing } = useGameStore();
     const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
     const nextSpawnRef = useRef(0);
-    const rng = useRNG();
 
     useEffect(() => {
         if (gameStatus === 'IDLE') {
@@ -329,14 +309,17 @@ export const GridlockTraffic = ({ playerLane }: { playerLane: number }) => {
     useFrame((state) => {
         if (gameStatus !== 'PLAYING' || isCrashing) return;
         
+        // Spawn congested traffic in lanes -1 and 1
         if (state.clock.elapsedTime > nextSpawnRef.current) {
             
-            const lane = rng.chance(0.5) ? 1 : -1;
+            // Randomly choose lane -1 or 1
+            const lane = Math.random() > 0.5 ? 1 : -1;
             
             const types: any[] = ['MATATU', 'BUS', 'CAR', 'SUV'];
-            const type = rng.pick(types);
+            const type = types[Math.floor(Math.random() * types.length)];
             
-            const speed = rng.range(0, 20);
+            // Very slow speeds: 0 to 20 km/h
+            const speed = Math.random() * 20;
 
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
@@ -347,12 +330,13 @@ export const GridlockTraffic = ({ playerLane }: { playerLane: number }) => {
                 type,
                 direction: 'SAME',
                 playerLane,
-                driftX: true, 
+                driftX: true, // Enable Squeeze Mechanic
                 onRemove: removeVehicle
             };
     
             setVehicleList(prev => [...prev, newVehicle]);
-            nextSpawnRef.current = state.clock.elapsedTime + rng.range(1, 2.5);
+            // Dense spawn rate
+            nextSpawnRef.current = state.clock.elapsedTime + (1 + Math.random() * 1.5);
         }
     });
 
@@ -365,7 +349,7 @@ export const GridlockTraffic = ({ playerLane }: { playerLane: number }) => {
     );
 }
 
-// --- Rongai Traffic (Chaos) ---
+// --- Rongai Traffic (Chaos: Overlappers + Bullies) ---
 export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
     const { gameStatus, isCrashing, selectedRoute } = useGameStore();
     const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
@@ -374,7 +358,6 @@ export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
     const nextOncomingSpawn = useRef(0);
     const nextOverlapSpawn = useRef(0);
     const nextBullySpawn = useRef(0); 
-    const rng = useRNG();
 
     const isRaceMode = selectedRoute?.gamemode === 'RACE';
 
@@ -396,74 +379,75 @@ export const RongaiTraffic = ({ playerLane }: { playerLane: number }) => {
         if (gameStatus !== 'PLAYING' || isCrashing) return;
         const t = state.clock.elapsedTime;
         
+        // Multiplier to make Race Mode traffic more dense
         const rateMult = isRaceMode ? 0.6 : 1.0; 
 
-        // 1. Slow Gridlock in Main Lane
+        // 1. Slow Gridlock in Main Lane (Lane -1, since player uses -1 as main)
         if (t > nextMainSpawn.current) {
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -250, 
                 lane: -1, 
                 laneOffset: RONGAI_LANE_OFFSET,
-                speed: rng.range(15, 30),
+                speed: 15 + Math.random() * 15, // Slow
                 type: 'CAR',
                 direction: 'SAME',
                 playerLane,
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            nextMainSpawn.current = t + rng.range(2, 4) * rateMult;
+            nextMainSpawn.current = t + (2 + Math.random() * 2) * rateMult;
         }
 
-        // 2. Fast Oncoming
+        // 2. Fast Oncoming in Lane 1
         if (t > nextOncomingSpawn.current) {
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -250, 
                 lane: 1, 
                 laneOffset: RONGAI_LANE_OFFSET,
-                speed: rng.range(60, 100),
+                speed: 60 + Math.random() * 40,
                 type: 'MATATU',
                 direction: 'OPPOSITE',
                 playerLane,
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            nextOncomingSpawn.current = t + rng.range(1, 3) * rateMult;
+            nextOncomingSpawn.current = t + (1 + Math.random() * 2) * rateMult;
         }
 
-        // 3. "Overlappers"
+        // 3. "Overlappers" - Cars in Lane -2 (Shoulder) going FAST
         if (t > nextOverlapSpawn.current) {
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
                 initialZ: -300, 
                 lane: -2, 
                 laneOffset: RONGAI_LANE_OFFSET,
-                speed: rng.range(70, 90),
+                speed: 70 + Math.random() * 20, // Fast overtaking on dirt
                 type: 'MATATU',
                 direction: 'SAME',
                 playerLane,
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            nextOverlapSpawn.current = t + rng.range(5, 10) * rateMult;
+            nextOverlapSpawn.current = t + (5 + Math.random() * 5) * rateMult;
         }
 
-        // 4. "The Bully"
+        // 4. "The Bully" - Oncoming car overtaking into Lane -1 (Player's Lane)
         if (t > nextBullySpawn.current) {
              const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
-                initialZ: -400, 
-                lane: -1, 
+                initialZ: -400, // Starts far
+                lane: -1, // IN YOUR LANE
                 laneOffset: RONGAI_LANE_OFFSET,
-                speed: 80, 
-                type: 'BUS', 
-                direction: 'OPPOSITE', 
+                speed: 80, // Coming fast
+                type: 'BUS', // Scary
+                direction: 'OPPOSITE', // Head on!
                 playerLane,
                 onRemove: removeVehicle
             };
             setVehicleList(prev => [...prev, newVehicle]);
-            nextBullySpawn.current = t + rng.range(10, 20) * rateMult; 
+            nextBullySpawn.current = t + (10 + Math.random() * 10) * rateMult; 
         }
     });
 
@@ -482,7 +466,6 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     const [vehicleList, setVehicleList] = useState<TrafficVehicleProps[]>([]);
     const nextSpawnRef = useRef(0);
     const lastSpawnLaneRef = useRef<number | null>(null);
-    const rng = useRNG();
 
     const isRaceMode = selectedRoute?.gamemode === 'RACE';
 
@@ -507,7 +490,7 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
             
             let validLanes = lanes.filter(l => l !== lastSpawnLaneRef.current);
             if (validLanes.length === 0) validLanes = lanes;
-            const spawnLane = rng.pick(validLanes);
+            const spawnLane = validLanes[Math.floor(Math.random() * validLanes.length)];
             lastSpawnLaneRef.current = spawnLane;
 
             let minS = 40, maxS = 60;
@@ -516,22 +499,22 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
             if (spawnLane === -1) { // Left (Slow)
                 minS = 40; maxS = 65;
                 const types = ['BUS', 'MATATU', 'CAR']; 
-                type = rng.pick(types);
+                type = types[Math.floor(Math.random() * types.length)];
             } else if (spawnLane === 0) { // Middle
                 minS = 65; maxS = 85;
                 const types = ['MATATU', 'CAR', 'SUV'];
-                type = rng.pick(types);
+                type = types[Math.floor(Math.random() * types.length)];
             } else { // Right (Fast)
                 minS = 85; maxS = 110;
                 const types = ['CAR', 'SUV', 'BIKE'];
-                type = rng.pick(types);
+                type = types[Math.floor(Math.random() * types.length)];
             }
 
-            const trafficSpeed = rng.range(minS, maxS);
+            const trafficSpeed = minS + Math.random() * (maxS - minS);
 
             const newVehicle: TrafficVehicleProps = {
                 id: Math.random(),
-                initialZ: -300 - (rng.range(0, 50)),
+                initialZ: -300 - (Math.random() * 50),
                 lane: spawnLane,
                 laneOffset: HIGHWAY_LANE_OFFSET,
                 speed: trafficSpeed,
@@ -543,9 +526,10 @@ export const HighwayTraffic = ({ playerLane }: { playerLane: number }) => {
     
             setVehicleList(prev => [...prev, newVehicle]);
             
+            // In Race Mode, spawn traffic more frequently (0.3s - 0.6s)
             const interval = isRaceMode 
-                ? rng.range(0.3, 0.6) 
-                : rng.range(0.5, 1.3);
+                ? 0.3 + Math.random() * 0.3 
+                : 0.5 + Math.random() * 0.8;
             
             nextSpawnRef.current = state.clock.elapsedTime + interval;
         }

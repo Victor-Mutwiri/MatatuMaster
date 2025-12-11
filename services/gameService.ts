@@ -1,7 +1,6 @@
 
 import { supabase } from './supabaseClient';
 import { PlayerStats, LifetimeStats, VehicleType, UserMode } from '../types';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 // --- Types mirroring the Supabase DB Schema ---
 export interface DBProfile {
@@ -57,15 +56,6 @@ export interface GameRoom {
     // Expanded profiles
     host?: { username: string; sacco: string; };
     guest?: { username: string; sacco: string; };
-}
-
-export interface PlayerStatePacket {
-    x: number;          // Lane position (visual x)
-    z: number;          // Distance down road (visual z relative to start, but usually calculated via distanceTraveled)
-    dist: number;       // Actual game logic distance
-    rotZ: number;       // Tilt
-    speed: number;
-    isCrashed: boolean;
 }
 
 // --- Service Layer ---
@@ -471,33 +461,6 @@ export const GameService = {
       } catch (e) {
           console.error("Room update error", e);
       }
-  },
-
-  /**
-   * Subscribe to Realtime Channel for 1v1 Race
-   */
-  subscribeToRoom: (roomId: string, onOpponentUpdate: (payload: PlayerStatePacket) => void): RealtimeChannel => {
-      const channel = supabase.channel(`game_${roomId}`);
-      
-      channel
-        .on('broadcast', { event: 'player_update' }, (payload) => {
-            // Receive data from opponent
-            onOpponentUpdate(payload.payload as PlayerStatePacket);
-        })
-        .subscribe();
-
-      return channel;
-  },
-
-  /**
-   * Broadcast my state to the room
-   */
-  broadcastPlayerState: async (channel: RealtimeChannel, payload: PlayerStatePacket) => {
-      await channel.send({
-          type: 'broadcast',
-          event: 'player_update',
-          payload: payload
-      });
   },
 
   /**
