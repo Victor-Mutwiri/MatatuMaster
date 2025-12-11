@@ -6,7 +6,7 @@ import { GameScene } from '../components/game/GameScene';
 import { HUD } from '../components/game/HUD';
 import { StageModal } from '../components/game/StageModal';
 import { PoliceModal } from '../components/game/PoliceModal';
-import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause, Timer, AlertTriangle } from 'lucide-react';
+import { X, AlertOctagon, RotateCcw, Map, CheckCircle2, TrendingUp, TrendingDown, Coins, Play, LogOut, Pause, Timer, AlertTriangle, Loader2 } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 import { RotatePrompt } from '../components/ui/RotatePrompt';
 import { GameService, PlayerStatePacket } from '../services/gameService';
@@ -53,6 +53,21 @@ export const GameLoopScreen: React.FC = () => {
   // Refs for Broadcast
   const broadcastInterval = useRef<any>(null);
   const channelRef = useRef<any>(null);
+
+  // FAILSAFE: If no route is selected, don't try to render the scene (Avoids black screen)
+  if (!selectedRoute) {
+      return (
+          <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+              <Loader2 className="text-matatu-yellow animate-spin mb-4" size={48} />
+              <h2 className="text-white font-bold text-xl uppercase tracking-widest">Loading Route Data...</h2>
+              <p className="text-slate-400 text-sm mt-2">Connecting to game server.</p>
+              
+              <Button variant="secondary" className="mt-8" onClick={exitToMapSelection}>
+                  Cancel / Return to Lobby
+              </Button>
+          </div>
+      )
+  }
 
   // Timer Effect
   useEffect(() => {

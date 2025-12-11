@@ -85,6 +85,14 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   
   const [launchCountdown, setLaunchCountdown] = useState<number | null>(null);
 
+  // Refs for stable access in intervals
+  const roomStateRef = useRef<GameRoom | null>(null);
+  const myVehicleRef = useRef<VehicleType | null>(null);
+
+  // Update refs when state changes
+  useEffect(() => { roomStateRef.current = roomState; }, [roomState]);
+  useEffect(() => { myVehicleRef.current = mySelectedVehicle; }, [mySelectedVehicle]);
+
   // Unique ID (Visual)
   const uniqueId = btoa(playerName).substring(0, 8).toUpperCase();
 
@@ -355,7 +363,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
       await GameService.voteMap(activeRoomId, vote);
   };
 
-  // Launch Logic
+  // Launch Logic - Start Countdown
   useEffect(() => {
     if (viewState === 'ROOM' && roomState && roomState.map_vote === 'APPROVE') {
         const hostReady = roomState.host_ready && roomState.host_vehicle;
@@ -369,41 +377,65 @@ export const MultiplayerLobbyScreen: React.FC = () => {
     }
   }, [roomState, viewState]);
 
+  // Launch Execution - End Countdown
   useEffect(() => {
       if (launchCountdown !== null) {
           const interval = setInterval(() => {
               setLaunchCountdown(prev => {
                   if (prev === null) return null;
+                  
                   if (prev <= 0) {
                       clearInterval(interval);
+                      console.log("🚀 Launching Game from Lobby...");
+
+                      const currentRoomState = roomStateRef.current;
+                      const myVehicle = myVehicleRef.current;
+
+                      if (!currentRoomState || !myVehicle) {
+                          console.error("❌ Launch Failed: Missing room state or vehicle");
+                          setLaunchCountdown(null); // Abort
+                          return null;
+                      }
                       
-                      // 1. Set the Map
-                      if (roomState?.selected_map) {
-                          const route = MAP_DEFINITIONS.find(m => m.id === roomState.selected_map);
-                          if (route) selectRoute(route);
+                      // 1. Set the Map (Critical)
+                      if (currentRoomState.selected_map) {
+                          const route = MAP_DEFINITIONS.find(m => m.id === currentRoomState.selected_map);
+                          if (route) {
+                              console.log("✅ Map Selected:", route.name);
+                              selectRoute(route);
+                          } else {
+                              console.error("❌ Map Definition Not Found for:", currentRoomState.selected_map);
+                          }
+                      } else {
+                          console.error("❌ No Selected Map in Room State");
                       }
 
                       // 2. Set Ghost Vehicle (Opponent)
-                      const oppVehicle = myRole === 'HOST' ? roomState?.guest_vehicle : roomState?.host_vehicle;
+                      const oppVehicle = myRole === 'HOST' ? currentRoomState.guest_vehicle : currentRoomState.host_vehicle;
                       if (oppVehicle) setOpponentVehicle(oppVehicle);
 
                       // 3. Sync Global Room ID (Critical for Networking)
-                      if (activeRoomId) setGlobalRoomId(activeRoomId);
+                      if (activeRoomId) {
+                          setGlobalRoomId(activeRoomId);
+                      }
 
                       // 4. Set My Vehicle and Start Game Loop
-                      if (mySelectedVehicle) {
-                          setVehicleType(mySelectedVehicle);
-                          // Bypass MapSelectionScreen entirely to prevent route overwrite
+                      setVehicleType(myVehicle);
+                      
+                      // Force a tiny delay to ensure state updates propagate before switching screen
+                      setTimeout(() => {
+                          console.log("🏁 Starting Game Loop...");
                           useGameStore.getState().startGameLoop();
-                      }
-                      return 0;
+                      }, 50);
+
+                      return 0; // Keep 0 to show "GO" while switching
                   }
                   return prev - 1;
               });
           }, 1000);
           return () => clearInterval(interval);
       }
-  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen, roomState, selectRoute, myRole, setOpponentVehicle, activeRoomId, setGlobalRoomId]);
+  }, [launchCountdown, activeRoomId, myRole, selectRoute, setGlobalRoomId, setOpponentVehicle, setVehicleType]);
 
 
   // --- RENDER: ROOM VIEW ---
