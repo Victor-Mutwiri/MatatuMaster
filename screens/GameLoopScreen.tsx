@@ -11,6 +11,7 @@ import { AuthGateModal } from '../components/ui/AuthGateModal';
 import { RotatePrompt } from '../components/ui/RotatePrompt';
 import { GameService, PlayerStatePacket } from '../services/gameService';
 import { supabase } from '../services/supabaseClient';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 const CITY_LANE_OFFSET = 2.2;
 const HIGHWAY_LANE_OFFSET = 3.5;
@@ -94,14 +95,21 @@ export const GameLoopScreen: React.FC = () => {
   // Multiplayer Logic: Setup & Broadcast
   useEffect(() => {
       if (activeRoomId && gameStatus === 'PLAYING') {
+          console.log("📡 Multiplayer Active. Room:", activeRoomId);
+          
           // Subscribe
           channelRef.current = GameService.subscribeToRoom(activeRoomId, (packet) => {
               setOpponentState(packet);
           });
 
-          // Start Broadcast Loop (100ms = 10 updates/sec)
+          // Start Broadcast Loop (200ms = 5 updates/sec to reduce fallback spam)
           broadcastInterval.current = setInterval(() => {
               
+              // Only send if channel is ready to avoid "falling back to REST" spam which freezes UI
+              if (!channelRef.current || channelRef.current.state !== 'joined') {
+                  return;
+              }
+
               // Calculate visual X based on map type
               let laneOffset = CITY_LANE_OFFSET;
               const isHighway = selectedRoute?.id === 'thika-highway' || selectedRoute?.id === 'thika-race';
@@ -121,11 +129,11 @@ export const GameLoopScreen: React.FC = () => {
                   isCrashed: isCrashing
               };
               
-              if (channelRef.current) {
-                  GameService.broadcastPlayerState(channelRef.current, packet);
-              }
+              GameService.broadcastPlayerState(channelRef.current, packet).catch(err => {
+                  console.warn("Broadcast failed:", err);
+              });
 
-          }, 100);
+          }, 200); 
       }
 
       return () => {
@@ -340,16 +348,22 @@ export const GameLoopScreen: React.FC = () => {
       {activeModal === 'POLICE' && <PoliceModal />}
       {activeModal === 'GAME_OVER' && (gameOverReason === 'COMPLETED' ? renderSuccessModal() : renderGameOverModal())}
 
-      {/* 7. HUD Layer */}
-      <HUD />
+      {/* 7. HUD Layer - Always rendered on top of 3D */}
+      <div className="absolute inset-0 z-20 pointer-events-none">
+          <div className="w-full h-full pointer-events-auto">
+             <HUD />
+          </div>
+      </div>
 
-      {/* 8. 3D Scene Layer */}
+      {/* 8. 3D Scene Layer with Error Boundary */}
       <div className="absolute inset-0 z-0">
-        <GameScene 
-            vehicleType={vehicleType} 
-            playerLane={playerLane}
-            setPlayerLane={setPlayerLane}
-        />
+        <ErrorBoundary>
+            <GameScene 
+                vehicleType={vehicleType} 
+                playerLane={playerLane}
+                setPlayerLane={setPlayerLane}
+            />
+        </ErrorBoundary>
       </div>
 
     </div>
