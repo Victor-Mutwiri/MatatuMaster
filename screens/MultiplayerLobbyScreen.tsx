@@ -4,7 +4,7 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore, VEHICLE_SPECS, MAP_DEFINITIONS } from '../store/gameStore';
 import { VehicleType, Route } from '../types';
-import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X, Bell, UserCheck, Gamepad2, Timer, Map, ThumbsUp, ThumbsDown, ChevronLeft, ChevronRight, AlertCircle, Hourglass } from 'lucide-react';
+import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X, Bell, UserCheck, Gamepad2, Timer, Map as MapIcon, ThumbsUp, ThumbsDown, ChevronLeft, ChevronRight, AlertCircle, Hourglass } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { GameService, FriendRequest, GameRoom } from '../services/gameService';
 
@@ -36,7 +36,7 @@ const VEHICLE_ICONS: Record<VehicleType, React.ReactNode> = {
 const RACE_MAPS = MAP_DEFINITIONS.filter(m => m.gamemode === 'RACE');
 
 export const MultiplayerLobbyScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType, userId, selectRoute } = useGameStore();
+  const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType, userId, selectRoute, setOpponentVehicle } = useGameStore();
   
   // View State: 'LOBBY' (Friend list) or 'ROOM' (Staging area)
   const [viewState, setViewState] = useState<'LOBBY' | 'ROOM'>('LOBBY');
@@ -365,15 +365,23 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                   if (prev === null) return null;
                   if (prev <= 0) {
                       clearInterval(interval);
-                      // Apply Map and Vehicle
+                      
+                      // 1. Set the Map
                       if (roomState?.selected_map) {
                           const route = MAP_DEFINITIONS.find(m => m.id === roomState.selected_map);
                           if (route) selectRoute(route);
                       }
+
+                      // 2. Set Ghost Vehicle (Opponent)
+                      const oppVehicle = myRole === 'HOST' ? roomState?.guest_vehicle : roomState?.host_vehicle;
+                      if (oppVehicle) setOpponentVehicle(oppVehicle);
+
+                      // 3. Set My Vehicle and Start
                       if (mySelectedVehicle) {
                           setVehicleType(mySelectedVehicle);
-                          setScreen('MAP_SELECT'); // Actually goes to map select logic but route is pre-selected
-                          // Force Game Start immediately since we did staging
+                          setScreen('MAP_SELECT'); // Internal route trigger
+                          
+                          // Launch game loop
                           setTimeout(() => useGameStore.getState().startGameLoop(), 100);
                       }
                       return 0;
@@ -383,7 +391,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           }, 1000);
           return () => clearInterval(interval);
       }
-  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen, roomState, selectRoute]);
+  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen, roomState, selectRoute, myRole, setOpponentVehicle]);
 
 
   // --- RENDER: ROOM VIEW ---
@@ -431,18 +439,47 @@ export const MultiplayerLobbyScreen: React.FC = () => {
 
       // 2. MAP SELECTION PHASE
       if (isMapPhase) {
-          const hostMap = RACE_MAPS[hostSelectedMapIndex];
           const selectedMapId = roomState?.selected_map;
           const voteStatus = roomState?.map_vote;
-          
-          // Determine which map to show
-          let mapToDisplay = hostMap; 
-          
-          if (selectedMapId && voteStatus !== 'REJECT') {
-              mapToDisplay = MAP_DEFINITIONS.find(m => m.id === selectedMapId) || hostMap;
+          const isHost = myRole === 'HOST';
+
+          // --- GUEST WAITING VIEW (If no map proposed yet) ---
+          if (!isHost && !selectedMapId) {
+              return (
+                <GameLayout noMaxWidth className="bg-slate-950">
+                   <div className="flex flex-col h-full w-full max-w-lg mx-auto p-6 items-center justify-center relative">
+                      <div className="absolute top-4 left-4 z-20">
+                          <button onClick={handleBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-700 shadow-lg"><ArrowLeft size={20} /></button>
+                      </div>
+                      <div className="bg-slate-900/50 border border-slate-700 rounded-2xl p-8 w-full shadow-2xl text-center space-y-6 backdrop-blur-md">
+                          <div className="w-24 h-24 mx-auto bg-slate-800 rounded-full flex items-center justify-center relative">
+                              <MapIcon className="text-slate-500 animate-pulse" size={40} />
+                              <div className="absolute -top-2 -right-2 bg-matatu-yellow text-black rounded-full p-2 animate-bounce">
+                                  <Loader2 size={16} className="animate-spin" />
+                              </div>
+                          </div>
+                          <div>
+                              <h2 className="font-display text-xl font-bold text-white uppercase tracking-wider mb-2">Host Selecting Track...</h2>
+                              <p className="text-slate-400 text-sm">Wait for {opponentName} to propose a race map.</p>
+                          </div>
+                      </div>
+                   </div>
+                </GameLayout>
+              );
           }
 
-          const canInteractWithArrows = myRole === 'HOST' && (voteStatus === 'REJECT' || !selectedMapId);
+          // Determine which map to show
+          let mapToDisplay: Route | undefined;
+          
+          if (isHost) {
+              // Host sees what they are browsing
+              mapToDisplay = RACE_MAPS[hostSelectedMapIndex];
+          } else {
+              // Guest sees what was proposed in DB
+              mapToDisplay = MAP_DEFINITIONS.find(m => m.id === selectedMapId);
+          }
+
+          const canInteractWithArrows = isHost && (voteStatus === 'REJECT' || !selectedMapId);
 
           return (
             <GameLayout noMaxWidth className="bg-slate-950">
@@ -453,28 +490,30 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                   </div>
 
                   <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider mb-8 flex items-center gap-3">
-                      <Map className="text-matatu-yellow" size={24} /> 
-                      {myRole === 'HOST' ? (voteStatus === 'REJECT' ? "Select New Track" : "Select a Track") : "Map Voting"}
+                      <MapIcon className="text-matatu-yellow" size={24} /> 
+                      {isHost ? (voteStatus === 'REJECT' ? "Select New Track" : "Select a Track") : "Map Voting"}
                   </h2>
 
                   {/* MAP CARD */}
                   <div className="relative w-full max-w-md bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl mb-8">
                       <div className="h-40 bg-slate-800 relative">
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#64748b_1px,transparent_1px)] bg-[size:20px_20px] opacity-20"></div>
-                          {/* Navigation Arrows for Host - Only clickable if interaction allowed */}
+                          
+                          {/* Navigation Arrows - Only for Host */}
                           {canInteractWithArrows && (
                               <>
                                 <button onClick={() => handleMapCycle(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-matatu-yellow hover:text-black transition-colors z-10"><ChevronLeft size={24} /></button>
                                 <button onClick={() => handleMapCycle(1)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-matatu-yellow hover:text-black transition-colors z-10"><ChevronRight size={24} /></button>
                               </>
                           )}
+                          
                           <div className="absolute bottom-4 left-4">
-                              <h3 className="font-display font-bold text-2xl text-white uppercase leading-none">{mapToDisplay?.name || "Selecting..."}</h3>
+                              <h3 className="font-display font-bold text-2xl text-white uppercase leading-none">{mapToDisplay?.name || "Loading..."}</h3>
                               <p className="text-xs text-slate-400 mt-1">{mapToDisplay?.distance} KM • {mapToDisplay?.dangerLevel}</p>
                           </div>
                       </div>
                       <div className="p-6">
-                          <p className="text-slate-300 text-sm leading-relaxed mb-4">{mapToDisplay?.description || "Waiting for host..."}</p>
+                          <p className="text-slate-300 text-sm leading-relaxed mb-4">{mapToDisplay?.description || "Details unavailable."}</p>
                           
                           {/* FEEDBACK STATUS AREA */}
                           <div className={`bg-black/30 rounded-xl p-4 flex items-center justify-between border border-slate-800 ${voteStatus === 'REJECT' ? 'border-red-500/50 bg-red-900/10' : ''}`}>
@@ -492,7 +531,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
 
                   {/* CONTROLS */}
                   <div className="w-full max-w-md flex gap-4">
-                      {myRole === 'HOST' ? (
+                      {isHost ? (
                           <Button 
                             fullWidth 
                             size="lg" 
@@ -514,9 +553,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                                         <ThumbsUp size={20} className="mr-2" /> Accept
                                     </Button>
                                 </>
-                            ) : (
-                                <div className="text-center w-full text-slate-500 animate-pulse">Waiting for Host to propose...</div>
-                            )}
+                            ) : null}
                           </>
                       )}
                   </div>
