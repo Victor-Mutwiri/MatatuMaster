@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { LandingScreen } from './screens/LandingScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -12,7 +11,6 @@ import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { useGameStore } from './store/gameStore';
 import { Route } from './types';
-import { ErrorBoundary } from './components/utility/ErrorBoundary';
 
 const App: React.FC = () => {
   const { currentScreen, stats, setScreen, selectRoute, resetGame } = useGameStore();
@@ -31,7 +29,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <ErrorBoundary>
+    <>
       {currentScreen === 'LANDING' && (
         <LandingScreen onStart={handleStartShift} />
       )}
@@ -76,7 +74,7 @@ const App: React.FC = () => {
           onLogout={handleLogout}
         />
       )}
-    </ErrorBoundary>
+    </>
   );
 };
 

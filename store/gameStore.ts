@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
-import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode, VehicleUpgrades } from '../types';
+import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode } from '../types';
 import { playSfx } from '../utils/audio';
 import { GameService } from '../services/gameService';
 
@@ -120,24 +120,26 @@ export const MAP_DEFINITIONS: Route[] = [
   }
 ];
 
-// --- Secure Storage Wrapper ---
+// --- Secure Storage Wrapper (Simple Obfuscation with UTF-8 Support) ---
 const secureStorage: StateStorage = {
   getItem: (name: string): string | null => {
     const value = localStorage.getItem(name);
     if (!value) return null;
     try {
+      // Decode Base64 with UTF-8 handling
       return decodeURIComponent(escape(atob(value)));
     } catch (e) {
-      console.error("Failed to decode save data.", e);
+      console.error("Failed to decode save data. It may be corrupted or format changed.", e);
       return null;
     }
   },
   setItem: (name: string, value: string): void => {
     try {
+      // Encode Base64 with UTF-8 handling (Fixes crash on "→" or emojis)
       const encoded = btoa(unescape(encodeURIComponent(value)));
       localStorage.setItem(name, encoded);
     } catch (e) {
-      console.error("Failed to save data.", e);
+      console.error("Failed to save data to local storage", e);
     }
   },
   removeItem: (name: string): void => {
@@ -146,7 +148,7 @@ const secureStorage: StateStorage = {
 };
 
 const INITIAL_STATS: PlayerStats = {
-  cash: 0, 
+  cash: 0, // Session cash starts at 0
   reputation: 50,
   time: "08:00 AM",
   energy: 100
@@ -159,23 +161,6 @@ const INITIAL_LIFETIME: LifetimeStats = {
   totalTripsCompleted: 0
 };
 
-// Default Upgrades (Level 0 for all)
-const DEFAULT_UPGRADES: Record<VehicleType, VehicleUpgrades> = {
-  'boda': { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 },
-  'tuktuk': { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 },
-  'personal-car': { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 },
-  '14-seater': { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 },
-  '32-seater': { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 },
-  '52-seater': { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 },
-};
-
-// Upgrade Costs (Simple Tier System)
-export const UPGRADE_COSTS = {
-  engine: [5000, 15000, 40000], // Level 1, 2, 3
-  license: [8000, 20000, 50000],
-  suspension: [4000, 10000, 25000]
-};
-
 // Consumption in KM per Liter
 const FUEL_EFFICIENCY = {
   'boda': 35,
@@ -186,6 +171,7 @@ const FUEL_EFFICIENCY = {
   '52-seater': 5
 };
 
+// Assumed Tank Capacities in Liters for gauge calculation
 const TANK_CAPACITY = {
   'boda': 12,
   'tuktuk': 10,
@@ -195,6 +181,7 @@ const TANK_CAPACITY = {
   '52-seater': 150
 };
 
+// Vehicle Capacities (Legal vs Max Physical Overload)
 const VEHICLE_CAPACITY = {
   'boda': { legal: 1, max: 2 },
   'tuktuk': { legal: 3, max: 4 },
@@ -207,41 +194,112 @@ const VEHICLE_CAPACITY = {
 interface VehicleSpec {
   maxSpeedKmh: number;
   timeMultiplier: number;
-  price: number; 
+  price: number; // Cost to unlock
 }
 
+// Vehicle Performance & Pricing Specs
 export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
-  'boda': { maxSpeedKmh: 140, timeMultiplier: 1.0, price: 0 },
-  'tuktuk': { maxSpeedKmh: 90, timeMultiplier: 1.4, price: 10000 },
-  'personal-car': { maxSpeedKmh: 190, timeMultiplier: 0.85, price: 40000 },
-  '14-seater': { maxSpeedKmh: 175, timeMultiplier: 1.0, price: 120000 },
-  '32-seater': { maxSpeedKmh: 130, timeMultiplier: 1.2, price: 200000 },
-  '52-seater': { maxSpeedKmh: 120, timeMultiplier: 1.3, price: 350000 }
+  'boda': { 
+    maxSpeedKmh: 140, 
+    timeMultiplier: 1.0,
+    price: 0 // Free
+  },
+  'tuktuk': { 
+    maxSpeedKmh: 90, 
+    timeMultiplier: 1.4,
+    price: 10000
+  },
+  'personal-car': { 
+    maxSpeedKmh: 190, 
+    timeMultiplier: 0.85,
+    price: 40000
+  },
+  '14-seater': { 
+    maxSpeedKmh: 175, 
+    timeMultiplier: 1.0,
+    price: 120000
+  },
+  '32-seater': { 
+    maxSpeedKmh: 130, 
+    timeMultiplier: 1.2,
+    price: 200000
+  },
+  '52-seater': { 
+    maxSpeedKmh: 120, 
+    timeMultiplier: 1.3,
+    price: 350000
+  }
 };
 
-// Base Earnings Caps
-const BASE_EARNINGS_CAPS: Record<string, Record<VehicleType, number>> = {
-  'kiambu-route': { 'boda': 800, 'personal-car': 3000, 'tuktuk': 600, '14-seater': 1700, '32-seater': 3000, '52-seater': 3800 },
-  'river-road': { 'boda': 500, 'personal-car': 1500, 'tuktuk': 500, '14-seater': 600, '32-seater': 1300, '52-seater': 1800 },
-  'rural-dirt': { 'boda': 400, 'personal-car': 1000, 'tuktuk': 400, '14-seater': 750, '32-seater': 1100, '52-seater': 1800 },
-  'limuru-drive': { 'boda': 800, 'personal-car': 3000, 'tuktuk': 600, '14-seater': 1300, '32-seater': 2000, '52-seater': 2800 },
-  'maimahiu-escarpment': { 'boda': 700, 'personal-car': 4000, 'tuktuk': 800, '14-seater': 1300, '32-seater': 2000, '52-seater': 2800 },
-  'thika-highway': { 'boda': 700, 'personal-car': 2000, 'tuktuk': 600, '14-seater': 1300, '32-seater': 2000, '52-seater': 2800 },
-  'rongai-extreme': { 'boda': 800, 'personal-car': 3000, 'tuktuk': 600, '14-seater': 1300, '32-seater': 2000, '52-seater': 2800 }
+// --- EARNINGS MATRIX (Map ID -> Vehicle Type -> Max Potential) ---
+export const EARNINGS_CAPS: Record<string, Record<VehicleType, number>> = {
+  'kiambu-route': {
+    'boda': 800,
+    'personal-car': 3000,
+    'tuktuk': 600,
+    '14-seater': 1700,
+    '32-seater': 3000,
+    '52-seater': 3800
+  },
+  'river-road': {
+    'boda': 500,
+    'personal-car': 1500,
+    'tuktuk': 500,
+    '14-seater': 600,
+    '32-seater': 1300,
+    '52-seater': 1800
+  },
+  'rural-dirt': {
+    'boda': 400,
+    'personal-car': 1000,
+    'tuktuk': 400,
+    '14-seater': 750,
+    '32-seater': 1100,
+    '52-seater': 1800
+  },
+  'limuru-drive': {
+    'boda': 800,
+    'personal-car': 3000,
+    'tuktuk': 600,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  },
+  'maimahiu-escarpment': {
+    'boda': 700,
+    'personal-car': 4000,
+    'tuktuk': 800,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  },
+  'thika-highway': {
+    'boda': 700,
+    'personal-car': 2000,
+    'tuktuk': 600,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  },
+  'rongai-extreme': {
+    'boda': 800,
+    'personal-car': 3000,
+    'tuktuk': 600,
+    '14-seater': 1300,
+    '32-seater': 2000,
+    '52-seater': 2800
+  }
 };
-
-// Mock export for direct access, actual logic is in store helper
-export const EARNINGS_CAPS = BASE_EARNINGS_CAPS; 
 
 interface GameStore extends GameState {
-  userId: string | null; 
+  userId: string | null; // Supabase Auth UID
   setScreen: (screen: ScreenName) => void;
   setPlayerInfo: (name: string, sacco: string) => void;
   setVehicleType: (type: VehicleType) => void;
   selectRoute: (route: Route) => void;
   resetGame: () => void;
   resetCareer: () => void; 
-  deleteAccount: () => Promise<void>;
+  deleteAccount: () => Promise<void>; // New action
   updateDistance: (delta: number) => void;
   setCurrentSpeed: (speed: number) => void;
   setBrakeTemp: (temp: number) => void;
@@ -251,8 +309,6 @@ interface GameStore extends GameState {
   registerUser: (uid: string) => void;
   loadUserData: (data: any) => void;
   unlockVehicle: (type: VehicleType) => void;
-  purchaseUpgrade: (vehicle: VehicleType, type: 'engine' | 'license' | 'suspension') => void;
-  buyGameCash: (amount: number, cost: number) => void;
 
   // Controls
   setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
@@ -301,7 +357,6 @@ export const useGameStore = create<GameStore>()(
       saccoName: '',
       vehicleType: null,
       unlockedVehicles: ['boda'],
-      vehicleUpgrades: DEFAULT_UPGRADES,
       currentSpeed: 0,
       distanceTraveled: 0,
       totalRouteDistance: 0,
@@ -358,6 +413,7 @@ export const useGameStore = create<GameStore>()(
       registerUser: (uid) => set({ userMode: 'REGISTERED', userId: uid }),
 
       loadUserData: (data) => {
+        // Hydrate store from Supabase 'player_progress' data
         if (!data) return;
         set({
             bankBalance: data.bank_balance || 0,
@@ -365,14 +421,13 @@ export const useGameStore = create<GameStore>()(
                 totalCashEarned: data.lifetime_earnings || 0,
                 totalDistanceKm: data.total_distance || 0,
                 totalBribesPaid: data.total_bribes || 0,
-                totalTripsCompleted: get().lifetimeStats.totalTripsCompleted 
+                totalTripsCompleted: get().lifetimeStats.totalTripsCompleted // Not strictly tracked in DB schema provided, keep local or ignore
             },
             stats: {
                 ...get().stats,
                 reputation: data.reputation || 50
             },
-            unlockedVehicles: data.unlocked_vehicles || ['boda'],
-            vehicleUpgrades: data.vehicle_upgrades || DEFAULT_UPGRADES // Ensure default if missing
+            unlockedVehicles: data.unlocked_vehicles || ['boda']
         });
       },
 
@@ -384,50 +439,15 @@ export const useGameStore = create<GameStore>()(
           playSfx('COIN');
           const newUnlocked = [...unlockedVehicles, type];
           const newBalance = bankBalance - price;
-          set({ bankBalance: newBalance, unlockedVehicles: newUnlocked });
+          
+          set({
+            bankBalance: newBalance,
+            unlockedVehicles: newUnlocked
+          });
+          
+          // Trigger cloud sync
           get().syncToCloud();
         }
-      },
-
-      // --- UPGRADE SYSTEM ---
-      purchaseUpgrade: (vehicle, type) => {
-          const state = get();
-          // Ensure upgrades object exists
-          const currentUpgrades = (state.vehicleUpgrades && state.vehicleUpgrades[vehicle]) 
-              ? state.vehicleUpgrades[vehicle] 
-              : { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 };
-          
-          let level = 0;
-          if (type === 'engine') level = currentUpgrades.engineLevel;
-          if (type === 'license') level = currentUpgrades.licenseLevel;
-          if (type === 'suspension') level = currentUpgrades.suspensionLevel;
-
-          if (level >= 3) return; // Max level
-
-          const cost = UPGRADE_COSTS[type][level];
-          
-          if (state.bankBalance >= cost) {
-              playSfx('COIN');
-              const newBalance = state.bankBalance - cost;
-              const newUpgrades = { ...state.vehicleUpgrades };
-              
-              newUpgrades[vehicle] = { ...currentUpgrades };
-              
-              if (type === 'engine') newUpgrades[vehicle].engineLevel++;
-              if (type === 'license') newUpgrades[vehicle].licenseLevel++;
-              if (type === 'suspension') newUpgrades[vehicle].suspensionLevel++;
-
-              set({ bankBalance: newBalance, vehicleUpgrades: newUpgrades });
-              get().syncToCloud();
-          }
-      },
-
-      buyGameCash: (amount, cost) => {
-          // This simulates a successful MPesa transaction
-          const state = get();
-          playSfx('COIN');
-          set({ bankBalance: state.bankBalance + amount });
-          get().syncToCloud();
       },
 
       setControl: (control, active) => {
@@ -453,19 +473,22 @@ export const useGameStore = create<GameStore>()(
           selectedRoute
         } = get();
         
+        // Check Destination / Completion
         if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= totalRouteDistance) {
-          set({ distanceTraveled: totalRouteDistance, currentSpeed: 0 });
+          set({ distanceTraveled: totalRouteDistance, currentSpeed: 0 }); // Force stop
           endGame('COMPLETED');
           return;
         }
 
+        // --- Fuel Logic ---
         let newFuel = fuel;
         let newFuelUsedLiters = fuelUsedLiters;
 
         if (vehicleType && currentSpeed > 0) {
-          const kmTraveled = amount / 1000;
+          const kmTraveled = amount / 1000; // Convert game units to km
           const baseEfficiency = FUEL_EFFICIENCY[vehicleType] || 9;
           
+          // Speed Penalty
           let speedPenalty = 1;
           const kmph = currentSpeed * 1.6;
           if (kmph > 80) {
@@ -478,21 +501,25 @@ export const useGameStore = create<GameStore>()(
           const litersConsumed = kmTraveled / realEfficiency;
           newFuelUsedLiters += litersConsumed;
 
+          // Update Gauge Percentage
           const capacity = TANK_CAPACITY[vehicleType] || 70;
           const percentConsumed = (litersConsumed / capacity) * 100;
           newFuel = Math.max(0, fuel - percentConsumed);
         }
 
+        // RACE MODE: No Police or Stages
         const isRace = selectedRoute?.gamemode === 'RACE';
 
+        // Check Police (Hustle Mode Only)
         if (!isRace && activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
-          set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters });
+          set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
           triggerPoliceCheck();
           return;
         }
 
+        // Check Stage (Hustle Mode Only)
         if (!isRace && activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
-          set({ distanceTraveled: nextStageDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters });
+          set({ distanceTraveled: nextStageDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
           triggerStage();
           return;
         } 
@@ -501,21 +528,15 @@ export const useGameStore = create<GameStore>()(
       },
       
       triggerStage: () => {
-        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute, vehicleUpgrades } = get();
+        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute } = get();
         
         const waiting = nextStagePassengerCount; 
         const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
         
         const mapId = selectedRoute?.id || 'kiambu-route';
         const vType = vehicleType || '14-seater';
-        
-        // --- UPGRADE LOGIC: EARNINGS ---
-        const upgrades = (vehicleUpgrades && vehicleUpgrades[vType]) ? vehicleUpgrades[vType] : { engineLevel: 0, licenseLevel: 0 };
-        const licenseMultiplier = 1 + (upgrades.licenseLevel * 0.2); // 20% boost per level
-
-        const mapCaps = BASE_EARNINGS_CAPS[mapId] || BASE_EARNINGS_CAPS['kiambu-route'];
-        const baseCap = mapCaps[vType] || 2000;
-        const earningCap = baseCap * licenseMultiplier;
+        const mapCaps = EARNINGS_CAPS[mapId] || EARNINGS_CAPS['kiambu-route'];
+        const earningCap = mapCaps[vType] || 2000;
 
         const estimatedStops = Math.ceil(selectedRoute!.distance / 2.5) || 5;
         const legalCapacity = VEHICLE_CAPACITY[vType].legal;
@@ -674,7 +695,7 @@ export const useGameStore = create<GameStore>()(
       },
       
       startGameLoop: () => {
-        const { selectedRoute, vehicleType, stats, vehicleUpgrades } = get();
+        const { selectedRoute, vehicleType, stats } = get();
         if (!selectedRoute) return;
 
         let seconds = 420; 
@@ -695,11 +716,7 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
-        const vType = vehicleType || '14-seater';
-        const spec = VEHICLE_SPECS[vType];
-        
-        // --- UPGRADE LOGIC: SPEED (Indirect via Time Multiplier for now, Physics handles real speed) ---
-        // Just for time remaining, we keep it standard, speed benefit is in PhysicsController
+        const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
         seconds = Math.ceil(seconds * spec.timeMultiplier);
 
         const totalDist = selectedRoute.distance * 1000;
@@ -803,15 +820,9 @@ export const useGameStore = create<GameStore>()(
 
         if (state.vehicleType && state.currentSpeed > 0) {
             const spec = VEHICLE_SPECS[state.vehicleType];
-            
-            // --- UPGRADE LOGIC: SPEED (Calculate max allowed speed for happiness penalty) ---
-            const upgrades = (state.vehicleUpgrades && state.vehicleUpgrades[state.vehicleType]) ? state.vehicleUpgrades[state.vehicleType] : { engineLevel: 0 };
-            const speedBoost = 1 + (upgrades.engineLevel * 0.15); // 15% boost per level
-            const adjustedMaxKmh = spec.maxSpeedKmh * speedBoost;
-
             const currentKmh = state.currentSpeed * 1.6;
             
-            if (currentKmh > adjustedMaxKmh * 0.9) {
+            if (currentKmh > spec.maxSpeedKmh * 0.9) {
                 newHappiness = Math.max(0, newHappiness - 0.5);
             }
         }
@@ -830,6 +841,8 @@ export const useGameStore = create<GameStore>()(
       }),
 
       endGame: (reason) => {
+        // Just halt the game and show the appropriate modal.
+        // DO NOT save to lifetime stats or sync to cloud here.
         set({ 
           gameStatus: 'GAME_OVER', 
           gameOverReason: reason,
@@ -866,28 +879,22 @@ export const useGameStore = create<GameStore>()(
             bankBalance: newBankBalance
         });
 
+        // Trigger Sync
         get().syncToCloud();
+        
+        // Return to Map
         get().exitToMapSelection();
       },
       
       syncToCloud: async () => {
         const state = get();
-        
-        // Ensure upgrades are valid object
-        const upgradesPayload = state.vehicleUpgrades || DEFAULT_UPGRADES;
-
-        // Try syncing. Catch errors gracefully to avoid blocking game loop.
-        try {
-            await GameService.syncProgress(state.userMode, state.userId || undefined, {
-                bankBalance: state.bankBalance,
-                lifetimeStats: state.lifetimeStats,
-                reputation: state.stats.reputation,
-                unlockedVehicles: state.unlockedVehicles,
-                vehicleUpgrades: upgradesPayload
-            });
-        } catch (e) {
-            console.warn("Cloud Sync failed (likely network or schema mismatch). Continuing locally.", e);
-        }
+        // Fire and forget sync (don't block UI)
+        await GameService.syncProgress(state.userMode, state.userId || undefined, {
+            bankBalance: state.bankBalance,
+            lifetimeStats: state.lifetimeStats,
+            reputation: state.stats.reputation,
+            unlockedVehicles: state.unlockedVehicles
+        });
       },
 
       deleteAccount: async () => {
@@ -895,9 +902,11 @@ export const useGameStore = create<GameStore>()(
               if (get().userMode === 'REGISTERED') {
                  await GameService.deleteAccount();
               }
+              // Clear local state
               get().resetCareer(); 
           } catch (e) {
               console.error("Failed to delete account fully", e);
+              // Force local wipe anyway if backend fails or if it was guest
               get().resetCareer();
           }
       },
@@ -938,7 +947,6 @@ export const useGameStore = create<GameStore>()(
         bankBalance: 0,
         userMode: 'GUEST',
         unlockedVehicles: ['boda'],
-        vehicleUpgrades: DEFAULT_UPGRADES,
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
@@ -967,7 +975,6 @@ export const useGameStore = create<GameStore>()(
         userMode: state.userMode,
         userId: state.userId,
         unlockedVehicles: state.unlockedVehicles,
-        vehicleUpgrades: state.vehicleUpgrades,
         lifetimeStats: state.lifetimeStats,
         bankBalance: state.bankBalance,
         isSoundOn: state.isSoundOn,
@@ -980,9 +987,6 @@ export const useGameStore = create<GameStore>()(
         if (state) {
             if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {
               state.unlockedVehicles = ['boda'];
-            }
-            if (!state.vehicleUpgrades) {
-                state.vehicleUpgrades = DEFAULT_UPGRADES;
             }
             if (!state.userMode) {
               state.userMode = 'GUEST';

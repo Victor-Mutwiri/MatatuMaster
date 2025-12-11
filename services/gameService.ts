@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { PlayerStats, LifetimeStats, VehicleType, UserMode, VehicleUpgrades } from '../types';
+import { PlayerStats, LifetimeStats, VehicleType, UserMode } from '../types';
 
 // --- Types mirroring the Supabase DB Schema ---
 export interface DBProfile {
@@ -17,7 +17,6 @@ export interface DBProgress {
   total_bribes: number;
   reputation: number;
   unlocked_vehicles: VehicleType[];
-  vehicle_upgrades: Record<VehicleType, VehicleUpgrades>; // Added
   lifetime_earnings: number;
   updated_at?: string;
 }
@@ -73,7 +72,6 @@ export const GameService = {
       lifetimeStats: LifetimeStats;
       reputation: number;
       unlockedVehicles: VehicleType[];
-      vehicleUpgrades: Record<VehicleType, VehicleUpgrades>; // Added
     }
   ) => {
     if (userMode === 'GUEST' || !userId) {
@@ -82,10 +80,9 @@ export const GameService = {
 
     try {
         // Ensure values are integers for BigInt columns
-        // NOTE: If vehicle_upgrades column doesn't exist in Supabase, this will fail.
-        // We assume the DB schema is updated or we handle it gracefully.
-        
-        const payload: any = { 
+        const { error } = await supabase
+          .from('player_progress')
+          .upsert({ 
             user_id: userId,
             bank_balance: Math.floor(data.bankBalance),
             total_distance: Math.floor(data.lifetimeStats.totalDistanceKm),
@@ -93,13 +90,8 @@ export const GameService = {
             lifetime_earnings: Math.floor(data.lifetimeStats.totalCashEarned),
             reputation: Math.floor(data.reputation),
             unlocked_vehicles: data.unlockedVehicles,
-            vehicle_upgrades: data.vehicleUpgrades, // JSONB
             updated_at: new Date().toISOString()
-        };
-
-        const { error } = await supabase
-          .from('player_progress')
-          .upsert(payload);
+          });
 
         if (error) {
             if (error.code === '42501') {

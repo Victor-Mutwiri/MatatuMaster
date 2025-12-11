@@ -1,9 +1,13 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
 import { Road, HighwayBarrier, ModernBuilding, HighwayLightPole } from '../environment/WorldAssets';
+
+// A stripped-down version of ThikaRoadMap focused on speed.
+// No StageMarkers, No PoliceMarkers.
+// Enhanced visual effects for speed perception.
 
 const SpeedDecorations = () => {
     const groupRef = useRef<THREE.Group>(null);
@@ -12,12 +16,13 @@ const SpeedDecorations = () => {
     const COUNT = 20;
     const GAP = 15;
     
-    // REPLACE useMemo with useState
-    const [chunks] = useState(() => Array.from({ length: COUNT }).map((_, i) => -i * GAP));
+    // Static placement array
+    const chunks = useMemo(() => Array.from({ length: COUNT }).map((_, i) => -i * GAP), []);
 
     useFrame((state, delta) => {
         if (!groupRef.current) return;
         
+        // Move decorations to simulate travel
         groupRef.current.children.forEach((child) => {
             if (currentSpeed > 0) {
                 child.position.z += currentSpeed * delta;
@@ -32,14 +37,21 @@ const SpeedDecorations = () => {
         <group ref={groupRef}>
             {chunks.map((z, i) => (
                 <group key={i} position={[0, 0, z]}>
+                    
+                    {/* RIGHT SIDE (Barrier + Lights) */}
                     <group position={[8, 0, 0]}>
                         <HighwayBarrier />
+                        {/* More frequent lights for racing atmosphere */}
                         <HighwayLightPole isLeft={false} />
                     </group>
+
+                    {/* LEFT SIDE (Barrier + Lights) */}
                     <group position={[-8, 0, 0]}>
                         <HighwayBarrier />
                         <HighwayLightPole isLeft={true} />
                     </group>
+
+                    {/* Checkered Flags / Banners occasionally */}
                     {i % 5 === 0 && (
                         <group position={[0, 6, 0]}>
                              <mesh position={[0, 0, 0]} rotation={[0, 0, 0]}>
@@ -52,6 +64,7 @@ const SpeedDecorations = () => {
                              </mesh>
                         </group>
                     )}
+
                 </group>
             ))}
         </group>
@@ -64,6 +77,7 @@ export const MultiplayerThikaMap = () => {
     const distRemaining = totalRouteDistance - distanceTraveled;
     const isVisible = distRemaining < 2000;
 
+    // Background Parallax
     useFrame(() => {
         if (groupRef.current) {
            groupRef.current.position.z = -(totalRouteDistance - distanceTraveled) * 0.1;
@@ -73,13 +87,20 @@ export const MultiplayerThikaMap = () => {
   return (
     <group>
       <Road variant="HIGHWAY" />
+      
+      {/* Intense Speed Decorations */}
       <SpeedDecorations />
+
+      {/* Opposite Lane (Visual Only) - Pushed out further for highway feel */}
       <group position={[22, -0.05, 0]}>
            <mesh rotation={[-Math.PI / 2, 0, 0]}>
                 <planeGeometry args={[12, 300]} />
                 <meshStandardMaterial color="#1a1a1a" />
            </mesh>
+           {/* We can add simple red taillights streaming away here for effect */}
       </group>
+
+      {/* Distant Skyline */}
       {isVisible && (
         <group ref={groupRef} position={[0, 0, -500]}>
             <ModernBuilding height={60} color="#0f172a" position={[-40, 0, 0]} />

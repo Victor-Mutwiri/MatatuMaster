@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
@@ -11,8 +11,11 @@ const ScrollingTerrain = () => {
     const COUNT = 16;
     const GAP = 15;
 
-    // REPLACE useMemo with useState
-    const [chunks] = useState(() => Array.from({ length: COUNT }).map((_, i) => ({
+    // Stable generation of obstacles to prevent flickering during re-renders
+    // Updated spawn ranges to match new road width
+    // Lane -1 (Tarmac) x range approx: -1.5 to -4.5
+    // Lane -2 (Dirt) x range approx: -5.0 to -7.5
+    const chunks = useMemo(() => Array.from({ length: COUNT }).map((_, i) => ({
         z: -i * GAP,
         pothole: Math.random() > 0.6 ? {
             x: Math.random() > 0.5 ? (-3.2 + (Math.random() - 0.5)) : (-6.4 + (Math.random() - 0.5)),
@@ -21,7 +24,7 @@ const ScrollingTerrain = () => {
         dirtPatch: Math.random() > 0.8 ? {
             x: -6.4 + (Math.random() - 0.5) * 2
         } : null
-    })));
+    })), []);
 
     useFrame((state, delta) => {
         if (!groupRef.current) return;
@@ -39,15 +42,22 @@ const ScrollingTerrain = () => {
         <group ref={groupRef}>
             {chunks.map((chunk, i) => (
                 <group key={i} position={[0, 0, chunk.z]}>
+                    
+                    {/* Visual Scenery is handled by Scenery Component but specific road decals here */}
+                    
+                    {/* Potholes - Pre-calculated and raised slightly to prevent Z-fighting */}
                     {chunk.pothole && (
                         <Pothole position={[chunk.pothole.x, 0.07, chunk.pothole.z]} />
                     )}
+                    
+                    {/* Dirt Patch Overlay */}
                     {chunk.dirtPatch && (
                          <mesh position={[chunk.dirtPatch.x, 0.05, 0]} rotation={[-Math.PI/2, 0, 0]}>
                             <circleGeometry args={[1.5, 6]} />
                             <meshStandardMaterial color="#5D4037" transparent opacity={0.6} />
                          </mesh>
                     )}
+
                 </group>
             ))}
         </group>
@@ -57,9 +67,15 @@ const ScrollingTerrain = () => {
 export const RongaiMap = () => {
   return (
     <group>
+      {/* Rongai has chaotic mix of buildings and rough terrain */}
       <Scenery variant="RONGAI" />
+      
+      {/* Road with extra shoulder width for overlapping and clear separation */}
       <Road variant="RONGAI" />
+      
+      {/* Dynamic Potholes and Dirt */}
       <ScrollingTerrain />
+      
       <StageMarker />
       <PoliceMarker />
     </group>

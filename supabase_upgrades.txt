@@ -1,5 +1,0 @@
-
--- Run this in your Supabase SQL Editor to fix the sync error
-
-ALTER TABLE public.player_progress 
-ADD COLUMN IF NOT EXISTS vehicle_upgrades jsonb DEFAULT '{}'::jsonb;

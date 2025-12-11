@@ -4,32 +4,22 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore, EARNINGS_CAPS, MAP_DEFINITIONS } from '../store/gameStore';
 import { Route } from '../types';
-import { Lock, MapPin, ArrowLeft, TrendingUp, Car } from 'lucide-react';
+import { Clock, Lock, MapPin, ArrowLeft, TrendingUp, Car, Shield, Navigation } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const MapSelectionScreen: React.FC = () => {
-  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType, vehicleUpgrades } = useGameStore();
+  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType } = useGameStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
 
-  // Helper to get real potential earnings including UPGRADES
+  // Helper to get real potential earnings
   const getEarnings = (mapId: string) => {
     const currentVehicle = vehicleType || '14-seater';
     const mapCaps = EARNINGS_CAPS[mapId];
-    
-    let baseEarnings = 0;
     if (mapCaps && mapCaps[currentVehicle]) {
-        baseEarnings = mapCaps[currentVehicle];
+        return mapCaps[currentVehicle];
     }
-
-    // Apply Route Permit Upgrade Multiplier safely
-    const upgrades = (vehicleUpgrades && vehicleUpgrades[currentVehicle]) 
-        ? vehicleUpgrades[currentVehicle] 
-        : { engineLevel: 0, licenseLevel: 0, suspensionLevel: 0 };
-        
-    const multiplier = 1 + (upgrades.licenseLevel * 0.2); // 20% boost per level
-    
-    return Math.floor(baseEarnings * multiplier);
+    return 0;
   };
 
   // Filter Maps: Single Player only shows HUSTLE mode maps
@@ -64,12 +54,6 @@ export const MapSelectionScreen: React.FC = () => {
 
   const activeRoute = selectedRoute && selectedRoute.gamemode === 'HUSTLE' ? selectedRoute : displayedMaps[0];
   const activeEarnings = getEarnings(activeRoute.id);
-  
-  // Check if active vehicle has license upgrade to show indicator
-  const currentUpgrades = (vehicleUpgrades && vehicleUpgrades[vehicleType || '14-seater']) 
-      ? vehicleUpgrades[vehicleType || '14-seater'] 
-      : { licenseLevel: 0 };
-  const hasBoost = currentUpgrades.licenseLevel > 0;
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
@@ -121,10 +105,7 @@ export const MapSelectionScreen: React.FC = () => {
                    </div>
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
                       <span className="text-slate-500 uppercase font-bold text-xs">Potential</span>
-                      <div className="flex items-center gap-2">
-                          <span className="text-green-400 font-mono">KES {activeEarnings}</span>
-                          {hasBoost && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 rounded font-bold uppercase">+Boosted</span>}
-                      </div>
+                      <span className="text-green-400 font-mono">KES {activeEarnings}</span>
                    </div>
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
                       <span className="text-slate-500 uppercase font-bold text-xs">Difficulty</span>
@@ -209,10 +190,7 @@ export const MapSelectionScreen: React.FC = () => {
                 </div>
                 <div className="text-right">
                    <div className="text-[10px] text-slate-500 uppercase font-bold Reward">Potential</div>
-                   <div className="text-green-400 font-mono font-bold flex items-center justify-end gap-1">
-                       KES {activeEarnings}
-                       {hasBoost && <TrendingUp size={12} />}
-                   </div>
+                   <div className="text-green-400 font-mono font-bold">KES {activeEarnings}</div>
                 </div>
              </div>
              

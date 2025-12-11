@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../../store/gameStore';
 import * as THREE from 'three';
@@ -81,12 +81,14 @@ export const ModernBuilding = ({ height, color, position }: { height: number, co
 };
 
 export const ApartmentBlock = ({ position, color = "#d4d4d8" }: { position: [number, number, number], color?: string }) => {
+  // Rongai style apartment blocks - not too tall, concrete, balconies
   return (
     <group position={position}>
         <mesh position={[0, 6, 0]}>
              <boxGeometry args={[6, 12, 6]} />
              <meshStandardMaterial color={color} />
         </mesh>
+        {/* Balconies */}
         {Array.from({length: 4}).map((_, i) => (
              <group key={i} position={[0, i * 2.5 + 2, 3.1]}>
                  <mesh position={[0, 0, 0]}>
@@ -95,6 +97,7 @@ export const ApartmentBlock = ({ position, color = "#d4d4d8" }: { position: [num
                  </mesh>
              </group>
         ))}
+        {/* Shop on ground floor */}
         <mesh position={[0, 1, 3.1]}>
              <planeGeometry args={[5, 2]} />
              <meshStandardMaterial color="#0f172a" />
@@ -161,6 +164,7 @@ export const Rock = ({ scale = 1 }: { scale?: number }) => {
 };
 
 export const Pothole = ({ position }: { position: [number, number, number] }) => {
+    // A dark, slightly depressed circle to represent a pothole
     return (
         <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.6 + Math.random() * 0.4, 8]} />
@@ -172,10 +176,12 @@ export const Pothole = ({ position }: { position: [number, number, number] }) =>
 export const CliffFace = () => {
   return (
     <group>
+        {/* Large rock wall */}
         <mesh position={[0, 10, 0]} rotation={[0, 0, 0.2]}>
              <boxGeometry args={[5, 40, 40]} />
              <meshStandardMaterial color="#5D4037" roughness={1.0} />
         </mesh>
+        {/* Random outcroppings */}
         {Array.from({length: 5}).map((_, i) => (
             <mesh key={i} position={[2, Math.random() * 20 - 5, Math.random() * 30 - 15]} rotation={[Math.random(), Math.random(), Math.random()]}>
                 <dodecahedronGeometry args={[3, 0]} />
@@ -189,6 +195,7 @@ export const CliffFace = () => {
 export const ValleyView = () => {
     return (
         <group position={[50, -20, 0]}>
+            {/* Distant Hills */}
             <mesh position={[0, 0, -50]}>
                 <coneGeometry args={[40, 30, 4]} />
                 <meshStandardMaterial color="#5f6368" />
@@ -204,6 +211,7 @@ export const ValleyView = () => {
 export const HighwayBarrier = () => {
     return (
         <group>
+            {/* Concrete Jersey Barrier */}
             <mesh position={[0, 0.4, 0]}>
                 <boxGeometry args={[0.3, 0.8, 4]} />
                 <meshStandardMaterial color="#9ca3af" roughness={0.6} />
@@ -219,14 +227,17 @@ export const HighwayBarrier = () => {
 export const HighwayLightPole = ({ isLeft = false }: { isLeft?: boolean }) => {
   return (
       <group>
+          {/* Main Pole */}
           <mesh position={[0, 3, 0]}>
               <cylinderGeometry args={[0.1, 0.15, 6]} />
               <meshStandardMaterial color="#475569" />
           </mesh>
+          {/* Arm */}
           <mesh position={[isLeft ? 2 : -2, 6, 0]} rotation={[0, 0, isLeft ? 0.2 : -0.2]}>
                 <boxGeometry args={[5, 0.15, 0.3]} />
                 <meshStandardMaterial color="#475569" />
           </mesh>
+          {/* Lamp */}
           <mesh position={[isLeft ? 4 : -4, 5.8, 0]}>
                 <boxGeometry args={[0.8, 0.2, 0.5]} />
                 <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1} />
@@ -236,11 +247,8 @@ export const HighwayLightPole = ({ isLeft = false }: { isLeft?: boolean }) => {
 };
 
 export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotation: [number, number, number]; isWalking?: boolean }> = ({ position, rotation, isWalking = false }) => {
-  // REPLACED useMemo with useState initializer to avoid null hook error
-  const [colors] = useState(() => ({
-      shirt: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)],
-      pants: ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)]
-  }));
+  const shirtColor = useMemo(() => ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][Math.floor(Math.random() * 5)], []);
+  const pantsColor = useMemo(() => ['#1f2937', '#374151', '#4b5563', '#1e1e1e'][Math.floor(Math.random() * 4)], []);
   const skinColor = '#8d5524';
   const groupRef = useRef<THREE.Group>(null);
 
@@ -260,15 +268,15 @@ export const LowPolyHuman: React.FC<{ position: [number, number, number]; rotati
       </mesh>
       <mesh position={[0, 1.0, 0]}>
         <boxGeometry args={[0.4, 0.8, 0.25]} />
-        <meshStandardMaterial color={colors.shirt} />
+        <meshStandardMaterial color={shirtColor} />
       </mesh>
       <mesh position={[-0.12, 0.3, 0]}>
         <cylinderGeometry args={[0.08, 0.07, 0.6]} />
-        <meshStandardMaterial color={colors.pants} />
+        <meshStandardMaterial color={pantsColor} />
       </mesh>
       <mesh position={[0.12, 0.3, 0]}>
          <cylinderGeometry args={[0.08, 0.07, 0.6]} />
-        <meshStandardMaterial color={colors.pants} />
+        <meshStandardMaterial color={pantsColor} />
       </mesh>
     </group>
   );
@@ -282,14 +290,17 @@ export const CopOnFoot: React.FC<{ position: [number, number, number]; side: 'LE
                 <sphereGeometry args={[0.2, 8, 8]} />
                 <meshStandardMaterial color="#8d5524" />
             </mesh>
+            {/* Police Hat */}
             <mesh position={[0, 1.85, 0]}>
                 <cylinderGeometry args={[0.22, 0.22, 0.1]} />
                 <meshStandardMaterial color="#1e3a8a" />
             </mesh>
+             {/* Uniform */}
             <mesh position={[0, 1.0, 0]}>
                 <boxGeometry args={[0.4, 0.8, 0.25]} />
                 <meshStandardMaterial color="#1e40af" />
             </mesh>
+            {/* Reflective Vest */}
             <mesh position={[0, 1.1, 0.05]}>
                 <boxGeometry args={[0.42, 0.5, 0.26]} />
                 <meshStandardMaterial color="#fbbf24" />
@@ -306,6 +317,8 @@ export const CopOnFoot: React.FC<{ position: [number, number, number]; side: 'LE
     )
 }
 
+// --- Infrastructure ---
+
 export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHWAY' | 'RIVER_ROAD' | 'RONGAI' }) => {
   const groupRef = useRef<THREE.Group>(null);
   const STRIP_COUNT = 20;
@@ -320,7 +333,7 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
   let width = ROAD_WIDTH;
   if (isHighway) width = HIGHWAY_WIDTH;
   if (isRiverRoad) width = RIVER_ROAD_WIDTH;
-  if (isRongai) width = ROAD_WIDTH + 4; 
+  if (isRongai) width = ROAD_WIDTH + 4; // Total logical width
 
   const GRASS_OFFSET = width / 2 + 5;
 
@@ -338,17 +351,25 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
     }
   });
 
+  // Special Rendering for Rongai
   if (isRongai) {
     return (
         <group>
+            {/* 1. Main Road (Tarmac) - Covering Lane -1 and Lane 1 */}
+            {/* Approx Width 10, centered at 0 */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
                 <planeGeometry args={[10, 300]} />
                 <meshStandardMaterial color={roadColor} roughness={0.8} />
             </mesh>
+
+            {/* 2. Overlap Shoulder (Dirt) - Covering Lane -2 */}
+            {/* Positioned left of main road */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-8, -0.04, 0]} receiveShadow>
                 <planeGeometry args={[6, 300]} />
                 <meshStandardMaterial color="#5D4037" roughness={1} />
             </mesh>
+
+            {/* 3. Sides (Grass/Rough) */}
              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-14, -0.1, 0]}>
                 <planeGeometry args={[10, 300]} />
                 <meshStandardMaterial color={sideColor} />
@@ -357,13 +378,19 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
                 <planeGeometry args={[10, 300]} />
                 <meshStandardMaterial color={sideColor} />
             </mesh>
+
+            {/* 4. Moving Elements */}
             <group ref={groupRef}>
                  {Array.from({ length: STRIP_COUNT }).map((_, i) => (
                     <group key={i} position={[0, 0, -i * STRIP_GAP]}>
+                         {/* Center Line (Yellow broken) */}
                          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
                             <planeGeometry args={[0.15, 4]} />
                             <meshStandardMaterial color={stripColor} />
                          </mesh>
+                         
+                         {/* Shoulder Separator (Solid White Line) */}
+                         {/* Placed between Tarmac and Dirt at x = -5 */}
                          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-5, 0.06, 0]}>
                              <planeGeometry args={[0.2, STRIP_GAP]} />
                              <meshStandardMaterial color="#e2e8f0" />
@@ -377,13 +404,17 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
 
   return (
     <group>
+      {/* Main Road Surface */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
         <planeGeometry args={[width, 300]} />
         <meshStandardMaterial color={roadColor} roughness={isHighway ? 0.4 : 1.0} />
       </mesh>
+      
+      {/* Moving Markings */}
       <group ref={groupRef}>
         {Array.from({ length: STRIP_COUNT }).map((_, i) => (
           <group key={i} position={[0, 0, -i * STRIP_GAP]}>
+             {/* Center Lines */}
              {isHighway ? (
                 <>
                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-1.75, 0.01, 0]}>
@@ -413,7 +444,9 @@ export const Road = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'HIGHW
         ))}
       </group>
 
+      {/* Sides */}
       {isRiverRoad ? (
+          // River Road Pavements
           <>
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-(width/2 + 2), 0.15, 0]}>
                 <planeGeometry args={[4, 300]} />
@@ -464,8 +497,7 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'RO
 
   const isRural = variant === 'RURAL';
 
-  // REPLACED useMemo with useState initializer to avoid null hook error
-  const [sceneryItems] = useState(() => {
+  const sceneryItems = useMemo(() => {
     return Array.from({ length: OBJECT_COUNT }).map((_, i) => {
       const side = i % 2 === 0 ? 1 : -1;
       const x = (BASE_OFFSET + Math.random() * 4) * side;
@@ -475,6 +507,7 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'RO
       if (isRural) {
          type = Math.random() > 0.6 ? 'ROCK' : 'TREE';
       } else if (isRongai) {
+         // Mix of Apartments and Trees
          type = Math.random() > 0.7 ? 'APARTMENT' : 'TREE';
       } else {
          type = i % 6 === 0 ? 'SIGN' : i % 3 === 0 ? 'BUSH' : 'TREE';
@@ -483,7 +516,7 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'RO
       const scale = 0.8 + Math.random() * 0.4;
       return { x, z, type, side, scale };
     });
-  });
+  }, [isRural, isRongai, BASE_OFFSET]);
 
   useFrame((state, delta) => {
     const speed = useGameStore.getState().currentSpeed;
@@ -540,23 +573,28 @@ export const Scenery = ({ variant = 'CITY' }: { variant?: 'CITY' | 'RURAL' | 'RO
 };
 
 export const HeavyTruck = () => {
-    const bodyColor = "#f59e0b";
-    const cargoColor = "#374151";
+    // A simplified visual for the heavy truck (reuse bus geometry but different color/load)
+    const bodyColor = "#f59e0b"; // Orange Cabin
+    const cargoColor = "#374151"; // Grey Cargo
     
     return (
         <group position={[0, 0.6, 0]}>
+            {/* Cabin */}
             <mesh position={[0, 0.8, 3.5]}>
                 <boxGeometry args={[2.0, 1.8, 1.5]} />
                 <meshStandardMaterial color={bodyColor} />
             </mesh>
+            {/* Cargo Container */}
             <mesh position={[0, 1.5, -0.5]}>
                 <boxGeometry args={[2.1, 2.5, 6.0]} />
                 <meshStandardMaterial color={cargoColor} roughness={0.9} />
             </mesh>
+            {/* Windshield */}
              <mesh position={[0, 1.2, 4.26]} rotation={[0.05, 0, 0]}>
                 <boxGeometry args={[1.9, 0.8, 0.1]} />
                 <meshStandardMaterial color="#111" metalness={0.8} roughness={0.1} />
             </mesh>
+            {/* Wheels */}
             <Wheel position={[1.0, -0.15, 3.5]} radius={0.45} />
             <Wheel position={[-1.0, -0.15, 3.5]} radius={0.45} />
             <Wheel position={[1.0, -0.15, -2.0]} radius={0.45} />
@@ -567,6 +605,7 @@ export const HeavyTruck = () => {
             <VehicleHeadlight position={[0.8, 0.4, 4.26]} />
             <VehicleHeadlight position={[-0.8, 0.4, 4.26]} />
             
+             {/* Brake Lights Bar */}
             <mesh position={[0, 1.0, -3.51]}>
                 <boxGeometry args={[1.8, 0.2, 0.1]} />
                 <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={1} />
@@ -575,27 +614,26 @@ export const HeavyTruck = () => {
     )
 }
 
+// --- Markers ---
+
 export const StageModel = ({ distance, passengerCount, isDeparting }: { distance: number, passengerCount: number, isDeparting: boolean }) => {
   const markerRef = useRef<THREE.Group>(null);
   const { selectedRoute } = useGameStore();
   const isHighway = selectedRoute?.id === 'thika-highway';
   const isRongai = selectedRoute?.id === 'rongai-extreme';
   
+  // Position marker further out on highway/rongai to avoid collision
+  // Rongai has overlap lane -2 (at x=-6.4), dirt edge at -11. Stage needs to be safe. -12 is good.
   const MARKER_X = isHighway ? -12 : (isRongai ? -12 : -(ROAD_WIDTH / 2 + 2.5));
   
-  // REPLACED useMemo with useState initializer
-  const [crowd] = useState(() => {
-    // Only generate once
-    return Array.from({ length: 15 }).map((_, i) => ({
+  const crowd = useMemo(() => {
+    if (isDeparting || passengerCount <= 0) return [];
+    return Array.from({ length: passengerCount }).map((_, i) => ({
       x: (Math.random() - 0.5) * 3,
       z: (Math.random() - 0.5) * 1.5,
       rotY: (Math.random() - 0.5) * Math.PI
     }));
-  });
-
-  // Calculate visibility and active crowd slice based on props in render or useFrame
-  // We can't change useState size easily, so we just map a slice of the pre-generated crowd
-  const activeCrowd = isDeparting ? [] : crowd.slice(0, passengerCount);
+  }, [passengerCount, isDeparting]);
 
   useFrame(() => {
     const distToStage = distance - useGameStore.getState().distanceTraveled;
@@ -614,7 +652,7 @@ export const StageModel = ({ distance, passengerCount, isDeparting }: { distance
   return (
     <group ref={markerRef} position={[MARKER_X, 0, 0]}>
       <BusStopShelter />
-      {activeCrowd.map((p, i) => (
+      {crowd.map((p, i) => (
         <LowPolyHuman key={i} position={[p.x, 0, p.z]} rotation={[0, p.rotY, 0]} />
       ))}
     </group>
