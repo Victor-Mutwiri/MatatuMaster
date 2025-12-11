@@ -22,6 +22,7 @@ export const GameLoopScreen: React.FC = () => {
     startGameLoop, 
     exitToMapSelection,
     endGame,
+    bankCurrentRun,
     stats,
     fuel,
     fuelUsedLiters,
@@ -92,7 +93,8 @@ export const GameLoopScreen: React.FC = () => {
     if (userMode === 'GUEST') {
         setShowAuthGate(true);
     } else {
-        exitToMapSelection();
+        // This will save stats and return to map selection
+        bankCurrentRun();
     }
   };
 

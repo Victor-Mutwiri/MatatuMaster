@@ -79,15 +79,16 @@ export const GameService = {
     }
 
     try {
+        // Ensure values are integers for BigInt columns
         const { error } = await supabase
           .from('player_progress')
           .upsert({ 
             user_id: userId,
-            bank_balance: data.bankBalance,
-            total_distance: data.lifetimeStats.totalDistanceKm,
-            total_bribes: data.lifetimeStats.totalBribesPaid,
-            lifetime_earnings: data.lifetimeStats.totalCashEarned,
-            reputation: data.reputation,
+            bank_balance: Math.floor(data.bankBalance),
+            total_distance: Math.floor(data.lifetimeStats.totalDistanceKm),
+            total_bribes: Math.floor(data.lifetimeStats.totalBribesPaid),
+            lifetime_earnings: Math.floor(data.lifetimeStats.totalCashEarned),
+            reputation: Math.floor(data.reputation),
             unlocked_vehicles: data.unlockedVehicles,
             updated_at: new Date().toISOString()
           });

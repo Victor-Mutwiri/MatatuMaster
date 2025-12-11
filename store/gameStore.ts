@@ -289,6 +289,9 @@ interface GameStore extends GameState {
   endGame: (reason: GameOverReason) => void;
   triggerCrash: () => void;
   
+  // Banking / Saving
+  bankCurrentRun: () => void;
+
   // Stage Actions
   triggerStage: () => void;
   handleStageAction: (action: 'PICKUP_LEGAL' | 'PICKUP_OVERLOAD' | 'DEPART') => void;
@@ -800,38 +803,49 @@ export const useGameStore = create<GameStore>()(
       }),
 
       endGame: (reason) => {
+        // Just halt the game and show the appropriate modal.
+        // DO NOT save to lifetime stats or sync to cloud here.
+        set({ 
+          gameStatus: 'GAME_OVER', 
+          gameOverReason: reason,
+          activeModal: 'GAME_OVER',
+          isCrashing: false
+        });
+      },
+
+      bankCurrentRun: () => {
         const state = get();
+        if (state.gameOverReason !== 'COMPLETED') return;
+
         const fuelPricePerLiter = 182;
         const fuelCost = Math.floor(state.fuelUsedLiters * fuelPricePerLiter);
         
         const sessionEarnings = state.stats.cash;
         const profit = Math.max(0, sessionEarnings - fuelCost);
-        
         const distanceKm = state.distanceTraveled / 1000;
 
         const newLifetime = {
           totalCashEarned: state.lifetimeStats.totalCashEarned + profit,
           totalDistanceKm: state.lifetimeStats.totalDistanceKm + distanceKm,
           totalBribesPaid: state.lifetimeStats.totalBribesPaid + state.bribesPaid,
-          totalTripsCompleted: state.lifetimeStats.totalTripsCompleted + (reason === 'COMPLETED' ? 1 : 0)
+          totalTripsCompleted: state.lifetimeStats.totalTripsCompleted + 1
         };
 
         let newBankBalance = state.bankBalance;
-        if (reason === 'COMPLETED' && state.userMode === 'REGISTERED') {
+        if (state.userMode === 'REGISTERED') {
             newBankBalance += profit;
         }
 
-        set({ 
-          gameStatus: 'GAME_OVER', 
-          gameOverReason: reason,
-          activeModal: 'GAME_OVER',
-          isCrashing: false,
-          lifetimeStats: newLifetime,
-          bankBalance: newBankBalance
+        set({
+            lifetimeStats: newLifetime,
+            bankBalance: newBankBalance
         });
 
-        // Trigger Sync immediately after updating state
+        // Trigger Sync
         get().syncToCloud();
+        
+        // Return to Map
+        get().exitToMapSelection();
       },
       
       syncToCloud: async () => {
