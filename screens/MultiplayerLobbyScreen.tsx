@@ -60,6 +60,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [roomState, setRoomState] = useState<GameRoom | null>(null);
   const [myRole, setMyRole] = useState<'HOST' | 'GUEST' | null>(null);
+  const [roomTimeRemaining, setRoomTimeRemaining] = useState<number | null>(null); // For Host timeout
   
   // Local Room Selection
   const [mySelectedVehicle, setMySelectedVehicle] = useState<VehicleType | null>(null);
@@ -73,14 +74,11 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   // --- 1. Load Friends and Requests on Mount ---
   useEffect(() => {
     fetchSocialData();
-    // Poll updates every 10s for friend list
     const interval = setInterval(fetchSocialData, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchSocialData = async () => {
-      // Don't show loading spinner on background polls
-      // setIsLoadingData(true); 
       try {
           const rawFriends = await GameService.getFriends();
           const processedFriends: Friend[] = rawFriends.map(f => ({
@@ -95,7 +93,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           const requests = await GameService.getFriendRequests();
           setIncomingRequests(requests);
       } catch (e) {
-          console.error("Failed to fetch social data", e);
+          // Silent catch to prevent UI freeze, logs in service
       } 
   };
 
@@ -107,7 +105,8 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           try {
               const invites = await GameService.getPendingGameInvites();
               if (invites.length > 0) {
-                  const newest = invites[0]; // Take first
+                  // Prefer newest invite
+                  const newest = invites.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
                   setIncomingInvite(newest);
               } else {
                   setIncomingInvite(null);
@@ -117,12 +116,14 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           }
       };
 
+      // Initial check
       pollInvites();
-      const interval = setInterval(pollInvites, 3000); // 3s polling
+      
+      const interval = setInterval(pollInvites, 3000); 
       return () => clearInterval(interval);
   }, [viewState]);
 
-  // --- 3. Invite Timer Logic ---
+  // --- 3. Invite Timer Logic (Receiver Side) ---
   useEffect(() => {
       if (!incomingInvite) {
           setInviteTimer(0);
@@ -147,49 +148,73 @@ export const MultiplayerLobbyScreen: React.FC = () => {
       return () => clearInterval(interval);
   }, [incomingInvite]);
 
-  // --- 4. Room State Polling (Room Only) ---
+  // --- 4. Room State Polling & Host Timeout (Room Only) ---
   useEffect(() => {
       if (viewState !== 'ROOM' || !activeRoomId) return;
 
       const pollRoom = async () => {
-          const room = await GameService.getRoomState(activeRoomId);
-          if (room) {
-              setRoomState(room);
-              
-              // Handle Cancelled
-              if (room.status === 'CANCELLED' || room.status === 'EXPIRED') {
-                  handleBack(); // Kick out
-                  return;
-              }
+          try {
+              const room = await GameService.getRoomState(activeRoomId);
+              if (room) {
+                  setRoomState(room);
+                  
+                  // Handle Cancelled / Expired
+                  if (room.status === 'CANCELLED' || room.status === 'EXPIRED') {
+                      alert("Room was closed or timed out.");
+                      handleBack(); 
+                      return;
+                  }
 
-              // Determine Role if not set
-              if (!myRole && userId) {
-                  if (room.host_id === userId) setMyRole('HOST');
-                  else if (room.guest_id === userId) setMyRole('GUEST');
+                  // Determine Role if not set
+                  if (!myRole && userId) {
+                      if (room.host_id === userId) setMyRole('HOST');
+                      else if (room.guest_id === userId) setMyRole('GUEST');
+                  }
+
+                  // --- Host Timeout Logic ---
+                  // If I am Host AND room is still 'INVITED', check expiry
+                  if (room.host_id === userId && room.status === 'INVITED') {
+                      const created = new Date(room.created_at).getTime();
+                      const expires = created + 30000; // 30s
+                      const now = Date.now();
+                      const left = Math.ceil((expires - now) / 1000);
+                      
+                      setRoomTimeRemaining(Math.max(0, left));
+
+                      if (left <= 0) {
+                          // Expire it
+                          await GameService.cancelGameRoom(room.id);
+                          setRoomState({ ...room, status: 'EXPIRED' });
+                      }
+                  } else {
+                      setRoomTimeRemaining(null);
+                  }
               }
+          } catch(e) {
+              // Ignore fetch errors during polling
           }
       };
 
       pollRoom(); // Immediate
-      const interval = setInterval(pollRoom, 1000); // 1s polling for responsiveness
+      const interval = setInterval(pollRoom, 1000); 
       return () => clearInterval(interval);
   }, [viewState, activeRoomId, userId, myRole]);
 
   // --- 5. Sync Local State to Room ---
   useEffect(() => {
-      if (viewState === 'ROOM' && activeRoomId && myRole) {
-          // Debounce update to DB? No, just fire on change.
+      if (viewState === 'ROOM' && activeRoomId && myRole && roomState && roomState.status === 'STAGING') {
           GameService.updateRoomPlayerState(activeRoomId, myRole, mySelectedVehicle, isMyReady);
       }
-  }, [mySelectedVehicle, isMyReady, activeRoomId, myRole, viewState]);
+  }, [mySelectedVehicle, isMyReady, activeRoomId, myRole, viewState, roomState?.status]);
 
   // --- Handlers ---
 
   const handleBack = () => {
     if (viewState === 'ROOM') {
         // Leave Room Logic
-        if (activeRoomId && myRole) {
-             GameService.respondToGameInvite(activeRoomId, 'DECLINE'); // Treat back as decline/cancel
+        if (activeRoomId && myRole && roomState && roomState.status !== 'EXPIRED') {
+             // If I am host leaving, I cancel. If guest, I decline.
+             GameService.respondToGameInvite(activeRoomId, 'DECLINE');
         }
         setViewState('LOBBY');
         setActiveRoomId(null);
@@ -197,6 +222,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
         setMyRole(null);
         setIsMyReady(false);
         setMySelectedVehicle(null);
+        setRoomTimeRemaining(null);
     } else {
         setScreen('GAME_MODE');
     }
@@ -210,7 +236,6 @@ export const MultiplayerLobbyScreen: React.FC = () => {
     }
     
     setIsSearching(true);
-    // Debounce
     const delayDebounceFn = setTimeout(async () => {
         const results = await GameService.searchConductors(query);
         setSearchResults(results);
@@ -261,11 +286,11 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           setActiveRoomId(roomId);
           setMyRole('HOST');
           setViewState('ROOM');
-          
-          // Optimistic update of friend status
-          setFriendsList(prev => prev.map(f => f.id === friendId ? { ...f, status: 'INVITED' } : f));
+          // Start optimistic timer
+          setRoomTimeRemaining(30);
       } catch (e) {
           console.error("Invite failed", e);
+          alert("Failed to create room. Check connection.");
       }
   };
 
@@ -293,7 +318,6 @@ export const MultiplayerLobbyScreen: React.FC = () => {
         const guestReady = roomState.guest_ready && roomState.guest_vehicle;
 
         if (hostReady && guestReady) {
-            // Start sync launch
             if (launchCountdown === null) setLaunchCountdown(3);
         } else {
             setLaunchCountdown(null);
@@ -308,7 +332,6 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                   if (prev === null) return null;
                   if (prev <= 0) {
                       clearInterval(interval);
-                      // LAUNCH!
                       if (mySelectedVehicle) {
                           setVehicleType(mySelectedVehicle);
                           setScreen('MAP_SELECT'); 
@@ -341,11 +364,19 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                         <button onClick={handleBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"><ArrowLeft size={20} /></button>
                         <div><h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider leading-none">Staging Area</h2><p className="text-slate-400 text-xs uppercase tracking-widest mt-1">Room Code: {activeRoomId?.substring(0,6).toUpperCase()}</p></div>
                     </div>
+                    
+                    {/* Status Indicator */}
                     <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-full flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${launchCountdown !== null ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
                         <span className="text-xs font-bold uppercase text-slate-300">
                              {launchCountdown !== null ? 'Launching...' : isRoomReady ? 'Players Selecting...' : 'Waiting for Friend...'}
                         </span>
+                        {/* Waiting Timer for Host */}
+                        {roomTimeRemaining !== null && roomTimeRemaining > 0 && (
+                            <span className="text-xs font-mono text-orange-400 border-l border-slate-700 pl-2 ml-1">
+                                {roomTimeRemaining}s
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -389,6 +420,9 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                                  <div className="text-center text-slate-500">
                                      <Loader2 size={32} className="animate-spin mx-auto mb-2" />
                                      <span className="text-xs uppercase font-bold tracking-widest">Waiting for Accept...</span>
+                                     {roomTimeRemaining !== null && (
+                                         <div className="text-orange-400 font-mono mt-2 font-bold">{roomTimeRemaining}s</div>
+                                     )}
                                  </div>
                              ) : !opponentVehicle ? (
                                  <div className="flex flex-col items-center gap-3 animate-pulse text-slate-500">

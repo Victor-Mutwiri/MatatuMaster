@@ -329,8 +329,8 @@ export const GameService = {
       if (!user) return [];
 
       // Fetch pending invites where I am the guest
-      // Also filter by time (e.g. created in last 2 minutes) to avoid stale ones
-      const cutoff = new Date(Date.now() - 120000).toISOString(); // 2 mins ago
+      // Filter out invites older than 2 minutes to prevent ghost invites
+      const cutoff = new Date(Date.now() - 120000).toISOString(); 
 
       const { data, error } = await supabase
         .from('game_rooms')
@@ -354,11 +354,17 @@ export const GameService = {
    */
   respondToGameInvite: async (roomId: string, action: 'ACCEPT' | 'DECLINE') => {
       if (action === 'DECLINE') {
-          // Update status to cancelled
           await supabase.from('game_rooms').update({ status: 'CANCELLED' }).eq('id', roomId);
       } else {
           await supabase.from('game_rooms').update({ status: 'STAGING' }).eq('id', roomId);
       }
+  },
+
+  /**
+   * Cancel Room (Host side)
+   */
+  cancelGameRoom: async (roomId: string) => {
+      await supabase.from('game_rooms').update({ status: 'EXPIRED' }).eq('id', roomId);
   },
 
   /**
@@ -427,7 +433,6 @@ export const GameService = {
       const realUserId = user.id;
       const profileData = { username, sacco, updated_at: new Date().toISOString() };
 
-      // Check existence
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles').select('id').eq('id', realUserId).maybeSingle();
 
@@ -439,7 +444,6 @@ export const GameService = {
           if (insertError && insertError.code !== '42501') throw new Error(`Permission Denied: ${insertError.message}`);
       }
       
-      // Initialize progress
       await supabase.from('player_progress').insert({
           user_id: realUserId,
           bank_balance: 0,
