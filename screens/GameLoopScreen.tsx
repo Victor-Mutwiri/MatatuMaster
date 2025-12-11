@@ -58,7 +58,7 @@ export const GameLoopScreen: React.FC = () => {
   // FAILSAFE: If no route is selected, don't try to render the scene (Avoids black screen)
   if (!selectedRoute) {
       return (
-          <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
               <Loader2 className="text-matatu-yellow animate-spin mb-4" size={48} />
               <h2 className="text-white font-bold text-xl uppercase tracking-widest">Loading Route Data...</h2>
               <p className="text-slate-400 text-sm mt-2">Connecting to game server.</p>
@@ -277,7 +277,7 @@ export const GameLoopScreen: React.FC = () => {
   );
 
   return (
-    <div className="w-full h-full relative bg-black overflow-hidden">
+    <div className="w-screen h-screen relative bg-black overflow-hidden">
       
       {/* 1. Mobile Rotation Prompt */}
       <RotatePrompt />

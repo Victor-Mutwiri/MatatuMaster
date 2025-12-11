@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { VehicleType } from '../../types';
 import { useGameStore } from '../../store/gameStore';
@@ -33,6 +33,10 @@ export const GameScene: React.FC<GameSceneProps> = ({ vehicleType, playerLane, s
   const selectedRoute = useGameStore(state => state.selectedRoute);
   const activeRoomId = useGameStore(state => state.activeRoomId);
   
+  useEffect(() => {
+      console.log("🎬 GameScene Mounted. Route:", selectedRoute?.id, "Mode:", selectedRoute?.gamemode);
+  }, [selectedRoute]);
+
   // Hustle Maps
   const isOffroad = selectedRoute?.id === 'rural-dirt';
   const isHighway = selectedRoute?.id === 'thika-highway';
