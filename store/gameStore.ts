@@ -5,6 +5,87 @@ import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, Gam
 import { playSfx } from '../utils/audio';
 import { GameService } from '../services/gameService';
 
+// --- SHARED MAP DEFINITIONS ---
+export const MAP_DEFINITIONS: Route[] = [
+  {
+    id: 'kiambu-route',
+    name: 'Nairobi → Kiambu',
+    distance: 14.5,
+    potentialEarnings: 4500,
+    trafficLevel: 'Medium',
+    dangerLevel: 'Safe',
+    timeLimit: '45 mins',
+    description: 'The standard commuter route. Good for beginners.',
+    isLocked: false
+  },
+  {
+    id: 'river-road',
+    name: 'River Road Gridlock',
+    distance: 6.5,
+    potentialEarnings: 15000,
+    trafficLevel: 'Gridlock',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '40 mins',
+    description: 'The Chaos Capital. Traffic is stuck. Drive on the pavement to pass, squeeze through gaps, but avoid the foot patrol!',
+    isLocked: false
+  },
+  {
+    id: 'rural-dirt',
+    name: 'Upcountry Dirt Road',
+    distance: 17.0,
+    potentialEarnings: 6000,
+    trafficLevel: 'Low',
+    dangerLevel: 'Sketchy',
+    timeLimit: '55 mins',
+    description: 'A rough offroad route through the village. Very bumpy and dusty.',
+    isLocked: false
+  },
+  {
+    id: 'limuru-drive',
+    name: 'Limuru Misty Drive',
+    distance: 22.5,
+    potentialEarnings: 7500,
+    trafficLevel: 'High',
+    dangerLevel: 'Sketchy',
+    timeLimit: '1h 00m',
+    description: 'A dangerous single-carriageway. Overtake slow trucks but watch out for incoming traffic in the fog!',
+    isLocked: false
+  },
+  {
+    id: 'maimahiu-escarpment',
+    name: 'Mai Mahiu Escarpment',
+    distance: 35.0,
+    potentialEarnings: 9500,
+    trafficLevel: 'High',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '1h 10m',
+    description: 'The Gravity Challenge. A steep descent down the Rift Valley. Gravity accelerates you, brakes will overheat!',
+    isLocked: false
+  },
+  {
+    id: 'thika-highway',
+    name: 'Thika Highway',
+    distance: 40.2,
+    potentialEarnings: 8000,
+    trafficLevel: 'Gridlock',
+    dangerLevel: 'Sketchy',
+    timeLimit: '1h 15m',
+    description: 'A massive 3-lane superhighway. Overtake traffic moving in your direction. Watch your speed!',
+    isLocked: false
+  },
+  {
+    id: 'rongai-extreme',
+    name: 'Rongai Extreme',
+    distance: 25.0,
+    potentialEarnings: 12000,
+    trafficLevel: 'Gridlock',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '2h 00m',
+    description: 'The Wild West. Potholes, overlapping Nganyas, and head-on collision risks. Drive on the shoulder to survive.',
+    isLocked: false
+  }
+];
+
 // --- Secure Storage Wrapper (Simple Obfuscation with UTF-8 Support) ---
 const secureStorage: StateStorage = {
   getItem: (name: string): string | null => {

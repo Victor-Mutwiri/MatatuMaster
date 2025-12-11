@@ -50,6 +50,9 @@ export interface GameRoom {
     host_ready: boolean;
     guest_ready: boolean;
     created_at: string;
+    // New Map Fields
+    selected_map: string | null;
+    map_vote: 'PENDING' | 'APPROVE' | 'REJECT';
     // Expanded profiles
     host?: { username: string; sacco: string; };
     guest?: { username: string; sacco: string; };
@@ -312,7 +315,9 @@ export const GameService = {
         .insert({
             host_id: user.id,
             guest_id: friendId,
-            status: 'INVITED'
+            status: 'INVITED',
+            selected_map: null,
+            map_vote: 'PENDING'
         })
         .select('id')
         .single();
@@ -365,6 +370,28 @@ export const GameService = {
    */
   cancelGameRoom: async (roomId: string) => {
       await supabase.from('game_rooms').update({ status: 'EXPIRED' }).eq('id', roomId);
+  },
+
+  /**
+   * Select Map (Host Only)
+   * Resets vote to PENDING so guest has to vote again on change.
+   */
+  selectMap: async (roomId: string, mapId: string) => {
+      await supabase.from('game_rooms').update({
+          selected_map: mapId,
+          map_vote: 'PENDING',
+          updated_at: new Date().toISOString()
+      }).eq('id', roomId);
+  },
+
+  /**
+   * Vote on Map (Guest Only)
+   */
+  voteMap: async (roomId: string, vote: 'APPROVE' | 'REJECT') => {
+      await supabase.from('game_rooms').update({
+          map_vote: vote,
+          updated_at: new Date().toISOString()
+      }).eq('id', roomId);
   },
 
   /**

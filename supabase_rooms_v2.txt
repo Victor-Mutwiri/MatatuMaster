@@ -1,0 +1,5 @@
+
+-- Add columns for map selection workflow
+ALTER TABLE public.game_rooms 
+ADD COLUMN IF NOT EXISTS selected_map text DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS map_vote text DEFAULT 'PENDING'; -- 'PENDING', 'APPROVE', 'REJECT'

@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { VehicleType } from '../types';
-import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X, Bell, UserCheck, Gamepad2, Timer } from 'lucide-react';
+import { useGameStore, VEHICLE_SPECS, MAP_DEFINITIONS } from '../store/gameStore';
+import { VehicleType, Route } from '../types';
+import { ArrowLeft, Wifi, UserPlus, PlayCircle, Lock, Search, Users, Copy, Check, Send, User, Car, Zap, Shield, TrendingUp, Bike, ShoppingCart, CheckCircle2, Loader2, X, Bell, UserCheck, Gamepad2, Timer, Map, ThumbsUp, ThumbsDown, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { GameService, FriendRequest, GameRoom } from '../services/gameService';
 
@@ -33,7 +33,7 @@ const VEHICLE_ICONS: Record<VehicleType, React.ReactNode> = {
 };
 
 export const MultiplayerLobbyScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType, userId } = useGameStore();
+  const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType, userId, selectRoute } = useGameStore();
   
   // View State: 'LOBBY' (Friend list) or 'ROOM' (Staging area)
   const [viewState, setViewState] = useState<'LOBBY' | 'ROOM'>('LOBBY');
@@ -62,7 +62,11 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   const [myRole, setMyRole] = useState<'HOST' | 'GUEST' | null>(null);
   const [roomTimeRemaining, setRoomTimeRemaining] = useState<number | null>(null); // For Host timeout
   
-  // Local Room Selection
+  // -- MAP SELECTION STATE (Host) --
+  const [hostSelectedMapIndex, setHostSelectedMapIndex] = useState(0);
+  const [isMapConfirming, setIsMapConfirming] = useState(false);
+
+  // -- LOCAL STAGING STATE --
   const [mySelectedVehicle, setMySelectedVehicle] = useState<VehicleType | null>(null);
   const [isMyReady, setIsMyReady] = useState(false);
   
@@ -203,9 +207,12 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   // --- 5. Sync Local State to Room ---
   useEffect(() => {
       if (viewState === 'ROOM' && activeRoomId && myRole && roomState && roomState.status === 'STAGING') {
-          GameService.updateRoomPlayerState(activeRoomId, myRole, mySelectedVehicle, isMyReady);
+          // Only sync readiness if map is approved
+          if (roomState.map_vote === 'APPROVE') {
+              GameService.updateRoomPlayerState(activeRoomId, myRole, mySelectedVehicle, isMyReady);
+          }
       }
-  }, [mySelectedVehicle, isMyReady, activeRoomId, myRole, viewState, roomState?.status]);
+  }, [mySelectedVehicle, isMyReady, activeRoomId, myRole, viewState, roomState?.status, roomState?.map_vote]);
 
   // --- Handlers ---
 
@@ -311,9 +318,32 @@ export const MultiplayerLobbyScreen: React.FC = () => {
       }
   };
 
+  // --- Map Selection Logic ---
+  const handleMapCycle = (direction: -1 | 1) => {
+      setHostSelectedMapIndex(prev => {
+          let next = prev + direction;
+          if (next < 0) next = MAP_DEFINITIONS.length - 1;
+          if (next >= MAP_DEFINITIONS.length) next = 0;
+          return next;
+      });
+  };
+
+  const handleHostConfirmMap = async () => {
+      if (!activeRoomId) return;
+      setIsMapConfirming(true);
+      const selected = MAP_DEFINITIONS[hostSelectedMapIndex];
+      await GameService.selectMap(activeRoomId, selected.id);
+      setIsMapConfirming(false);
+  };
+
+  const handleGuestVoteMap = async (vote: 'APPROVE' | 'REJECT') => {
+      if (!activeRoomId) return;
+      await GameService.voteMap(activeRoomId, vote);
+  };
+
   // Launch Logic
   useEffect(() => {
-    if (viewState === 'ROOM' && roomState) {
+    if (viewState === 'ROOM' && roomState && roomState.map_vote === 'APPROVE') {
         const hostReady = roomState.host_ready && roomState.host_vehicle;
         const guestReady = roomState.guest_ready && roomState.guest_vehicle;
 
@@ -332,9 +362,16 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                   if (prev === null) return null;
                   if (prev <= 0) {
                       clearInterval(interval);
+                      // Apply Map and Vehicle
+                      if (roomState?.selected_map) {
+                          const route = MAP_DEFINITIONS.find(m => m.id === roomState.selected_map);
+                          if (route) selectRoute(route);
+                      }
                       if (mySelectedVehicle) {
                           setVehicleType(mySelectedVehicle);
-                          setScreen('MAP_SELECT'); 
+                          setScreen('MAP_SELECT'); // Actually goes to map select logic but route is pre-selected
+                          // Force Game Start immediately since we did staging
+                          setTimeout(() => useGameStore.getState().startGameLoop(), 100);
                       }
                       return 0;
                   }
@@ -343,16 +380,109 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           }, 1000);
           return () => clearInterval(interval);
       }
-  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen]);
+  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen, roomState, selectRoute]);
 
 
   // --- RENDER: ROOM VIEW ---
   if (viewState === 'ROOM') {
+      const isRoomReady = roomState?.status === 'STAGING';
+      const isMapPhase = !roomState?.selected_map || roomState?.map_vote !== 'APPROVE';
+      
       const opponentName = myRole === 'HOST' ? roomState?.guest?.username : roomState?.host?.username;
+      
+      // Map Selection Renderer
+      if (isMapPhase) {
+          const hostMap = MAP_DEFINITIONS[hostSelectedMapIndex];
+          const selectedMapId = roomState?.selected_map;
+          const mapToDisplay = selectedMapId ? MAP_DEFINITIONS.find(m => m.id === selectedMapId) : hostMap;
+          const voteStatus = roomState?.map_vote;
+
+          return (
+            <GameLayout noMaxWidth className="bg-slate-950">
+               <div className="flex flex-col h-full w-full max-w-4xl mx-auto p-4 md:p-6 items-center justify-center relative">
+                  
+                  <div className="absolute top-4 left-4 z-20">
+                        <button onClick={handleBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-700 shadow-lg"><ArrowLeft size={20} /></button>
+                  </div>
+
+                  <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider mb-8 flex items-center gap-3">
+                      <Map className="text-matatu-yellow" size={24} /> 
+                      {myRole === 'HOST' ? "Select a Track" : "Map Voting"}
+                  </h2>
+
+                  {/* MAP CARD */}
+                  <div className="relative w-full max-w-md bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl mb-8">
+                      <div className="h-40 bg-slate-800 relative">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#64748b_1px,transparent_1px)] bg-[size:20px_20px] opacity-20"></div>
+                          {/* Navigation Arrows for Host */}
+                          {myRole === 'HOST' && (
+                              <>
+                                <button onClick={() => handleMapCycle(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-matatu-yellow hover:text-black transition-colors z-10"><ChevronLeft size={24} /></button>
+                                <button onClick={() => handleMapCycle(1)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-matatu-yellow hover:text-black transition-colors z-10"><ChevronRight size={24} /></button>
+                              </>
+                          )}
+                          <div className="absolute bottom-4 left-4">
+                              <h3 className="font-display font-bold text-2xl text-white uppercase leading-none">{mapToDisplay?.name || "Selecting..."}</h3>
+                              <p className="text-xs text-slate-400 mt-1">{mapToDisplay?.distance} KM • {mapToDisplay?.dangerLevel}</p>
+                          </div>
+                      </div>
+                      <div className="p-6">
+                          <p className="text-slate-300 text-sm leading-relaxed mb-4">{mapToDisplay?.description || "Waiting for host..."}</p>
+                          
+                          {/* FEEDBACK STATUS AREA */}
+                          <div className="bg-black/30 rounded-xl p-4 flex items-center justify-between border border-slate-800">
+                              <div className="flex items-center gap-3">
+                                  <div className={`w-3 h-3 rounded-full ${voteStatus === 'REJECT' ? 'bg-red-500 animate-pulse' : voteStatus === 'APPROVE' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                                  <span className="text-xs font-bold uppercase text-slate-400">
+                                      {voteStatus === 'PENDING' ? (selectedMapId ? "Vote Pending..." : "Selection Pending") : 
+                                       voteStatus === 'REJECT' ? "Opponent Rejected" : "Map Approved"}
+                                  </span>
+                              </div>
+                              {voteStatus === 'REJECT' && <AlertCircle className="text-red-500" size={20} />}
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* CONTROLS */}
+                  <div className="w-full max-w-md flex gap-4">
+                      {myRole === 'HOST' ? (
+                          <Button 
+                            fullWidth 
+                            size="lg" 
+                            onClick={handleHostConfirmMap} 
+                            disabled={isMapConfirming || (voteStatus === 'PENDING' && selectedMapId === mapToDisplay?.id)}
+                            className={voteStatus === 'REJECT' ? "border-red-500" : ""}
+                          >
+                              {voteStatus === 'REJECT' ? "Pick Different Map" : 
+                               selectedMapId === mapToDisplay?.id ? "Waiting for Vote..." : "Propose Map"}
+                          </Button>
+                      ) : (
+                          <>
+                            {selectedMapId ? (
+                                <>
+                                    <Button variant="danger" fullWidth onClick={() => handleGuestVoteMap('REJECT')} disabled={voteStatus !== 'PENDING'}>
+                                        <ThumbsDown size={20} className="mr-2" /> Veto
+                                    </Button>
+                                    <Button variant="primary" fullWidth onClick={() => handleGuestVoteMap('APPROVE')} disabled={voteStatus !== 'PENDING'}>
+                                        <ThumbsUp size={20} className="mr-2" /> Accept
+                                    </Button>
+                                </>
+                            ) : (
+                                <div className="text-center w-full text-slate-500 animate-pulse">Waiting for Host to propose...</div>
+                            )}
+                          </>
+                      )}
+                  </div>
+
+               </div>
+            </GameLayout>
+          );
+      }
+
+      // --- VEHICLE SELECTION PHASE (Original Staging UI) ---
       const opponentSacco = myRole === 'HOST' ? roomState?.guest?.sacco : roomState?.host?.sacco;
       const opponentVehicle = myRole === 'HOST' ? roomState?.guest_vehicle : roomState?.host_vehicle;
       const opponentReady = myRole === 'HOST' ? roomState?.guest_ready : roomState?.host_ready;
-      const isRoomReady = roomState?.status === 'STAGING';
 
       return (
         <GameLayout noMaxWidth className="bg-slate-950">
@@ -362,21 +492,18 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                 <div className="flex items-center justify-between mb-6 z-20">
                     <div className="flex items-center gap-4">
                         <button onClick={handleBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-all border border-slate-700 shadow-lg active:scale-95 shrink-0"><ArrowLeft size={20} /></button>
-                        <div><h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider leading-none">Staging Area</h2><p className="text-slate-400 text-xs uppercase tracking-widest mt-1">Room Code: {activeRoomId?.substring(0,6).toUpperCase()}</p></div>
+                        <div>
+                            <h2 className="font-display text-2xl font-bold text-white uppercase tracking-wider leading-none">Garage</h2>
+                            <p className="text-slate-400 text-xs uppercase tracking-widest mt-1">Map Approved: {MAP_DEFINITIONS.find(m => m.id === roomState?.selected_map)?.name}</p>
+                        </div>
                     </div>
                     
                     {/* Status Indicator */}
                     <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-full flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${launchCountdown !== null ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
                         <span className="text-xs font-bold uppercase text-slate-300">
-                             {launchCountdown !== null ? 'Launching...' : isRoomReady ? 'Players Selecting...' : 'Waiting for Friend...'}
+                             {launchCountdown !== null ? 'Launching...' : 'Players Selecting...'}
                         </span>
-                        {/* Waiting Timer for Host */}
-                        {roomTimeRemaining !== null && roomTimeRemaining > 0 && (
-                            <span className="text-xs font-mono text-orange-400 border-l border-slate-700 pl-2 ml-1">
-                                {roomTimeRemaining}s
-                            </span>
-                        )}
                     </div>
                 </div>
 

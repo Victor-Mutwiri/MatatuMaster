@@ -2,91 +2,10 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
-import { useGameStore, EARNINGS_CAPS } from '../store/gameStore';
+import { useGameStore, EARNINGS_CAPS, MAP_DEFINITIONS } from '../store/gameStore';
 import { Route } from '../types';
 import { Clock, Lock, MapPin, ArrowLeft, TrendingUp, Car, Shield, Navigation } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
-
-// Base map definitions - Earnings will be overwritten dynamically
-const MAPS: Route[] = [
-  {
-    id: 'kiambu-route',
-    name: 'Nairobi → Kiambu',
-    distance: 14.5,
-    potentialEarnings: 4500, // Placeholder
-    trafficLevel: 'Medium',
-    dangerLevel: 'Safe',
-    timeLimit: '45 mins',
-    description: 'The standard commuter route. Good for beginners.',
-    isLocked: false
-  },
-  {
-    id: 'river-road',
-    name: 'River Road Gridlock',
-    distance: 6.5,
-    potentialEarnings: 15000, // Placeholder
-    trafficLevel: 'Gridlock',
-    dangerLevel: 'No-Go Zone',
-    timeLimit: '40 mins',
-    description: 'The Chaos Capital. Traffic is stuck. Drive on the pavement to pass, squeeze through gaps, but avoid the foot patrol!',
-    isLocked: false
-  },
-  {
-    id: 'rural-dirt',
-    name: 'Upcountry Dirt Road',
-    distance: 17.0,
-    potentialEarnings: 6000, // Placeholder
-    trafficLevel: 'Low',
-    dangerLevel: 'Sketchy',
-    timeLimit: '55 mins',
-    description: 'A rough offroad route through the village. Very bumpy and dusty.',
-    isLocked: false
-  },
-  {
-    id: 'limuru-drive',
-    name: 'Limuru Misty Drive',
-    distance: 22.5,
-    potentialEarnings: 7500, // Placeholder
-    trafficLevel: 'High',
-    dangerLevel: 'Sketchy',
-    timeLimit: '1h 00m',
-    description: 'A dangerous single-carriageway. Overtake slow trucks but watch out for incoming traffic in the fog!',
-    isLocked: false
-  },
-  {
-    id: 'maimahiu-escarpment',
-    name: 'Mai Mahiu Escarpment',
-    distance: 35.0,
-    potentialEarnings: 9500, // Placeholder
-    trafficLevel: 'High',
-    dangerLevel: 'No-Go Zone',
-    timeLimit: '1h 10m',
-    description: 'The Gravity Challenge. A steep descent down the Rift Valley. Gravity accelerates you, brakes will overheat!',
-    isLocked: false
-  },
-  {
-    id: 'thika-highway',
-    name: 'Thika Highway',
-    distance: 40.2,
-    potentialEarnings: 8000, // Placeholder
-    trafficLevel: 'Gridlock',
-    dangerLevel: 'Sketchy',
-    timeLimit: '1h 15m',
-    description: 'A massive 3-lane superhighway. Overtake traffic moving in your direction. Watch your speed!',
-    isLocked: false
-  },
-  {
-    id: 'rongai-extreme',
-    name: 'Rongai Extreme',
-    distance: 25.0,
-    potentialEarnings: 12000, // Placeholder
-    trafficLevel: 'Gridlock',
-    dangerLevel: 'No-Go Zone',
-    timeLimit: '2h 00m',
-    description: 'The Wild West. Potholes, overlapping Nganyas, and head-on collision risks. Drive on the shoulder to survive.',
-    isLocked: false
-  }
-];
 
 export const MapSelectionScreen: React.FC = () => {
   const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType } = useGameStore();
@@ -104,7 +23,7 @@ export const MapSelectionScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!selectedRoute) selectRoute(MAPS[0]);
+    if (!selectedRoute) selectRoute(MAP_DEFINITIONS[0]);
   }, []);
 
   const handleRouteSelect = (map: Route) => {
@@ -127,7 +46,7 @@ export const MapSelectionScreen: React.FC = () => {
     }
   };
 
-  const activeRoute = selectedRoute || MAPS[0];
+  const activeRoute = selectedRoute || MAP_DEFINITIONS[0];
   const activeEarnings = getEarnings(activeRoute.id);
 
   return (
@@ -206,7 +125,7 @@ export const MapSelectionScreen: React.FC = () => {
               ref={scrollRef}
               className="flex-1 flex lg:flex-wrap items-center lg:items-start lg:justify-start lg:content-start overflow-x-auto lg:overflow-visible hide-scrollbar snap-x snap-mandatory px-6 lg:px-0 gap-6 lg:gap-6 pb-24 lg:pb-0"
             >
-              {MAPS.map((map) => {
+              {MAP_DEFINITIONS.map((map) => {
                 const isSelected = selectedRoute?.id === map.id;
                 const isLocked = map.isLocked;
                 const mapEarnings = getEarnings(map.id);
