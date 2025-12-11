@@ -1,0 +1,39 @@
+
+-- 1. Create Game Rooms Table
+create table if not exists public.game_rooms (
+  id uuid default gen_random_uuid() primary key,
+  host_id uuid references public.profiles(id) on delete cascade not null,
+  guest_id uuid references public.profiles(id) on delete cascade not null,
+  status text default 'INVITED', -- INVITED, STAGING, PLAYING, CANCELLED, EXPIRED
+  host_vehicle text,
+  guest_vehicle text,
+  host_ready boolean default false,
+  guest_ready boolean default false,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+-- 2. Enable RLS
+alter table public.game_rooms enable row level security;
+
+-- 3. Policies
+
+-- View: Participants can see the room
+create policy "Participants can view room"
+  on game_rooms for select
+  using ( auth.uid() = host_id OR auth.uid() = guest_id );
+
+-- Insert: Hosts can create rooms
+create policy "Hosts can create rooms"
+  on game_rooms for insert
+  with check ( auth.uid() = host_id );
+
+-- Update: Participants can update state (vehicle selection, ready status)
+create policy "Participants can update room"
+  on game_rooms for update
+  using ( auth.uid() = host_id OR auth.uid() = guest_id );
+
+-- Delete: Cleanup (Optional, usually better to mark status)
+create policy "Participants can delete room"
+  on game_rooms for delete
+  using ( auth.uid() = host_id OR auth.uid() = guest_id );

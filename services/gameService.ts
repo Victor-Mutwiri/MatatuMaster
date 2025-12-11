@@ -40,6 +40,21 @@ export interface FriendRequest {
     };
 }
 
+export interface GameRoom {
+    id: string;
+    host_id: string;
+    guest_id: string;
+    status: 'INVITED' | 'STAGING' | 'PLAYING' | 'CANCELLED' | 'EXPIRED';
+    host_vehicle: VehicleType | null;
+    guest_vehicle: VehicleType | null;
+    host_ready: boolean;
+    guest_ready: boolean;
+    created_at: string;
+    // Expanded profiles
+    host?: { username: string; sacco: string; };
+    guest?: { username: string; sacco: string; };
+}
+
 // --- Service Layer ---
 export const GameService = {
   
@@ -195,8 +210,6 @@ export const GameService = {
         });
 
       if (error) {
-          // If 23505 (unique_violation), they already sent a request.
-          // We throw a specific message so UI can handle it gracefully.
           if (error.code === '23505') {
               throw new Error("Request already sent.");
           }
@@ -212,7 +225,6 @@ export const GameService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Note: `sender:profiles!sender_id` tells Supabase to join 'profiles' using the foreign key on 'sender_id'
       const { data, error } = await supabase
         .from('friend_requests')
         .select(`
@@ -232,7 +244,6 @@ export const GameService = {
           return [];
       }
 
-      // Map Supabase join format to cleaner object
       return data.map((item: any) => ({
           id: item.id,
           sender_id: item.sender_id,
@@ -247,10 +258,8 @@ export const GameService = {
    */
   respondToFriendRequest: async (requestId: string, senderId: string, action: 'ACCEPT' | 'REJECT') => {
       if (action === 'REJECT') {
-          // Just delete the request
           await supabase.from('friend_requests').delete().eq('id', requestId);
       } else {
-          // Accept: Call RPC to create friendship and delete request atomically
           const { error } = await supabase.rpc('accept_friend_request', {
               request_id: requestId,
               friend_user_id: senderId
@@ -266,7 +275,6 @@ export const GameService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Note: `profile:profiles!friend_id` uses the foreign key on `friend_id`
       const { data, error } = await supabase
         .from('friendships')
         .select(`
@@ -288,6 +296,105 @@ export const GameService = {
           username: item.profile?.username || 'Unknown',
           sacco: item.profile?.sacco || 'Independent'
       }));
+  },
+
+  // --- MULTIPLAYER ROOMS ---
+
+  /**
+   * Invite a friend (Create Room)
+   */
+  inviteFriendToGame: async (friendId: string): Promise<string> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from('game_rooms')
+        .insert({
+            host_id: user.id,
+            guest_id: friendId,
+            status: 'INVITED'
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      return data.id;
+  },
+
+  /**
+   * Get pending invites for current user
+   */
+  getPendingGameInvites: async (): Promise<GameRoom[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      // Fetch pending invites where I am the guest
+      // Also filter by time (e.g. created in last 2 minutes) to avoid stale ones
+      const cutoff = new Date(Date.now() - 120000).toISOString(); // 2 mins ago
+
+      const { data, error } = await supabase
+        .from('game_rooms')
+        .select(`
+            *,
+            host:profiles!host_id (username, sacco)
+        `)
+        .eq('guest_id', user.id)
+        .eq('status', 'INVITED')
+        .gt('created_at', cutoff);
+
+      if (error) {
+          console.error("Poll invites error", error);
+          return [];
+      }
+      return data as GameRoom[];
+  },
+
+  /**
+   * Accept or Decline Invite
+   */
+  respondToGameInvite: async (roomId: string, action: 'ACCEPT' | 'DECLINE') => {
+      if (action === 'DECLINE') {
+          // Update status to cancelled
+          await supabase.from('game_rooms').update({ status: 'CANCELLED' }).eq('id', roomId);
+      } else {
+          await supabase.from('game_rooms').update({ status: 'STAGING' }).eq('id', roomId);
+      }
+  },
+
+  /**
+   * Get Room State (For Staging)
+   */
+  getRoomState: async (roomId: string): Promise<GameRoom | null> => {
+      const { data, error } = await supabase
+        .from('game_rooms')
+        .select(`
+            *,
+            host:profiles!host_id (username, sacco),
+            guest:profiles!guest_id (username, sacco)
+        `)
+        .eq('id', roomId)
+        .single();
+
+      if (error) return null;
+      return data as GameRoom;
+  },
+
+  /**
+   * Update Player State in Room
+   */
+  updateRoomPlayerState: async (roomId: string, role: 'HOST' | 'GUEST', vehicle: VehicleType | null, ready: boolean) => {
+      const updates: any = {};
+      if (role === 'HOST') {
+          updates.host_vehicle = vehicle;
+          updates.host_ready = ready;
+      } else {
+          updates.guest_vehicle = vehicle;
+          updates.guest_ready = ready;
+      }
+      updates.updated_at = new Date().toISOString();
+
+      const { error } = await supabase.from('game_rooms').update(updates).eq('id', roomId);
+      if (error) console.error("Room update error", error);
   },
 
   /**
