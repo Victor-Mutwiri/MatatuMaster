@@ -22,8 +22,14 @@ export const MapSelectionScreen: React.FC = () => {
     return 0;
   };
 
+  // Filter Maps: Single Player only shows HUSTLE mode maps
+  const displayedMaps = MAP_DEFINITIONS.filter(m => m.gamemode === 'HUSTLE');
+
   useEffect(() => {
-    if (!selectedRoute) selectRoute(MAP_DEFINITIONS[0]);
+    // Ensure we start with a valid map from the filtered list if current selection is invalid
+    if (!selectedRoute || selectedRoute.gamemode !== 'HUSTLE') {
+        selectRoute(displayedMaps[0]);
+    }
   }, []);
 
   const handleRouteSelect = (map: Route) => {
@@ -46,7 +52,7 @@ export const MapSelectionScreen: React.FC = () => {
     }
   };
 
-  const activeRoute = selectedRoute || MAP_DEFINITIONS[0];
+  const activeRoute = selectedRoute && selectedRoute.gamemode === 'HUSTLE' ? selectedRoute : displayedMaps[0];
   const activeEarnings = getEarnings(activeRoute.id);
 
   return (
@@ -125,8 +131,8 @@ export const MapSelectionScreen: React.FC = () => {
               ref={scrollRef}
               className="flex-1 flex lg:flex-wrap items-center lg:items-start lg:justify-start lg:content-start overflow-x-auto lg:overflow-visible hide-scrollbar snap-x snap-mandatory px-6 lg:px-0 gap-6 lg:gap-6 pb-24 lg:pb-0"
             >
-              {MAP_DEFINITIONS.map((map) => {
-                const isSelected = selectedRoute?.id === map.id;
+              {displayedMaps.map((map) => {
+                const isSelected = activeRoute.id === map.id;
                 const isLocked = map.isLocked;
                 const mapEarnings = getEarnings(map.id);
 

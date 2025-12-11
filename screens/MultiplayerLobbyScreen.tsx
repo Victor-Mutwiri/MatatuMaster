@@ -32,6 +32,9 @@ const VEHICLE_ICONS: Record<VehicleType, React.ReactNode> = {
   '52-seater': <TrendingUp />,
 };
 
+// Filter RACE Maps for Multiplayer
+const RACE_MAPS = MAP_DEFINITIONS.filter(m => m.gamemode === 'RACE');
+
 export const MultiplayerLobbyScreen: React.FC = () => {
   const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType, userId, selectRoute } = useGameStore();
   
@@ -318,12 +321,12 @@ export const MultiplayerLobbyScreen: React.FC = () => {
       }
   };
 
-  // --- Map Selection Logic ---
+  // --- Map Selection Logic (Using RACE_MAPS) ---
   const handleMapCycle = (direction: -1 | 1) => {
       setHostSelectedMapIndex(prev => {
           let next = prev + direction;
-          if (next < 0) next = MAP_DEFINITIONS.length - 1;
-          if (next >= MAP_DEFINITIONS.length) next = 0;
+          if (next < 0) next = RACE_MAPS.length - 1;
+          if (next >= RACE_MAPS.length) next = 0;
           return next;
       });
   };
@@ -331,7 +334,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
   const handleHostConfirmMap = async () => {
       if (!activeRoomId) return;
       setIsMapConfirming(true);
-      const selected = MAP_DEFINITIONS[hostSelectedMapIndex];
+      const selected = RACE_MAPS[hostSelectedMapIndex];
       await GameService.selectMap(activeRoomId, selected.id);
       setIsMapConfirming(false);
   };
@@ -428,13 +431,11 @@ export const MultiplayerLobbyScreen: React.FC = () => {
 
       // 2. MAP SELECTION PHASE
       if (isMapPhase) {
-          const hostMap = MAP_DEFINITIONS[hostSelectedMapIndex];
+          const hostMap = RACE_MAPS[hostSelectedMapIndex];
           const selectedMapId = roomState?.selected_map;
           const voteStatus = roomState?.map_vote;
           
           // Determine which map to show
-          // If voteStatus is REJECTED, host sees their LOCAL selection (to allow picking a new one)
-          // Otherwise (PENDING or nothing selected yet), show the DB selection or host local if nothing in DB
           let mapToDisplay = hostMap; 
           
           if (selectedMapId && voteStatus !== 'REJECT') {

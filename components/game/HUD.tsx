@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause, Maximize, Minimize, Siren } from 'lucide-react';
+import { Users, Smile, Wallet, Clock, Radio, Volume2, VolumeX, Music, Music2, AlertOctagon, MapPin, Fuel, Megaphone, Car, Pause, Maximize, Minimize, Siren, Flag } from 'lucide-react';
 import { useGameStore, VEHICLE_SPECS } from '../../store/gameStore';
 import { playSfx } from '../../utils/audio';
 
@@ -116,6 +116,7 @@ export const HUD: React.FC = () => {
   // Warning logic
   const isOverlapWarning = overlapTimer > 2;
   const isRiverRoad = selectedRoute?.id === 'river-road';
+  const isRaceMode = selectedRoute?.gamemode === 'RACE';
 
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-1 md:p-2 lg:p-4 z-10 select-none">
@@ -142,10 +143,9 @@ export const HUD: React.FC = () => {
       )}
 
       {/* --- TOP HUD AREA --- */}
-      {/* We use lg: to switch layout. Phones/Tablets stay in 'row' mode to save vertical space */}
       <div className="flex flex-col lg:flex-row justify-between items-start gap-2 relative z-10 pt-1 lg:pt-0">
         
-        {/* Left Side: Stats (Mobile: Horizontal Row, Desktop: Vertical Stack) */}
+        {/* Left Side: Stats */}
         <div className="flex flex-row lg:flex-col gap-2 pointer-events-auto w-full lg:w-auto items-center lg:items-start overflow-x-auto lg:overflow-visible no-scrollbar">
             
             {/* Control Buttons Group */}
@@ -184,7 +184,7 @@ export const HUD: React.FC = () => {
 
             {/* Distance Card */}
             <div className="backdrop-blur-md bg-slate-900/80 border-l-2 lg:border-l-4 border-slate-500 px-2 py-1 lg:px-3 lg:py-2 rounded-r-lg shadow-lg flex items-center gap-2 min-w-fit lg:min-w-[130px] shrink-0">
-                <MapPin className="text-neon-blue" size={14} />
+                {isRaceMode ? <Flag className="text-neon-blue" size={14} /> : <MapPin className="text-neon-blue" size={14} />}
                 <div className="flex flex-col leading-none w-full">
                     <span className="text-[8px] lg:text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0 lg:mb-0.5 hidden lg:block">Dst. Left</span>
                     <span className="font-display text-sm lg:text-lg font-bold text-white whitespace-nowrap">{distLeftKm} km</span>
@@ -194,7 +194,7 @@ export const HUD: React.FC = () => {
                 </div>
             </div>
 
-            {/* Fuel Card */}
+            {/* Fuel Card - Always relevant */}
             <div className="backdrop-blur-md bg-slate-900/80 border-l-2 lg:border-l-4 border-slate-600 px-2 py-1 lg:px-3 lg:py-2 rounded-r-lg shadow-lg flex items-center gap-2 min-w-fit lg:min-w-[130px] shrink-0">
                 <Fuel className={fuel < 20 ? "text-red-500 animate-pulse" : "text-orange-400"} size={14} />
                 <div className="flex flex-col leading-none w-full">
@@ -209,13 +209,17 @@ export const HUD: React.FC = () => {
 
         {/* Right Side: Vibe & Settings */}
         <div className="flex lg:flex-col gap-2 items-center lg:items-end pointer-events-auto absolute top-1 right-0 lg:static">
-          <div className="bg-slate-900/80 backdrop-blur-md border-r-4 border-neon-blue px-3 py-1 lg:px-4 lg:py-2 rounded-l-lg shadow-lg flex items-center gap-2">
-             <div className="flex flex-col items-end leading-none">
-               <span className="text-[8px] lg:text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0 lg:mb-0.5 hidden lg:block">Vibe</span>
-               <span className={`font-display text-sm lg:text-lg font-bold ${happinessColor}`}>{Math.round(happiness)}%</span>
-             </div>
-             <Smile className={happinessColor} size={16} />
-          </div>
+          
+          {/* Vibe / Happiness - Hidden in Race Mode (less relevant) */}
+          {!isRaceMode && (
+              <div className="bg-slate-900/80 backdrop-blur-md border-r-4 border-neon-blue px-3 py-1 lg:px-4 lg:py-2 rounded-l-lg shadow-lg flex items-center gap-2">
+                 <div className="flex flex-col items-end leading-none">
+                   <span className="text-[8px] lg:text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0 lg:mb-0.5 hidden lg:block">Vibe</span>
+                   <span className={`font-display text-sm lg:text-lg font-bold ${happinessColor}`}>{Math.round(happiness)}%</span>
+                 </div>
+                 <Smile className={happinessColor} size={16} />
+              </div>
+          )}
 
           <div className="flex gap-2">
             <button onClick={toggleEngineSound} className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-lg ${isEngineSoundOn ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`} title="Toggle Engine Sound">
@@ -233,7 +237,6 @@ export const HUD: React.FC = () => {
       </div>
 
       {/* --- BOTTOM AREA (Pedals and Stats) --- */}
-      {/* Reduced bottom padding drastically to fix mobile cut-off */}
       <div className="mt-auto flex justify-between items-end pb-1 lg:pb-4 relative z-10">
         
         {/* Left: Brake Pedal & Passengers */}
@@ -247,7 +250,6 @@ export const HUD: React.FC = () => {
             onTouchEnd={handleBrakeEnd}
             onContextMenu={preventContextMenu}
           >
-            {/* Reduced Height for Mobile: h-20 (80px) -> LG: h-32 */}
             <div className="w-14 h-20 lg:w-16 lg:h-32 bg-red-900 border-4 border-red-600 rounded-lg flex flex-col justify-end p-1.5 lg:p-2 shadow-lg relative overflow-hidden">
                <span className="text-[8px] lg:text-[10px] font-black text-red-400 uppercase text-center w-full z-10">Brake</span>
                <div className="absolute inset-0 bg-red-500 opacity-0 group-active:opacity-30 transition-opacity"></div>
@@ -258,25 +260,26 @@ export const HUD: React.FC = () => {
           </button>
 
           <div className="flex flex-col gap-1 lg:gap-2 pointer-events-none mb-0.5 lg:mb-1">
-            {/* Scaled down gauge for mobile */}
             <div className="bg-slate-900/90 backdrop-blur-md p-1 rounded-full border border-slate-700 shadow-2xl relative scale-75 origin-bottom-left">
                <SpeedGauge speed={displaySpeed} maxSpeed={maxDisplaySpeed} />
             </div>
 
-            <div className={`backdrop-blur-md px-2 py-1 lg:px-3 lg:py-2 rounded-lg border shadow-lg flex items-center gap-2 transition-colors ${isOverloaded ? 'bg-red-900/90 border-red-500' : 'bg-slate-900/80 border-slate-700'}`}>
-              {isOverloaded ? (<AlertOctagon className="text-white animate-pulse" size={14} />) : (<Users className="text-slate-300" size={14} />)}
-              <div className="leading-none">
-                <span className={`block text-[8px] uppercase font-bold mb-0.5 ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>Pass.</span>
-                <span className="font-display text-xs lg:text-sm font-bold text-white">{currentPassengers}/{maxPassengers}</span>
-              </div>
-            </div>
+            {/* Passenger Counter - HIDDEN IN RACE MODE */}
+            {!isRaceMode && (
+                <div className={`backdrop-blur-md px-2 py-1 lg:px-3 lg:py-2 rounded-lg border shadow-lg flex items-center gap-2 transition-colors ${isOverloaded ? 'bg-red-900/90 border-red-500' : 'bg-slate-900/80 border-slate-700'}`}>
+                  {isOverloaded ? (<AlertOctagon className="text-white animate-pulse" size={14} />) : (<Users className="text-slate-300" size={14} />)}
+                  <div className="leading-none">
+                    <span className={`block text-[8px] uppercase font-bold mb-0.5 ${isOverloaded ? 'text-red-200' : 'text-slate-400'}`}>Pass.</span>
+                    <span className="font-display text-xs lg:text-sm font-bold text-white">{currentPassengers}/{maxPassengers}</span>
+                  </div>
+                </div>
+            )}
           </div>
         </div>
         
         {/* Center/Right: Horn & Gas */}
         <div className="flex items-end gap-2 lg:gap-4 pointer-events-auto">
            
-           {/* Horn Button */}
            <button 
              className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center shadow-lg active:scale-95 active:bg-slate-700 active:border-slate-500 transition-all group touch-none select-none"
              onClick={() => playSfx('HORN')}
@@ -286,13 +289,17 @@ export const HUD: React.FC = () => {
            </button>
 
            <div className="flex flex-col gap-1 lg:gap-2 items-end">
-              <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 lg:px-4 lg:py-2 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3 pointer-events-none">
-                <div className="text-right leading-none">
-                  <span className="block text-[8px] lg:text-[10px] text-matatu-yellow uppercase font-bold tracking-wider mb-0.5">Cash</span>
-                  <span className="font-display text-sm lg:text-lg font-bold text-green-400">KES {stats.cash.toLocaleString()}</span>
-                </div>
-                <Wallet className="text-green-400" size={16} />
-              </div>
+              
+              {/* Cash Counter - HIDDEN IN RACE MODE */}
+              {!isRaceMode && (
+                  <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 lg:px-4 lg:py-2 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3 pointer-events-none">
+                    <div className="text-right leading-none">
+                      <span className="block text-[8px] lg:text-[10px] text-matatu-yellow uppercase font-bold tracking-wider mb-0.5">Cash</span>
+                      <span className="font-display text-sm lg:text-lg font-bold text-green-400">KES {stats.cash.toLocaleString()}</span>
+                    </div>
+                    <Wallet className="text-green-400" size={16} />
+                  </div>
+              )}
 
               <button 
                 className="group active:scale-95 transition-transform touch-none select-none" 
@@ -303,7 +310,6 @@ export const HUD: React.FC = () => {
                 onTouchEnd={handleGasEnd}
                 onContextMenu={preventContextMenu}
               >
-                {/* Reduced Height for Mobile: h-24 (96px) -> LG: h-32 */}
                 <div className="w-14 h-24 lg:w-16 lg:h-32 bg-slate-800 border-4 border-green-500 rounded-lg flex flex-col justify-end p-1.5 lg:p-2 shadow-lg relative overflow-hidden">
                   <span className="text-[8px] lg:text-[10px] font-black text-green-400 uppercase text-center w-full z-10">Gas</span>
                   <div className="absolute inset-0 bg-green-500 opacity-0 group-active:opacity-30 transition-opacity"></div>

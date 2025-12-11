@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export type ScreenName = 'LANDING' | 'SETUP' | 'GAME_MODE' | 'VEHICLE_SELECT' | 'MULTIPLAYER_LOBBY' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD' | 'SETTINGS';
@@ -36,6 +37,7 @@ export interface Route {
   timeLimit?: string; // e.g. "30 mins"
   description?: string;
   isLocked?: boolean;
+  gamemode: 'HUSTLE' | 'RACE'; // New property
 }
 
 export interface StageData {

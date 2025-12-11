@@ -3,10 +3,11 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode } from '../types';
 import { playSfx } from '../utils/audio';
-import { GameService } from '../services/gameService';
+import { GameService, PlayerStatePacket } from '../services/gameService';
 
 // --- SHARED MAP DEFINITIONS ---
 export const MAP_DEFINITIONS: Route[] = [
+  // --- HUSTLE MAPS ---
   {
     id: 'kiambu-route',
     name: 'Nairobi → Kiambu',
@@ -16,7 +17,8 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'Safe',
     timeLimit: '45 mins',
     description: 'The standard commuter route. Good for beginners.',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
   },
   {
     id: 'river-road',
@@ -27,7 +29,8 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'No-Go Zone',
     timeLimit: '40 mins',
     description: 'The Chaos Capital. Traffic is stuck. Drive on the pavement to pass, squeeze through gaps, but avoid the foot patrol!',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
   },
   {
     id: 'rural-dirt',
@@ -38,7 +41,8 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'Sketchy',
     timeLimit: '55 mins',
     description: 'A rough offroad route through the village. Very bumpy and dusty.',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
   },
   {
     id: 'limuru-drive',
@@ -49,7 +53,8 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'Sketchy',
     timeLimit: '1h 00m',
     description: 'A dangerous single-carriageway. Overtake slow trucks but watch out for incoming traffic in the fog!',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
   },
   {
     id: 'maimahiu-escarpment',
@@ -60,7 +65,8 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'No-Go Zone',
     timeLimit: '1h 10m',
     description: 'The Gravity Challenge. A steep descent down the Rift Valley. Gravity accelerates you, brakes will overheat!',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
   },
   {
     id: 'thika-highway',
@@ -71,7 +77,8 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'Sketchy',
     timeLimit: '1h 15m',
     description: 'A massive 3-lane superhighway. Overtake traffic moving in your direction. Watch your speed!',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
   },
   {
     id: 'rongai-extreme',
@@ -82,7 +89,34 @@ export const MAP_DEFINITIONS: Route[] = [
     dangerLevel: 'No-Go Zone',
     timeLimit: '2h 00m',
     description: 'The Wild West. Potholes, overlapping Nganyas, and head-on collision risks. Drive on the shoulder to survive.',
-    isLocked: false
+    isLocked: false,
+    gamemode: 'HUSTLE'
+  },
+
+  // --- MULTIPLAYER RACE MAPS ---
+  {
+    id: 'thika-race',
+    name: 'Thika Speed Trap',
+    distance: 12.0,
+    potentialEarnings: 0,
+    trafficLevel: 'High',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '8 mins',
+    description: 'Pure Speed. Weave through dense highway traffic. No stops, just gas. Instant loss if you crash.',
+    isLocked: false,
+    gamemode: 'RACE'
+  },
+  {
+    id: 'rongai-race',
+    name: 'Rongai Technical',
+    distance: 8.5,
+    potentialEarnings: 0,
+    trafficLevel: 'Medium',
+    dangerLevel: 'No-Go Zone',
+    timeLimit: '10 mins',
+    description: 'Technical Run. Tight lanes, massive potholes, and dust. Suspension killer. One mistake flips your ride.',
+    isLocked: false,
+    gamemode: 'RACE'
   }
 ];
 
@@ -308,6 +342,16 @@ interface GameStore extends GameState {
   
   // Cloud Sync
   syncToCloud: () => void;
+
+  // Multiplayer
+  activeRoomId: string | null;
+  setActiveRoomId: (id: string | null) => void;
+  opponentState: PlayerStatePacket | null;
+  opponentVehicleType: VehicleType | null;
+  setOpponentState: (data: PlayerStatePacket) => void;
+  setOpponentVehicle: (type: VehicleType) => void;
+  multiplayerWastedTimer: number; // 3s penalty
+  setMultiplayerWastedTimer: (time: number) => void;
 }
 
 export const useGameStore = create<GameStore>()(
@@ -361,6 +405,17 @@ export const useGameStore = create<GameStore>()(
       isEngineSoundOn: true,
       
       timeOfDay: 'DAY',
+
+      // Multiplayer Init
+      activeRoomId: null,
+      opponentState: null,
+      opponentVehicleType: null,
+      multiplayerWastedTimer: 0,
+
+      setActiveRoomId: (id) => set({ activeRoomId: id }),
+      setOpponentState: (data) => set({ opponentState: data }),
+      setOpponentVehicle: (type) => set({ opponentVehicleType: type }),
+      setMultiplayerWastedTimer: (time) => set({ multiplayerWastedTimer: time }),
 
       setScreen: (screen) => set({ currentScreen: screen }),
       
@@ -435,7 +490,8 @@ export const useGameStore = create<GameStore>()(
           fuel, 
           fuelUsedLiters,
           vehicleType,
-          isAccelerating
+          isAccelerating,
+          selectedRoute
         } = get();
         
         // Check Destination / Completion
@@ -472,15 +528,18 @@ export const useGameStore = create<GameStore>()(
           newFuel = Math.max(0, fuel - percentConsumed);
         }
 
-        // Check Police
-        if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
+        // RACE MODE: No Police or Stages
+        const isRace = selectedRoute?.gamemode === 'RACE';
+
+        // Check Police (Hustle Mode Only)
+        if (!isRace && activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
           set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
           triggerPoliceCheck();
           return;
         }
 
-        // Check Stage
-        if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
+        // Check Stage (Hustle Mode Only)
+        if (!isRace && activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
           set({ distanceTraveled: nextStageDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
           triggerStage();
           return;
@@ -723,7 +782,10 @@ export const useGameStore = create<GameStore>()(
           happiness: 100,
           isStereoOn: false,
           timeOfDay,
-          stats: { ...stats, cash: 0, time: gameTime }
+          stats: { ...stats, cash: 0, time: gameTime },
+          // Reset multiplayer vars
+          opponentState: null,
+          multiplayerWastedTimer: 0
         });
       },
 
@@ -757,22 +819,52 @@ export const useGameStore = create<GameStore>()(
         stageData: null,
         brakeTemp: 0,
         overlapTimer: 0,
-        happiness: 100
+        happiness: 100,
+        activeRoomId: null,
+        opponentState: null
       }),
 
       triggerCrash: () => {
         playSfx('CRASH');
-        set({
-          gameStatus: 'CRASHING',
-          isCrashing: true,
-          currentSpeed: 0, 
-          isAccelerating: false
-        });
+        const state = get();
+        
+        // Multiplayer Logic: No Game Over, just 3s freeze
+        if (state.activeRoomId) {
+            set({
+                gameStatus: 'CRASHING',
+                isCrashing: true,
+                currentSpeed: 0, 
+                isAccelerating: false,
+                multiplayerWastedTimer: 3 // 3 Seconds
+            });
+        } else {
+            // Single Player Logic
+            set({
+              gameStatus: 'CRASHING',
+              isCrashing: true,
+              currentSpeed: 0, 
+              isAccelerating: false
+            });
+        }
       },
 
       tickTimer: () => set((state) => {
         if (state.gameStatus !== 'PLAYING') return {};
         
+        // --- Multiplayer Wasted Timer Logic ---
+        if (state.activeRoomId && state.isCrashing && state.multiplayerWastedTimer > 0) {
+            const newWasted = state.multiplayerWastedTimer - 1;
+            if (newWasted <= 0) {
+                // Respawn
+                return {
+                    multiplayerWastedTimer: 0,
+                    isCrashing: false,
+                    gameStatus: 'PLAYING'
+                };
+            }
+            return { multiplayerWastedTimer: newWasted };
+        }
+
         const newTime = state.gameTimeRemaining - 1;
         
         let newHappiness = state.happiness;
@@ -900,7 +992,9 @@ export const useGameStore = create<GameStore>()(
         overlapTimer: 0,
         timeOfDay: 'DAY',
         isAccelerating: false,
-        isBraking: false
+        isBraking: false,
+        activeRoomId: null,
+        opponentState: null
       }),
 
       resetCareer: () => set({
@@ -912,7 +1006,9 @@ export const useGameStore = create<GameStore>()(
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
-        stats: INITIAL_STATS
+        stats: INITIAL_STATS,
+        activeRoomId: null,
+        opponentState: null
       }),
       
       toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),
@@ -944,6 +1040,8 @@ export const useGameStore = create<GameStore>()(
         currentScreen: state.currentScreen,
         vehicleType: state.vehicleType,
         selectedRoute: state.selectedRoute,
+        activeRoomId: state.activeRoomId, // Persist for rejoin? (Maybe not needed for ephemeral rooms)
+        opponentVehicleType: state.opponentVehicleType
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -953,12 +1051,14 @@ export const useGameStore = create<GameStore>()(
             if (!state.userMode) {
               state.userMode = 'GUEST';
             }
+            // Always reset active game state on reload
             if (['GAME_LOOP', 'CRASHING', 'GAME_OVER', 'PAUSED'].includes(state.currentScreen)) {
                 state.currentScreen = 'MAP_SELECT';
                 state.gameStatus = 'IDLE';
                 state.activeModal = 'NONE';
                 state.currentSpeed = 0;
                 state.isCrashing = false;
+                state.activeRoomId = null;
             }
         }
       }

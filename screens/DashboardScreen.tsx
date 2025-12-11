@@ -19,7 +19,8 @@ const SAMPLE_ROUTES: Route[] = [
     distance: 5.2,
     potentialEarnings: 2500,
     trafficLevel: 'Medium',
-    dangerLevel: 'Safe'
+    dangerLevel: 'Safe',
+    gamemode: 'HUSTLE'
   },
   {
     id: '2',
@@ -27,7 +28,8 @@ const SAMPLE_ROUTES: Route[] = [
     distance: 8.4,
     potentialEarnings: 4500,
     trafficLevel: 'Gridlock',
-    dangerLevel: 'Sketchy'
+    dangerLevel: 'Sketchy',
+    gamemode: 'HUSTLE'
   },
   {
     id: '3',
@@ -35,7 +37,8 @@ const SAMPLE_ROUTES: Route[] = [
     distance: 14.1,
     potentialEarnings: 7000,
     trafficLevel: 'Medium',
-    dangerLevel: 'No-Go Zone'
+    dangerLevel: 'No-Go Zone',
+    gamemode: 'HUSTLE'
   }
 ];
 
