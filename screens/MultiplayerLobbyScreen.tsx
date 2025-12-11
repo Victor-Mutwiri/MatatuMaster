@@ -36,17 +36,7 @@ const VEHICLE_ICONS: Record<VehicleType, React.ReactNode> = {
 const RACE_MAPS = MAP_DEFINITIONS.filter(m => m.gamemode === 'RACE');
 
 export const MultiplayerLobbyScreen: React.FC = () => {
-  const { 
-    setScreen, 
-    playerName, 
-    saccoName, 
-    unlockedVehicles, 
-    setVehicleType, 
-    userId, 
-    selectRoute, 
-    setOpponentVehicle,
-    setActiveRoomId: setGlobalRoomId // Import global setter
-  } = useGameStore();
+  const { setScreen, playerName, saccoName, unlockedVehicles, setVehicleType, userId, selectRoute, setOpponentVehicle } = useGameStore();
   
   // View State: 'LOBBY' (Friend list) or 'ROOM' (Staging area)
   const [viewState, setViewState] = useState<'LOBBY' | 'ROOM'>('LOBBY');
@@ -238,7 +228,6 @@ export const MultiplayerLobbyScreen: React.FC = () => {
         }
         setViewState('LOBBY');
         setActiveRoomId(null);
-        setGlobalRoomId(null); // Clear global as well
         setRoomState(null);
         setMyRole(null);
         setIsMyReady(false);
@@ -387,14 +376,13 @@ export const MultiplayerLobbyScreen: React.FC = () => {
                       const oppVehicle = myRole === 'HOST' ? roomState?.guest_vehicle : roomState?.host_vehicle;
                       if (oppVehicle) setOpponentVehicle(oppVehicle);
 
-                      // 3. Sync Global Room ID (Critical for Networking)
-                      if (activeRoomId) setGlobalRoomId(activeRoomId);
-
-                      // 4. Set My Vehicle and Start Game Loop
+                      // 3. Set My Vehicle and Start
                       if (mySelectedVehicle) {
                           setVehicleType(mySelectedVehicle);
-                          // Bypass MapSelectionScreen entirely to prevent route overwrite
-                          useGameStore.getState().startGameLoop();
+                          setScreen('MAP_SELECT'); // Internal route trigger
+                          
+                          // Launch game loop
+                          setTimeout(() => useGameStore.getState().startGameLoop(), 100);
                       }
                       return 0;
                   }
@@ -403,7 +391,7 @@ export const MultiplayerLobbyScreen: React.FC = () => {
           }, 1000);
           return () => clearInterval(interval);
       }
-  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen, roomState, selectRoute, myRole, setOpponentVehicle, activeRoomId, setGlobalRoomId]);
+  }, [launchCountdown, mySelectedVehicle, setVehicleType, setScreen, roomState, selectRoute, myRole, setOpponentVehicle]);
 
 
   // --- RENDER: ROOM VIEW ---

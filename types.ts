@@ -156,3 +156,10 @@ declare global {
     interface IntrinsicElements extends R3FIntrinsicElements {}
   }
 }
+
+// Module augmentation for React (necessary for some setups)
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements extends R3FIntrinsicElements {}
+  }
+}
