@@ -16,11 +16,15 @@ import { Route } from './types';
 import { CelebrationOverlay } from './components/ui/CelebrationOverlay';
 
 const App: React.FC = () => {
-  const { currentScreen, stats, setScreen, selectRoute, resetGame, checkLocation } = useGameStore();
+  const { currentScreen, stats, setScreen, selectRoute, resetGame, checkLocation, userMode } = useGameStore();
 
   useEffect(() => {
-    checkLocation();
-  }, []);
+    // CRITICAL: Only check IP location for GUESTS. 
+    // Registered users must rely 100% on their DB profile "country" column to prevent VPN exploits.
+    if (userMode === 'GUEST') {
+      checkLocation();
+    }
+  }, [userMode]); // Re-run if user logs out (becomes GUEST)
 
   const handleStartShift = () => {
     setScreen('SETUP');

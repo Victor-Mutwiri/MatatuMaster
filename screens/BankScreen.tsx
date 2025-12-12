@@ -181,7 +181,7 @@ export const BankScreen: React.FC = () => {
                                 Beta Tester Grant
                             </h2>
                             <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-lg mx-auto mb-8">
-                                Welcome to the Matatu Master Beta! As an early tester from <span className="text-white font-bold underline">International Region</span>, you have been selected to receive a <span className="text-white font-bold">periodic grant</span>.
+                                Welcome to the Matatu Master Beta! As an early tester, you have been selected to receive a <span className="text-white font-bold">periodic grant</span>.
                                 <br/><br/>
                                 Use these funds to upgrade vehicles, test routes, and provide feedback on the game economy.
                             </p>

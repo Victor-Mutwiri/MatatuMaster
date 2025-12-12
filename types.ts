@@ -134,34 +134,7 @@ export interface GameState {
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      // Core
-      group: any;
-      mesh: any;
-      primitive: any;
-      color: any;
-      
-      // Lights
-      ambientLight: any;
-      pointLight: any;
-      directionalLight: any;
-      spotLight: any;
-      
-      // Cameras / Effects
-      fog: any;
-      
-      // Geometries
-      boxGeometry: any;
-      planeGeometry: any;
-      sphereGeometry: any;
-      cylinderGeometry: any;
-      circleGeometry: any;
-      coneGeometry: any;
-      dodecahedronGeometry: any;
-      tetrahedronGeometry: any;
-      
-      // Materials
-      meshStandardMaterial: any;
-      meshBasicMaterial: any;
+      [elemName: string]: any;
     }
   }
 }

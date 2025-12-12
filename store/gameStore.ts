@@ -471,13 +471,14 @@ export const useGameStore = create<GameStore>()(
       checkLocation: async () => {
           const { isKenyaLocked, userMode } = get();
           
-          // CRITICAL SECURITY FIX: If user is REGISTERED, do not check IP.
-          // We rely on the 'isKenyaLocked' or 'isInternational' state which is set via loadUserData from the DB profile.
+          // CRITICAL SECURITY: 
+          // If user is REGISTERED, we ignore geolocation entirely to prevent VPN exploits.
+          // The region is locked based on the profile data loaded from DB.
           if (userMode === 'REGISTERED') {
               return; 
           }
 
-          // Anti-Exploit: If already detected as Kenyan, FORCE Kenyan mode regardless of VPN
+          // Double check mechanism for legacy/edge cases
           if (isKenyaLocked) {
               set({ isInternational: false, currency: 'KES' });
               return;
@@ -490,7 +491,7 @@ export const useGameStore = create<GameStore>()(
                   const data = await res.json();
                   
                   if (data.country_code === 'KE') {
-                      // Detected Kenya: Lock it forever
+                      // Detected Kenya: Lock it forever for this guest session
                       set({ isInternational: false, isKenyaLocked: true, currency: 'KES' });
                   } else {
                       // International: Enable Beta Mode and USD
@@ -539,16 +540,11 @@ export const useGameStore = create<GameStore>()(
         // Hydrate store from Supabase 'player_progress' and Profile Country
         if (!data) return;
         
-        // SECURITY: Enforce country from DB profile
-        // If country is 'Kenya', they are LOCKED to Kenya (Standard Payment).
-        // If country is anything else, they are International (Grant System).
-        let isKenyan = true;
-        if (country) {
-            isKenyan = country === 'Kenya';
-        } else {
-            // Fallback for old accounts: Use current locked state or default to Kenya
-            isKenyan = get().isKenyaLocked; 
-        }
+        // SECURITY: Strict Country Check from DB Profile
+        // If profile.country is strictly 'Kenya', enforce local settings.
+        // Any other string (including VPN spoofed creation, if we caught it then) = International/Grant.
+        // We do NOT use IP check here.
+        const isKenyanProfile = country === 'Kenya';
 
         set({
             bankBalance: data.bank_balance || 0,
@@ -566,10 +562,11 @@ export const useGameStore = create<GameStore>()(
             vehicleUpgrades: data.vehicle_upgrades || DEFAULT_UPGRADES,
             vehicleFuelUpgrades: data.vehicle_fuel_upgrades || DEFAULT_UPGRADES,
             vehiclePerformanceUpgrades: data.vehicle_performance_upgrades || DEFAULT_UPGRADES,
-            // Set Location State based on DB Record
-            isKenyaLocked: isKenyan,
-            isInternational: !isKenyan,
-            currency: isKenyan ? 'KES' : 'USD'
+            
+            // STRICT REGION SETTING
+            isKenyaLocked: isKenyanProfile,
+            isInternational: !isKenyanProfile,
+            currency: isKenyanProfile ? 'KES' : 'USD'
         });
       },
 
@@ -887,7 +884,7 @@ export const useGameStore = create<GameStore>()(
                 message = "Niaje boss. Leta ya macho (200).";
             } else {
                 bribe = 100;
-                message = "Routine check. Toa mia ya chai.";
+                message = "Routine check. Nunua chai.";
             }
           }
         }
@@ -1235,12 +1232,16 @@ export const useGameStore = create<GameStore>()(
         selectedRoute: state.selectedRoute,
         lastDailyGrantClaim: state.lastDailyGrantClaim, 
         isKenyaLocked: state.isKenyaLocked, // PERSIST THE LOCK
-        currency: state.currency // Persist currency preference
+        currency: state.currency, // Persist currency preference
+        isInternational: state.isInternational // IMPORTANT: Persist this now!
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-            // Reset temporary international flag, but KEEP the lock and currency
-            state.isInternational = false;
+            // For GUESTS only: Reset temporary international flag to re-check.
+            // For REGISTERED users: TRUST the persisted state until sync updates it.
+            if (state.userMode === 'GUEST') {
+                state.isInternational = false;
+            }
 
             if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {
               state.unlockedVehicles = ['boda'];
