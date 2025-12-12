@@ -105,7 +105,8 @@ export const BankScreen: React.FC = () => {
       setVerifying(true);
       const startBalance = bankBalance;
       let attempts = 0;
-      const MAX_ATTEMPTS = 15; // 30 seconds max
+      // Increased to 45 attempts * 2s = 90 seconds
+      const MAX_ATTEMPTS = 45; 
 
       const check = async () => {
           if (!userId) return;
@@ -132,7 +133,7 @@ export const BankScreen: React.FC = () => {
           } else {
               setVerifying(false);
               setIsProcessing(false);
-              alert("Transaction taking longer than expected. Please check back later, your funds are safe.");
+              alert("The network is taking longer than usual. Don't worry, your funds are safe! The cash will appear in your account shortly once M-Pesa confirms the transaction.");
           }
       };
 
@@ -185,7 +186,10 @@ export const BankScreen: React.FC = () => {
                 verifyTransaction(cashAmount);
             },
             onClose: () => {
-                setIsProcessing(false);
+                // Only cancel if we haven't started verification yet
+                if (!verifying) {
+                    setIsProcessing(false);
+                }
             }
         });
 
@@ -226,10 +230,10 @@ export const BankScreen: React.FC = () => {
                   
                   <Loader2 className="text-green-500 animate-spin mb-4" size={48} />
                   <h3 className="font-bold text-xl mb-2">
-                      {verifying ? "Verifying Deposit..." : "Secure Checkout"}
+                      {verifying ? "Confirming Deposit..." : "Secure Checkout"}
                   </h3>
                   <p className="text-slate-500 text-sm text-center mb-6">
-                      {verifying ? "Waiting for bank confirmation. Do not close." : "Please complete the payment in the popup."}
+                      {verifying ? "Waiting for M-Pesa network confirmation. Please stay on this screen." : "Please complete the payment in the popup."}
                   </p>
                   
                   {!verifying && (
