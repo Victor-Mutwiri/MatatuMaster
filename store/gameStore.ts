@@ -472,7 +472,7 @@ export const useGameStore = create<GameStore>()(
           const { isKenyaLocked, userMode } = get();
           
           // CRITICAL SECURITY FIX: If user is REGISTERED, do not check IP.
-          // We rely on the 'isKenyaLocked' state which is set from the DB profile.
+          // We rely on the 'isKenyaLocked' or 'isInternational' state which is set via loadUserData from the DB profile.
           if (userMode === 'REGISTERED') {
               return; 
           }
@@ -540,6 +540,8 @@ export const useGameStore = create<GameStore>()(
         if (!data) return;
         
         // SECURITY: Enforce country from DB profile
+        // If country is 'Kenya', they are LOCKED to Kenya (Standard Payment).
+        // If country is anything else, they are International (Grant System).
         let isKenyan = true;
         if (country) {
             isKenyan = country === 'Kenya';

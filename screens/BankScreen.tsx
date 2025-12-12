@@ -49,9 +49,10 @@ export const BankScreen: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
-  // Grant Countdown Logic
+  // Grant Countdown Logic (72 Hours)
+  const GRANT_INTERVAL = 3 * 24 * 60 * 60 * 1000; // 3 Days
   const [timeLeft, setTimeLeft] = useState<string>('');
-  const canClaim = Date.now() - lastDailyGrantClaim >= 24 * 60 * 60 * 1000;
+  const canClaim = Date.now() - lastDailyGrantClaim >= GRANT_INTERVAL;
 
   useEffect(() => {
       if (canClaim) {
@@ -60,15 +61,21 @@ export const BankScreen: React.FC = () => {
       }
       const interval = setInterval(() => {
           const now = Date.now();
-          const target = lastDailyGrantClaim + 24 * 60 * 60 * 1000;
+          const target = lastDailyGrantClaim + GRANT_INTERVAL;
           const diff = target - now;
           if (diff <= 0) {
               setTimeLeft('READY');
               clearInterval(interval);
           } else {
-              const h = Math.floor(diff / (1000 * 60 * 60));
+              const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+              const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
               const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-              setTimeLeft(`${h}h ${m}m`);
+              
+              if (d > 0) {
+                  setTimeLeft(`${d}d ${h}h`);
+              } else {
+                  setTimeLeft(`${h}h ${m}m`);
+              }
           }
       }, 1000);
       return () => clearInterval(interval);
@@ -174,14 +181,14 @@ export const BankScreen: React.FC = () => {
                                 Beta Tester Grant
                             </h2>
                             <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-lg mx-auto mb-8">
-                                Welcome to the Matatu Master Beta! As an early tester, you have been selected to receive a <span className="text-white font-bold">daily grant</span>.
+                                Welcome to the Matatu Master Beta! As an early tester from <span className="text-white font-bold underline">International Region</span>, you have been selected to receive a <span className="text-white font-bold">periodic grant</span>.
                                 <br/><br/>
                                 Use these funds to upgrade vehicles, test routes, and provide feedback on the game economy.
                             </p>
 
                             <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-700/50 mb-8 max-w-md mx-auto flex items-center justify-between gap-4">
                                 <div className="text-left">
-                                    <span className="text-xs text-slate-500 uppercase font-bold block">Daily Stimulus</span>
+                                    <span className="text-xs text-slate-500 uppercase font-bold block">3-Day Stimulus</span>
                                     <span className="font-mono text-2xl font-bold text-green-400">{formatCurrency(50000)}</span>
                                 </div>
                                 <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
@@ -204,7 +211,7 @@ export const BankScreen: React.FC = () => {
                             </Button>
                             
                             <p className="text-xs text-slate-500 mt-6">
-                                * Grants reset every 24 hours. Enjoy the ride!
+                                * Grants reset every 72 hours.
                             </p>
                         </div>
                     </div>

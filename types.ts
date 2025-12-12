@@ -130,44 +130,38 @@ export interface GameState {
   timeOfDay: 'DAY' | 'NIGHT';
 }
 
-// Type definition for R3F elements
-interface R3FIntrinsicElements {
-  // Core
-  group: any;
-  mesh: any;
-  primitive: any;
-  color: any;
-  
-  // Lights
-  ambientLight: any;
-  pointLight: any;
-  directionalLight: any;
-  spotLight: any;
-  
-  // Cameras / Effects
-  fog: any;
-  
-  // Geometries
-  boxGeometry: any;
-  planeGeometry: any;
-  sphereGeometry: any;
-  cylinderGeometry: any;
-  circleGeometry: any;
-  coneGeometry: any;
-  dodecahedronGeometry: any;
-  tetrahedronGeometry: any;
-  
-  // Materials
-  meshStandardMaterial: any;
-  meshBasicMaterial: any;
-
-  // Catch-all to prevent other R3F errors
-  [elemName: string]: any;
-}
-
 // Global augmentation for React Three Fiber elements
 declare global {
   namespace JSX {
-    interface IntrinsicElements extends R3FIntrinsicElements {}
+    interface IntrinsicElements {
+      // Core
+      group: any;
+      mesh: any;
+      primitive: any;
+      color: any;
+      
+      // Lights
+      ambientLight: any;
+      pointLight: any;
+      directionalLight: any;
+      spotLight: any;
+      
+      // Cameras / Effects
+      fog: any;
+      
+      // Geometries
+      boxGeometry: any;
+      planeGeometry: any;
+      sphereGeometry: any;
+      cylinderGeometry: any;
+      circleGeometry: any;
+      coneGeometry: any;
+      dodecahedronGeometry: any;
+      tetrahedronGeometry: any;
+      
+      // Materials
+      meshStandardMaterial: any;
+      meshBasicMaterial: any;
+    }
   }
 }
