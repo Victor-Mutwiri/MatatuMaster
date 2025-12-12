@@ -325,6 +325,11 @@ interface GameStore extends GameState {
   purchaseUpgrade: (type: VehicleType) => void;
   getUpgradeCost: (type: VehicleType, currentLevel: number) => number;
   getUpgradeMultiplier: (type: VehicleType) => number;
+  
+  // Fuel Upgrades
+  purchaseFuelUpgrade: (type: VehicleType) => void;
+  getFuelUpgradeCost: (type: VehicleType, currentLevel: number) => number;
+  getFuelEfficiencyMultiplier: (type: VehicleType) => number;
 
   // Controls
   setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
@@ -374,6 +379,7 @@ export const useGameStore = create<GameStore>()(
       vehicleType: null,
       unlockedVehicles: ['boda'],
       vehicleUpgrades: DEFAULT_UPGRADES,
+      vehicleFuelUpgrades: DEFAULT_UPGRADES,
       currentSpeed: 0,
       distanceTraveled: 0,
       totalRouteDistance: 0,
@@ -445,7 +451,8 @@ export const useGameStore = create<GameStore>()(
                 reputation: data.reputation || 50
             },
             unlockedVehicles: data.unlocked_vehicles || ['boda'],
-            vehicleUpgrades: data.vehicle_upgrades || DEFAULT_UPGRADES
+            vehicleUpgrades: data.vehicle_upgrades || DEFAULT_UPGRADES,
+            vehicleFuelUpgrades: data.vehicle_fuel_upgrades || DEFAULT_UPGRADES
         });
       },
 
@@ -475,39 +482,59 @@ export const useGameStore = create<GameStore>()(
         get().syncToCloud();
       },
 
+      // --- ROUTE UPGRADE ---
       getUpgradeCost: (type: VehicleType, currentLevel: number) => {
           if (currentLevel >= 4) return 0;
-          
-          const vehiclePrice = VEHICLE_SPECS[type].price || 10000; // Default base if undefined
-          
-          // INCREASED SCALING: Upgrades now cost 20%, 35%, 50%, 75% of vehicle price
-          // This ensures higher tier vehicles have proportionately expensive upgrades
-          const factors = [0.20, 0.35, 0.50, 0.75];
+          const vehiclePrice = VEHICLE_SPECS[type].price || 10000; 
+          const factors = [0.20, 0.35, 0.50, 0.75]; // Steep
           return Math.floor(vehiclePrice * factors[currentLevel]);
       },
 
       getUpgradeMultiplier: (type: VehicleType) => {
           const level = get().vehicleUpgrades[type] || 0;
-          return 1 + (level * 0.15); // +15% per level
+          return 1 + (level * 0.15); 
       },
 
       purchaseUpgrade: (type: VehicleType) => {
           const { bankBalance, vehicleUpgrades } = get();
           const currentLevel = vehicleUpgrades[type] || 0;
-          
           if (currentLevel >= 4) return;
-
           const cost = get().getUpgradeCost(type, currentLevel);
           
           if (bankBalance >= cost) {
               const newLevel = currentLevel + 1;
               const newUpgrades = { ...vehicleUpgrades, [type]: newLevel };
-              
-              set({
-                  bankBalance: bankBalance - cost,
-                  vehicleUpgrades: newUpgrades
-              });
-              
+              set({ bankBalance: bankBalance - cost, vehicleUpgrades: newUpgrades });
+              playSfx('COIN');
+              get().syncToCloud();
+          }
+      },
+
+      // --- FUEL UPGRADE ---
+      getFuelUpgradeCost: (type: VehicleType, currentLevel: number) => {
+          if (currentLevel >= 4) return 0;
+          const vehiclePrice = VEHICLE_SPECS[type].price || 10000; 
+          // Cheaper scaling: 10%, 15%, 25%, 40% of vehicle price
+          const factors = [0.10, 0.15, 0.25, 0.40];
+          return Math.floor(vehiclePrice * factors[currentLevel]);
+      },
+
+      getFuelEfficiencyMultiplier: (type: VehicleType) => {
+          const level = get().vehicleFuelUpgrades[type] || 0;
+          // +15% Base Efficiency per level
+          return 1 + (level * 0.15); 
+      },
+
+      purchaseFuelUpgrade: (type: VehicleType) => {
+          const { bankBalance, vehicleFuelUpgrades } = get();
+          const currentLevel = vehicleFuelUpgrades[type] || 0;
+          if (currentLevel >= 4) return;
+          const cost = get().getFuelUpgradeCost(type, currentLevel);
+          
+          if (bankBalance >= cost) {
+              const newLevel = currentLevel + 1;
+              const newUpgrades = { ...vehicleFuelUpgrades, [type]: newLevel };
+              set({ bankBalance: bankBalance - cost, vehicleFuelUpgrades: newUpgrades });
               playSfx('COIN');
               get().syncToCloud();
           }
@@ -533,7 +560,8 @@ export const useGameStore = create<GameStore>()(
           fuelUsedLiters,
           vehicleType,
           isAccelerating,
-          selectedRoute
+          selectedRoute,
+          getFuelEfficiencyMultiplier
         } = get();
         
         if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= totalRouteDistance) {
@@ -549,6 +577,9 @@ export const useGameStore = create<GameStore>()(
           const kmTraveled = amount / 1000;
           const baseEfficiency = FUEL_EFFICIENCY[vehicleType] || 9;
           
+          // Apply Fuel Upgrade Multiplier
+          const fuelMultiplier = getFuelEfficiencyMultiplier(vehicleType);
+          
           let speedPenalty = 1;
           const kmph = currentSpeed * 1.6;
           if (kmph > 80) {
@@ -556,7 +587,9 @@ export const useGameStore = create<GameStore>()(
           }
           
           const accelPenalty = isAccelerating ? 1.2 : 1.0;
-          const realEfficiency = baseEfficiency / (speedPenalty * accelPenalty);
+          
+          // Formula: Real Eff = (Base * Multiplier) / Penalties
+          const realEfficiency = (baseEfficiency * fuelMultiplier) / (speedPenalty * accelPenalty);
           
           const litersConsumed = kmTraveled / realEfficiency;
           newFuelUsedLiters += litersConsumed;
@@ -956,7 +989,8 @@ export const useGameStore = create<GameStore>()(
             lifetimeStats: state.lifetimeStats,
             reputation: state.stats.reputation,
             unlockedVehicles: state.unlockedVehicles,
-            vehicleUpgrades: state.vehicleUpgrades
+            vehicleUpgrades: state.vehicleUpgrades,
+            vehicleFuelUpgrades: state.vehicleFuelUpgrades
         });
       },
 
@@ -1009,6 +1043,7 @@ export const useGameStore = create<GameStore>()(
         userMode: 'GUEST',
         unlockedVehicles: ['boda'],
         vehicleUpgrades: DEFAULT_UPGRADES,
+        vehicleFuelUpgrades: DEFAULT_UPGRADES,
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
@@ -1038,6 +1073,7 @@ export const useGameStore = create<GameStore>()(
         userId: state.userId,
         unlockedVehicles: state.unlockedVehicles,
         vehicleUpgrades: state.vehicleUpgrades,
+        vehicleFuelUpgrades: state.vehicleFuelUpgrades,
         lifetimeStats: state.lifetimeStats,
         bankBalance: state.bankBalance,
         isSoundOn: state.isSoundOn,
@@ -1053,6 +1089,9 @@ export const useGameStore = create<GameStore>()(
             }
             if (!state.vehicleUpgrades) {
                 state.vehicleUpgrades = DEFAULT_UPGRADES;
+            }
+            if (!state.vehicleFuelUpgrades) {
+                state.vehicleFuelUpgrades = DEFAULT_UPGRADES;
             }
             if (!state.userMode) {
               state.userMode = 'GUEST';

@@ -4,11 +4,11 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus, TrendingDown, Hammer, Gauge } from 'lucide-react';
+import { CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus, TrendingDown, Hammer, Gauge, Fuel, Leaf } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const VehicleSelectionScreen: React.FC = () => {
-  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, purchaseUpgrade, getUpgradeCost } = useGameStore();
+  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, purchaseUpgrade, purchaseFuelUpgrade, getUpgradeCost, getFuelUpgradeCost } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -43,12 +43,20 @@ export const VehicleSelectionScreen: React.FC = () => {
       }
   };
 
-  const handleUpgrade = (type: VehicleType) => {
+  const handleRouteUpgrade = (type: VehicleType) => {
       if (userMode === 'GUEST') {
           setShowAuthGate(true);
           return;
       }
       purchaseUpgrade(type);
+  };
+
+  const handleFuelUpgrade = (type: VehicleType) => {
+      if (userMode === 'GUEST') {
+          setShowAuthGate(true);
+          return;
+      }
+      purchaseFuelUpgrade(type);
   };
 
   const vehicleOptions = [
@@ -150,11 +158,17 @@ export const VehicleSelectionScreen: React.FC = () => {
               const price = VEHICLE_SPECS[v.type].price;
               const canAfford = bankBalance >= price;
               
-              // Upgrade Logic
-              const currentLevel = vehicleUpgrades[v.type] || 0;
-              const nextLevelCost = getUpgradeCost(v.type, currentLevel);
-              const canAffordUpgrade = bankBalance >= nextLevelCost;
-              const isMaxed = currentLevel >= 4;
+              // Route Optimization Logic
+              const routeLevel = vehicleUpgrades[v.type] || 0;
+              const routeUpgradeCost = getUpgradeCost(v.type, routeLevel);
+              const canAffordRouteUpgrade = bankBalance >= routeUpgradeCost;
+              const isRouteMaxed = routeLevel >= 4;
+
+              // Fuel Upgrade Logic
+              const fuelLevel = vehicleFuelUpgrades[v.type] || 0;
+              const fuelUpgradeCost = getFuelUpgradeCost(v.type, fuelLevel);
+              const canAffordFuelUpgrade = bankBalance >= fuelUpgradeCost;
+              const isFuelMaxed = fuelLevel >= 4;
 
               return (
                 <div 
@@ -214,36 +228,76 @@ export const VehicleSelectionScreen: React.FC = () => {
                   <div className="mt-auto pt-3 border-t border-white/5">
                      {isUnlocked ? (
                         <div className="space-y-3">
+                           
                            {/* Route Optimization Upgrade */}
                            <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
                                <div className="flex justify-between items-center mb-1">
                                    <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Gauge size={10} /> Optimization</span>
-                                   <span className="text-[10px] font-bold text-green-400">+{currentLevel * 15}%</span>
+                                   <span className="text-[10px] font-bold text-green-400">+{routeLevel * 15}%</span>
                                </div>
                                
                                <div className="flex gap-1 mb-2">
                                    {[1,2,3,4].map(lvl => (
-                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= currentLevel ? 'bg-green-500' : 'bg-slate-700'}`}></div>
+                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= routeLevel ? 'bg-green-500' : 'bg-slate-700'}`}></div>
                                    ))}
                                </div>
 
-                               {!isMaxed && isSelected && (
+                               {!isRouteMaxed && isSelected && (
                                    <Button 
                                       size="sm" 
                                       fullWidth
-                                      variant={canAffordUpgrade ? 'outline' : 'secondary'}
-                                      className="py-1 text-[10px] h-8"
+                                      variant={canAffordRouteUpgrade ? 'outline' : 'secondary'}
+                                      className="py-1 text-[10px] h-8 whitespace-nowrap"
                                       onClick={(e) => {
                                           e.stopPropagation();
-                                          if (!canAffordUpgrade) handleOpenBank();
-                                          else handleUpgrade(v.type);
+                                          if (!canAffordRouteUpgrade) handleOpenBank();
+                                          else handleRouteUpgrade(v.type);
                                       }}
                                    >
-                                      {canAffordUpgrade ? `Upgrade (Lv ${currentLevel + 1}) - KES ${nextLevelCost.toLocaleString()}` : 'Add Funds to Upgrade'}
+                                      {canAffordRouteUpgrade 
+                                        ? `Upgrade (Lv ${routeLevel + 1}) - KES ${routeUpgradeCost.toLocaleString()}` 
+                                        : `KES ${routeUpgradeCost.toLocaleString()} (Add Funds)`
+                                      }
                                    </Button>
                                )}
-                               {isMaxed && (
+                               {isRouteMaxed && (
                                    <div className="text-center text-[10px] text-matatu-yellow font-bold uppercase tracking-widest py-1">Max Level Reached</div>
+                               )}
+                           </div>
+
+                           {/* Fuel Efficiency Upgrade */}
+                           <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
+                               <div className="flex justify-between items-center mb-1">
+                                   <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Fuel size={10} /> Eco-Tuning</span>
+                                   <span className="text-[10px] font-bold text-orange-400">+{fuelLevel * 15}%</span>
+                               </div>
+                               
+                               <div className="flex gap-1 mb-2">
+                                   {[1,2,3,4].map(lvl => (
+                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= fuelLevel ? 'bg-orange-500' : 'bg-slate-700'}`}></div>
+                                   ))}
+                               </div>
+
+                               {!isFuelMaxed && isSelected && (
+                                   <Button 
+                                      size="sm" 
+                                      fullWidth
+                                      variant={canAffordFuelUpgrade ? 'outline' : 'secondary'}
+                                      className={`py-1 text-[10px] h-8 whitespace-nowrap ${canAffordFuelUpgrade ? 'border-orange-500 text-orange-500 hover:bg-orange-900/20' : ''}`}
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!canAffordFuelUpgrade) handleOpenBank();
+                                          else handleFuelUpgrade(v.type);
+                                      }}
+                                   >
+                                      {canAffordFuelUpgrade 
+                                        ? `Tune (Lv ${fuelLevel + 1}) - KES ${fuelUpgradeCost.toLocaleString()}` 
+                                        : `KES ${fuelUpgradeCost.toLocaleString()} (Add Funds)`
+                                      }
+                                   </Button>
+                               )}
+                               {isFuelMaxed && (
+                                   <div className="text-center text-[10px] text-orange-400 font-bold uppercase tracking-widest py-1">Max Tuned</div>
                                )}
                            </div>
 

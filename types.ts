@@ -63,7 +63,8 @@ export interface GameState {
   saccoName: string;
   vehicleType: VehicleType | null;
   unlockedVehicles: VehicleType[]; // List of owned vehicles
-  vehicleUpgrades: Record<VehicleType, number>; // Level 0-4 for each vehicle
+  vehicleUpgrades: Record<VehicleType, number>; // Level 0-4 for route/earnings
+  vehicleFuelUpgrades: Record<VehicleType, number>; // Level 0-4 for fuel efficiency
   
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
