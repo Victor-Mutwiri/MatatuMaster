@@ -9,7 +9,7 @@ import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 // --- CONFIG ---
 // Replace with your actual Public Key from Paystack Dashboard
-const PAYSTACK_PUBLIC_KEY = 'pk_test_fcc27a08346f3aeee5e030182cc1782bcd8a45cf'; 
+const PAYSTACK_PUBLIC_KEY = 'pk_live_4cf950e639f784bfba41fab1b785dabe088b63bd'; 
 
 interface BundleProps {
   title: string;
