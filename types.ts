@@ -65,6 +65,7 @@ export interface GameState {
   unlockedVehicles: VehicleType[]; // List of owned vehicles
   vehicleUpgrades: Record<VehicleType, number>; // Level 0-4 for route/earnings
   vehicleFuelUpgrades: Record<VehicleType, number>; // Level 0-4 for fuel efficiency
+  vehiclePerformanceUpgrades: Record<VehicleType, number>; // Level 0-4 for top speed
   
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units

@@ -23,14 +23,20 @@ export const PhysicsController = ({ playerLane }: { playerLane: number }) => {
     setOverlapTimer,
     endGame,
     happiness,
-    isCrashing
+    isCrashing,
+    getPerformanceMultiplier
   } = useGameStore();
 
   const engineRef = useRef<EngineSynthesizer | null>(null);
 
   // Convert KMH to Game Units (Approx 1.6 ratio based on original logic)
   const spec = vehicleType ? VEHICLE_SPECS[vehicleType] : VEHICLE_SPECS['14-seater'];
-  const MAX_SPEED = spec.maxSpeedKmh / 1.6; 
+  
+  // Apply Performance Upgrade
+  const perfMultiplier = vehicleType ? getPerformanceMultiplier(vehicleType) : 1;
+  const boostedMaxSpeed = spec.maxSpeedKmh * perfMultiplier;
+  
+  const MAX_SPEED = boostedMaxSpeed / 1.6; 
   
   const ACCEL_RATE = 40;
   const BRAKE_RATE = 80;

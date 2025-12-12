@@ -8,7 +8,7 @@ import { CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, Tr
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const VehicleSelectionScreen: React.FC = () => {
-  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, purchaseUpgrade, purchaseFuelUpgrade, getUpgradeCost, getFuelUpgradeCost } = useGameStore();
+  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, vehiclePerformanceUpgrades, purchaseUpgrade, purchaseFuelUpgrade, purchasePerformanceUpgrade, getUpgradeCost, getFuelUpgradeCost, getPerformanceUpgradeCost } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -57,6 +57,14 @@ export const VehicleSelectionScreen: React.FC = () => {
           return;
       }
       purchaseFuelUpgrade(type);
+  };
+
+  const handlePerformanceUpgrade = (type: VehicleType) => {
+      if (userMode === 'GUEST') {
+          setShowAuthGate(true);
+          return;
+      }
+      purchasePerformanceUpgrade(type);
   };
 
   const vehicleOptions = [
@@ -170,6 +178,12 @@ export const VehicleSelectionScreen: React.FC = () => {
               const canAffordFuelUpgrade = bankBalance >= fuelUpgradeCost;
               const isFuelMaxed = fuelLevel >= 4;
 
+              // Performance Upgrade Logic
+              const perfLevel = vehiclePerformanceUpgrades[v.type] || 0;
+              const perfUpgradeCost = getPerformanceUpgradeCost(v.type, perfLevel);
+              const canAffordPerfUpgrade = bankBalance >= perfUpgradeCost;
+              const isPerfMaxed = perfLevel >= 4;
+
               return (
                 <div 
                   key={v.type}
@@ -229,7 +243,7 @@ export const VehicleSelectionScreen: React.FC = () => {
                      {isUnlocked ? (
                         <div className="space-y-3">
                            
-                           {/* Route Optimization Upgrade */}
+                           {/* 1. Route Optimization Upgrade */}
                            <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
                                <div className="flex justify-between items-center mb-1">
                                    <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Gauge size={10} /> Optimization</span>
@@ -265,7 +279,7 @@ export const VehicleSelectionScreen: React.FC = () => {
                                )}
                            </div>
 
-                           {/* Fuel Efficiency Upgrade */}
+                           {/* 2. Fuel Efficiency Upgrade */}
                            <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
                                <div className="flex justify-between items-center mb-1">
                                    <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Fuel size={10} /> Eco-Tuning</span>
@@ -298,6 +312,42 @@ export const VehicleSelectionScreen: React.FC = () => {
                                )}
                                {isFuelMaxed && (
                                    <div className="text-center text-[10px] text-orange-400 font-bold uppercase tracking-widest py-1">Max Tuned</div>
+                               )}
+                           </div>
+
+                           {/* 3. Performance (Speed) Upgrade */}
+                           <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
+                               <div className="flex justify-between items-center mb-1">
+                                   <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Zap size={10} /> Performance</span>
+                                   <span className="text-[10px] font-bold text-cyan-400">+{perfLevel * 15}%</span>
+                               </div>
+                               
+                               <div className="flex gap-1 mb-2">
+                                   {[1,2,3,4].map(lvl => (
+                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= perfLevel ? 'bg-cyan-500' : 'bg-slate-700'}`}></div>
+                                   ))}
+                               </div>
+
+                               {!isPerfMaxed && isSelected && (
+                                   <Button 
+                                      size="sm" 
+                                      fullWidth
+                                      variant={canAffordPerfUpgrade ? 'outline' : 'secondary'}
+                                      className={`py-1 text-[10px] h-8 whitespace-nowrap ${canAffordPerfUpgrade ? 'border-cyan-500 text-cyan-500 hover:bg-cyan-900/20' : ''}`}
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!canAffordPerfUpgrade) handleOpenBank();
+                                          else handlePerformanceUpgrade(v.type);
+                                      }}
+                                   >
+                                      {canAffordPerfUpgrade 
+                                        ? `Tune (Lv ${perfLevel + 1}) - KES ${perfUpgradeCost.toLocaleString()}` 
+                                        : `KES ${perfUpgradeCost.toLocaleString()} (Add Funds)`
+                                      }
+                                   </Button>
+                               )}
+                               {isPerfMaxed && (
+                                   <div className="text-center text-[10px] text-cyan-400 font-bold uppercase tracking-widest py-1">Max Power</div>
                                )}
                            </div>
 

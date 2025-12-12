@@ -1,0 +1,5 @@
+
+-- Add column for vehicle performance upgrades (JSONB)
+-- This allows storing key-value pairs like {"boda": 2, "14-seater": 1}
+ALTER TABLE public.player_progress 
+ADD COLUMN IF NOT EXISTS vehicle_performance_upgrades JSONB DEFAULT '{}'::jsonb;

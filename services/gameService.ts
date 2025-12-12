@@ -19,6 +19,7 @@ export interface DBProgress {
   unlocked_vehicles: VehicleType[];
   vehicle_upgrades: Record<string, number>; // JSONB in DB
   vehicle_fuel_upgrades: Record<string, number>; // JSONB in DB
+  vehicle_performance_upgrades: Record<string, number>; // JSONB in DB
   lifetime_earnings: number;
   updated_at?: string;
 }
@@ -76,6 +77,7 @@ export const GameService = {
       unlockedVehicles: VehicleType[];
       vehicleUpgrades: Record<VehicleType, number>;
       vehicleFuelUpgrades: Record<VehicleType, number>;
+      vehiclePerformanceUpgrades: Record<VehicleType, number>;
     }
   ) => {
     if (userMode === 'GUEST' || !userId) {
@@ -96,6 +98,7 @@ export const GameService = {
             unlocked_vehicles: data.unlockedVehicles,
             vehicle_upgrades: data.vehicleUpgrades,
             vehicle_fuel_upgrades: data.vehicleFuelUpgrades,
+            vehicle_performance_upgrades: data.vehiclePerformanceUpgrades,
             updated_at: new Date().toISOString()
           });
 
@@ -516,6 +519,7 @@ export const GameService = {
           unlocked_vehicles: ['boda'],
           vehicle_upgrades: {}, // Initialize empty
           vehicle_fuel_upgrades: {}, // Initialize empty
+          vehicle_performance_upgrades: {}, // Initialize empty
           updated_at: new Date().toISOString()
       });
 

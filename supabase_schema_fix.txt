@@ -1,0 +1,14 @@
+
+-- RUN THIS IN SUPABASE SQL EDITOR TO FIX THE SYNC ERROR
+
+-- 1. Add Fuel Upgrades Column (Missing in your DB)
+ALTER TABLE public.player_progress 
+ADD COLUMN IF NOT EXISTS vehicle_fuel_upgrades JSONB DEFAULT '{}'::jsonb;
+
+-- 2. Add Performance Upgrades Column (Ensure it exists)
+ALTER TABLE public.player_progress 
+ADD COLUMN IF NOT EXISTS vehicle_performance_upgrades JSONB DEFAULT '{}'::jsonb;
+
+-- NOTE:
+-- After running this, if you still see the error, go to:
+-- Project Settings -> API -> Schema Cache -> Click "Reload"
