@@ -319,7 +319,7 @@ interface GameStore extends GameState {
   
   // Progression
   registerUser: (uid: string) => void;
-  loadUserData: (data: any) => void;
+  loadUserData: (data: any, country: string | undefined) => void;
   unlockVehicle: (type: VehicleType) => void;
   purchaseCash: (amount: number) => void; 
   
@@ -469,8 +469,14 @@ export const useGameStore = create<GameStore>()(
       },
 
       checkLocation: async () => {
-          const { isKenyaLocked } = get();
+          const { isKenyaLocked, userMode } = get();
           
+          // CRITICAL SECURITY FIX: If user is REGISTERED, do not check IP.
+          // We rely on the 'isKenyaLocked' state which is set from the DB profile.
+          if (userMode === 'REGISTERED') {
+              return; 
+          }
+
           // Anti-Exploit: If already detected as Kenyan, FORCE Kenyan mode regardless of VPN
           if (isKenyaLocked) {
               set({ isInternational: false, currency: 'KES' });
@@ -478,7 +484,7 @@ export const useGameStore = create<GameStore>()(
           }
 
           try {
-              // Lightweight IP check for country detection
+              // Lightweight IP check for GUESTS ONLY
               const res = await fetch('https://ipapi.co/json/');
               if (res.ok) {
                   const data = await res.json();
@@ -500,9 +506,10 @@ export const useGameStore = create<GameStore>()(
       claimDailyGrant: () => {
           const { lastDailyGrantClaim, bankBalance } = get();
           const now = Date.now();
-          const ONE_DAY = 24 * 60 * 60 * 1000;
+          // CHANGED: 72 Hours (3 Days) instead of 24 Hours
+          const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
           
-          if (now - lastDailyGrantClaim >= ONE_DAY) {
+          if (now - lastDailyGrantClaim >= THREE_DAYS) {
               const grantAmount = 50000; // Value in KES
               set({ 
                   bankBalance: bankBalance + grantAmount, 
@@ -528,9 +535,19 @@ export const useGameStore = create<GameStore>()(
           }, 3000);
       },
 
-      loadUserData: (data) => {
-        // Hydrate store from Supabase 'player_progress' data
+      loadUserData: (data, country) => {
+        // Hydrate store from Supabase 'player_progress' and Profile Country
         if (!data) return;
+        
+        // SECURITY: Enforce country from DB profile
+        let isKenyan = true;
+        if (country) {
+            isKenyan = country === 'Kenya';
+        } else {
+            // Fallback for old accounts: Use current locked state or default to Kenya
+            isKenyan = get().isKenyaLocked; 
+        }
+
         set({
             bankBalance: data.bank_balance || 0,
             lifetimeStats: {
@@ -546,7 +563,11 @@ export const useGameStore = create<GameStore>()(
             unlockedVehicles: data.unlocked_vehicles || ['boda'],
             vehicleUpgrades: data.vehicle_upgrades || DEFAULT_UPGRADES,
             vehicleFuelUpgrades: data.vehicle_fuel_upgrades || DEFAULT_UPGRADES,
-            vehiclePerformanceUpgrades: data.vehicle_performance_upgrades || DEFAULT_UPGRADES
+            vehiclePerformanceUpgrades: data.vehicle_performance_upgrades || DEFAULT_UPGRADES,
+            // Set Location State based on DB Record
+            isKenyaLocked: isKenyan,
+            isInternational: !isKenyan,
+            currency: isKenyan ? 'KES' : 'USD'
         });
       },
 

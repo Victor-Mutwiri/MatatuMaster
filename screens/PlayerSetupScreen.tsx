@@ -67,7 +67,8 @@ export const PlayerSetupScreen: React.FC = () => {
                   if (profile) {
                       setPlayerInfo(profile.username, profile.sacco);
                       registerUser(data.user.id);
-                      if (progress) loadUserData(progress);
+                      // Pass profile.country to loadUserData to enforce region lock
+                      if (progress) loadUserData(progress, profile.country);
                       triggerCelebration('PROFILE', `WELCOME BACK, ${profile.username}`);
                       setScreen('GAME_MODE');
                   } else {
@@ -155,6 +156,7 @@ export const PlayerSetupScreen: React.FC = () => {
             
             setPlayerInfo(localName, localSacco);
             registerUser(confirmedUserId);
+            // Profile created, IP detected and stored on backend. No extra step needed here for new users.
             triggerCelebration('PROFILE', 'OFFICIAL BADGE ISSUED');
             setScreen('GAME_MODE');
         } catch (e: any) {

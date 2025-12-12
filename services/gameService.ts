@@ -7,6 +7,7 @@ export interface DBProfile {
   id: string;
   username: string;
   sacco: string;
+  country: string; // Added country field
   updated_at?: string;
 }
 
@@ -500,13 +501,33 @@ export const GameService = {
           throw new Error("No active session found. Please login again.");
       }
       const realUserId = user.id;
-      const profileData = { username, sacco, updated_at: new Date().toISOString() };
+      
+      // --- ORIGIN COUNTRY DETECTION (ANTI-EXPLOIT) ---
+      let country = 'Kenya'; // Default
+      try {
+          // One-time fetch during profile creation
+          const res = await fetch('https://ipapi.co/json/');
+          if (res.ok) {
+              const data = await res.json();
+              country = data.country_name || 'Kenya';
+          }
+      } catch (e) {
+          console.warn("Could not detect country during registration, defaulting to Kenya.");
+      }
+
+      const profileData = { username, sacco, country, updated_at: new Date().toISOString() };
 
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles').select('id').eq('id', realUserId).maybeSingle();
 
       if (existingProfile) {
-          const { error: updateError } = await supabase.from('profiles').update(profileData).eq('id', realUserId);
+          // If profile exists, we typically don't overwrite country unless it's null
+          const { error: updateError } = await supabase.from('profiles').update({
+              username, 
+              sacco,
+              updated_at: new Date().toISOString()
+          }).eq('id', realUserId);
+          
           if (updateError && updateError.code !== '42501') throw new Error(`Failed to update: ${updateError.message}`);
       } else {
           const { error: insertError } = await supabase.from('profiles').insert({ id: realUserId, ...profileData });
@@ -530,8 +551,13 @@ export const GameService = {
       const profilePromise = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       const progressPromise = supabase.from('player_progress').select('*').eq('user_id', userId).maybeSingle();
       const [profileRes, progressRes] = await Promise.all([profilePromise, progressPromise]);
+      
       if (profileRes.error && profileRes.error.code !== '42501') throw profileRes.error;
-      return { profile: profileRes.data, progress: progressRes.data };
+      
+      // Cast the profile response to ensure TS knows about 'country'
+      const profile = profileRes.data as DBProfile | null;
+      
+      return { profile, progress: progressRes.data };
   },
 
   deleteAccount: async () => {

@@ -1,0 +1,9 @@
+
+-- Run this in your Supabase SQL Editor
+
+-- 1. Add country column to profiles
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS country text DEFAULT 'Kenya';
+
+-- 2. (Optional) Backfill existing users as Kenya to be safe
+UPDATE public.profiles SET country = 'Kenya' WHERE country IS NULL;
