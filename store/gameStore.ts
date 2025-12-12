@@ -198,6 +198,7 @@ interface VehicleSpec {
 }
 
 // Vehicle Performance & Pricing Specs
+// UPDATED PRICES FOR ECONOMY BALANCE
 export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
   'boda': { 
     maxSpeedKmh: 140, 
@@ -207,27 +208,27 @@ export const VEHICLE_SPECS: Record<VehicleType, VehicleSpec> = {
   'tuktuk': { 
     maxSpeedKmh: 90, 
     timeMultiplier: 1.4,
-    price: 10000
+    price: 35000 // Increased from 10k
   },
   'personal-car': { 
     maxSpeedKmh: 190, 
     timeMultiplier: 0.85,
-    price: 40000
+    price: 95000 // Increased from 40k
   },
   '14-seater': { 
     maxSpeedKmh: 175, 
     timeMultiplier: 1.0,
-    price: 120000
+    price: 250000 // Increased from 120k (Major Milestone)
   },
   '32-seater': { 
     maxSpeedKmh: 130, 
     timeMultiplier: 1.2,
-    price: 200000
+    price: 650000 // Increased from 200k
   },
   '52-seater': { 
     maxSpeedKmh: 120, 
     timeMultiplier: 1.3,
-    price: 350000
+    price: 1200000 // Increased from 350k (Endgame)
   }
 };
 
@@ -477,15 +478,11 @@ export const useGameStore = create<GameStore>()(
       getUpgradeCost: (type: VehicleType, currentLevel: number) => {
           if (currentLevel >= 4) return 0;
           
-          const vehiclePrice = VEHICLE_SPECS[type].price || 5000; // Default base for boda
+          const vehiclePrice = VEHICLE_SPECS[type].price || 10000; // Default base if undefined
           
-          // Scaling cost based on level:
-          // Lvl 0->1: 10%
-          // Lvl 1->2: 20%
-          // Lvl 2->3: 40%
-          // Lvl 3->4: 80%
-          
-          const factors = [0.1, 0.2, 0.4, 0.8];
+          // INCREASED SCALING: Upgrades now cost 20%, 35%, 50%, 75% of vehicle price
+          // This ensures higher tier vehicles have proportionately expensive upgrades
+          const factors = [0.20, 0.35, 0.50, 0.75];
           return Math.floor(vehiclePrice * factors[currentLevel]);
       },
 

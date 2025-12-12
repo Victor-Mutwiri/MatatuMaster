@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 interface BundleProps {
@@ -125,10 +125,20 @@ export const BankScreen: React.FC = () => {
         <div className="flex-1 overflow-y-auto pb-20">
             <div className="text-center mb-8">
                 <h3 className="text-white font-bold text-lg mb-2">Need capital for a new Matatu?</h3>
-                <p className="text-slate-400 text-sm max-w-md mx-auto">Top up your game account instantly. All transactions are secure and funds are available immediately for vehicle purchases and bribes.</p>
+                <p className="text-slate-400 text-sm max-w-md mx-auto">Top up your game account instantly. All transactions are secure and funds are available immediately.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 px-2">
+                {/* Micro Bundle */}
+                <BundleCard 
+                    title="Street Kiosk" 
+                    cashAmount={15000} 
+                    price={20} 
+                    icon={<Store size={32} />} 
+                    onBuy={() => handlePurchase(15000)}
+                />
+                
+                {/* Small Bundle */}
                 <BundleCard 
                     title="Handshake" 
                     cashAmount={50000} 
@@ -136,13 +146,17 @@ export const BankScreen: React.FC = () => {
                     icon={<Coins size={32} />} 
                     onBuy={() => handlePurchase(50000)}
                 />
+                
+                {/* Medium Bundle */}
                 <BundleCard 
                     title="Route Owner" 
                     cashAmount={150000} 
-                    price={120} 
+                    price={100} 
                     icon={<CreditCard size={32} />} 
                     onBuy={() => handlePurchase(150000)}
                 />
+                
+                {/* Large Bundle */}
                 <BundleCard 
                     title="Fleet Manager" 
                     cashAmount={500000} 
@@ -150,6 +164,8 @@ export const BankScreen: React.FC = () => {
                     icon={<Gem size={32} />} 
                     onBuy={() => handlePurchase(500000)}
                 />
+                
+                {/* Mega Bundle */}
                 <BundleCard 
                     title="The Godfather" 
                     cashAmount={2000000} 
