@@ -4,14 +4,16 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus, TrendingDown, Hammer, Gauge, Fuel, Leaf } from 'lucide-react';
+import { CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus, Wrench, Gauge, Fuel } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
+import { VehicleUpgradeModal } from '../components/game/VehicleUpgradeModal';
 
 export const VehicleSelectionScreen: React.FC = () => {
-  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, vehiclePerformanceUpgrades, purchaseUpgrade, purchaseFuelUpgrade, purchasePerformanceUpgrade, getUpgradeCost, getFuelUpgradeCost, getPerformanceUpgradeCost } = useGameStore();
+  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, vehiclePerformanceUpgrades } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [upgradeModalVehicle, setUpgradeModalVehicle] = useState<VehicleType | null>(null);
 
   // Valid if vehicle selected AND vehicle is unlocked
   const isSelectionValid = selectedVehicle !== null && unlockedVehicles.includes(selectedVehicle);
@@ -43,28 +45,13 @@ export const VehicleSelectionScreen: React.FC = () => {
       }
   };
 
-  const handleRouteUpgrade = (type: VehicleType) => {
+  const handleOpenUpgrades = (e: React.MouseEvent, type: VehicleType) => {
+      e.stopPropagation();
       if (userMode === 'GUEST') {
           setShowAuthGate(true);
-          return;
+      } else {
+          setUpgradeModalVehicle(type);
       }
-      purchaseUpgrade(type);
-  };
-
-  const handleFuelUpgrade = (type: VehicleType) => {
-      if (userMode === 'GUEST') {
-          setShowAuthGate(true);
-          return;
-      }
-      purchaseFuelUpgrade(type);
-  };
-
-  const handlePerformanceUpgrade = (type: VehicleType) => {
-      if (userMode === 'GUEST') {
-          setShowAuthGate(true);
-          return;
-      }
-      purchasePerformanceUpgrade(type);
   };
 
   const vehicleOptions = [
@@ -74,7 +61,6 @@ export const VehicleSelectionScreen: React.FC = () => {
       capacity: 1, 
       icon: <Bike size={24} className="text-orange-400" />,
       desc: 'High risk, high speed.',
-      stats: { speed: 95, capacity: 10 },
       color: 'border-orange-500'
     },
     { 
@@ -83,7 +69,6 @@ export const VehicleSelectionScreen: React.FC = () => {
       capacity: 3, 
       icon: <ShoppingCart size={24} className="text-yellow-400" />,
       desc: 'Slow but steady.',
-      stats: { speed: 45, capacity: 20 },
       color: 'border-yellow-500'
     },
     { 
@@ -92,7 +77,6 @@ export const VehicleSelectionScreen: React.FC = () => {
       capacity: 4, 
       icon: <Car size={24} className="text-blue-400" />, 
       desc: 'Comfortable cruising.',
-      stats: { speed: 85, capacity: 25 },
       color: 'border-blue-500'
     },
     { 
@@ -101,7 +85,6 @@ export const VehicleSelectionScreen: React.FC = () => {
       capacity: 14, 
       icon: <Zap size={24} className="text-yellow-400" />,
       desc: 'Speed demon.',
-      stats: { speed: 90, capacity: 45 },
       color: 'border-yellow-500'
     },
     { 
@@ -110,7 +93,6 @@ export const VehicleSelectionScreen: React.FC = () => {
       capacity: 32, 
       icon: <Shield size={24} className="text-blue-400" />,
       desc: 'Balanced reliability.',
-      stats: { speed: 60, capacity: 70 },
       color: 'border-blue-500'
     },
     { 
@@ -119,7 +101,6 @@ export const VehicleSelectionScreen: React.FC = () => {
       capacity: 52, 
       icon: <TrendingUp size={24} className="text-green-400" />,
       desc: 'Profit machine.',
-      stats: { speed: 40, capacity: 100 },
       color: 'border-green-500'
     },
   ];
@@ -129,9 +110,16 @@ export const VehicleSelectionScreen: React.FC = () => {
       <AuthGateModal 
         isOpen={showAuthGate} 
         onClose={() => setShowAuthGate(false)}
-        featureName="Vehicle Purchase & Banking"
-        message="You need a registered profile to access the bank, own new vehicles, and upgrade them."
+        featureName="Vehicle Purchase & Upgrades"
+        message="You need a registered profile to access the bank, buy new vehicles, and customize them."
       />
+
+      {upgradeModalVehicle && (
+          <VehicleUpgradeModal 
+             vehicleType={upgradeModalVehicle} 
+             onClose={() => setUpgradeModalVehicle(null)} 
+          />
+      )}
 
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto p-4 md:p-6 lg:gap-8 relative">
         
@@ -166,23 +154,10 @@ export const VehicleSelectionScreen: React.FC = () => {
               const price = VEHICLE_SPECS[v.type].price;
               const canAfford = bankBalance >= price;
               
-              // Route Optimization Logic
-              const routeLevel = vehicleUpgrades[v.type] || 0;
-              const routeUpgradeCost = getUpgradeCost(v.type, routeLevel);
-              const canAffordRouteUpgrade = bankBalance >= routeUpgradeCost;
-              const isRouteMaxed = routeLevel >= 4;
-
-              // Fuel Upgrade Logic
-              const fuelLevel = vehicleFuelUpgrades[v.type] || 0;
-              const fuelUpgradeCost = getFuelUpgradeCost(v.type, fuelLevel);
-              const canAffordFuelUpgrade = bankBalance >= fuelUpgradeCost;
-              const isFuelMaxed = fuelLevel >= 4;
-
-              // Performance Upgrade Logic
-              const perfLevel = vehiclePerformanceUpgrades[v.type] || 0;
-              const perfUpgradeCost = getPerformanceUpgradeCost(v.type, perfLevel);
-              const canAffordPerfUpgrade = bankBalance >= perfUpgradeCost;
-              const isPerfMaxed = perfLevel >= 4;
+              // Get current levels for summary
+              const routeLvl = vehicleUpgrades[v.type] || 0;
+              const fuelLvl = vehicleFuelUpgrades[v.type] || 0;
+              const perfLvl = vehiclePerformanceUpgrades[v.type] || 0;
 
               return (
                 <div 
@@ -238,120 +213,40 @@ export const VehicleSelectionScreen: React.FC = () => {
                      </div>
                   </div>
                   
-                  {/* Footer / Upgrades */}
+                  {/* Footer / Actions */}
                   <div className="mt-auto pt-3 border-t border-white/5">
                      {isUnlocked ? (
                         <div className="space-y-3">
                            
-                           {/* 1. Route Optimization Upgrade */}
-                           <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
-                               <div className="flex justify-between items-center mb-1">
-                                   <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Gauge size={10} /> Optimization</span>
-                                   <span className="text-[10px] font-bold text-green-400">+{routeLevel * 15}%</span>
+                           {/* Quick Stats Summary Row */}
+                           <div className="flex justify-between items-center bg-slate-950/50 p-2 rounded-lg border border-slate-700/50">
+                               <div className="flex flex-col items-center flex-1 border-r border-slate-800">
+                                   <Gauge size={12} className="text-green-400 mb-1" />
+                                   <span className="text-[10px] font-bold text-slate-300">+{routeLvl * 15}%</span>
                                </div>
-                               
-                               <div className="flex gap-1 mb-2">
-                                   {[1,2,3,4].map(lvl => (
-                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= routeLevel ? 'bg-green-500' : 'bg-slate-700'}`}></div>
-                                   ))}
+                               <div className="flex flex-col items-center flex-1 border-r border-slate-800">
+                                   <Fuel size={12} className="text-orange-400 mb-1" />
+                                   <span className="text-[10px] font-bold text-slate-300">+{fuelLvl * 15}%</span>
                                </div>
-
-                               {!isRouteMaxed && isSelected && (
-                                   <Button 
-                                      size="sm" 
-                                      fullWidth
-                                      variant={canAffordRouteUpgrade ? 'outline' : 'secondary'}
-                                      className="py-1 text-[10px] h-8 whitespace-nowrap"
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (!canAffordRouteUpgrade) handleOpenBank();
-                                          else handleRouteUpgrade(v.type);
-                                      }}
-                                   >
-                                      {canAffordRouteUpgrade 
-                                        ? `Upgrade (Lv ${routeLevel + 1}) - KES ${routeUpgradeCost.toLocaleString()}` 
-                                        : `KES ${routeUpgradeCost.toLocaleString()} (Add Funds)`
-                                      }
-                                   </Button>
-                               )}
-                               {isRouteMaxed && (
-                                   <div className="text-center text-[10px] text-matatu-yellow font-bold uppercase tracking-widest py-1">Max Level Reached</div>
-                               )}
+                               <div className="flex flex-col items-center flex-1">
+                                   <Zap size={12} className="text-cyan-400 mb-1" />
+                                   <span className="text-[10px] font-bold text-slate-300">+{perfLvl * 15}%</span>
+                               </div>
                            </div>
 
-                           {/* 2. Fuel Efficiency Upgrade */}
-                           <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
-                               <div className="flex justify-between items-center mb-1">
-                                   <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Fuel size={10} /> Eco-Tuning</span>
-                                   <span className="text-[10px] font-bold text-orange-400">+{fuelLevel * 15}%</span>
-                               </div>
-                               
-                               <div className="flex gap-1 mb-2">
-                                   {[1,2,3,4].map(lvl => (
-                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= fuelLevel ? 'bg-orange-500' : 'bg-slate-700'}`}></div>
-                                   ))}
-                               </div>
+                           <Button 
+                              size="sm" 
+                              fullWidth
+                              variant="secondary"
+                              className="py-2 text-[10px] h-8 whitespace-nowrap bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-200"
+                              onClick={(e) => handleOpenUpgrades(e, v.type)}
+                           >
+                              <span className="flex items-center gap-2 justify-center">
+                                  <Wrench size={12} /> Tuning Workshop
+                              </span>
+                           </Button>
 
-                               {!isFuelMaxed && isSelected && (
-                                   <Button 
-                                      size="sm" 
-                                      fullWidth
-                                      variant={canAffordFuelUpgrade ? 'outline' : 'secondary'}
-                                      className={`py-1 text-[10px] h-8 whitespace-nowrap ${canAffordFuelUpgrade ? 'border-orange-500 text-orange-500 hover:bg-orange-900/20' : ''}`}
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (!canAffordFuelUpgrade) handleOpenBank();
-                                          else handleFuelUpgrade(v.type);
-                                      }}
-                                   >
-                                      {canAffordFuelUpgrade 
-                                        ? `Tune (Lv ${fuelLevel + 1}) - KES ${fuelUpgradeCost.toLocaleString()}` 
-                                        : `KES ${fuelUpgradeCost.toLocaleString()} (Add Funds)`
-                                      }
-                                   </Button>
-                               )}
-                               {isFuelMaxed && (
-                                   <div className="text-center text-[10px] text-orange-400 font-bold uppercase tracking-widest py-1">Max Tuned</div>
-                               )}
-                           </div>
-
-                           {/* 3. Performance (Speed) Upgrade */}
-                           <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
-                               <div className="flex justify-between items-center mb-1">
-                                   <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Zap size={10} /> Performance</span>
-                                   <span className="text-[10px] font-bold text-cyan-400">+{perfLevel * 15}%</span>
-                               </div>
-                               
-                               <div className="flex gap-1 mb-2">
-                                   {[1,2,3,4].map(lvl => (
-                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= perfLevel ? 'bg-cyan-500' : 'bg-slate-700'}`}></div>
-                                   ))}
-                               </div>
-
-                               {!isPerfMaxed && isSelected && (
-                                   <Button 
-                                      size="sm" 
-                                      fullWidth
-                                      variant={canAffordPerfUpgrade ? 'outline' : 'secondary'}
-                                      className={`py-1 text-[10px] h-8 whitespace-nowrap ${canAffordPerfUpgrade ? 'border-cyan-500 text-cyan-500 hover:bg-cyan-900/20' : ''}`}
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (!canAffordPerfUpgrade) handleOpenBank();
-                                          else handlePerformanceUpgrade(v.type);
-                                      }}
-                                   >
-                                      {canAffordPerfUpgrade 
-                                        ? `Tune (Lv ${perfLevel + 1}) - KES ${perfUpgradeCost.toLocaleString()}` 
-                                        : `KES ${perfUpgradeCost.toLocaleString()} (Add Funds)`
-                                      }
-                                   </Button>
-                               )}
-                               {isPerfMaxed && (
-                                   <div className="text-center text-[10px] text-cyan-400 font-bold uppercase tracking-widest py-1">Max Power</div>
-                               )}
-                           </div>
-
-                           {isSelected && <span className="text-xs text-white animate-pulse font-bold block text-center mt-2">Tap 'Confirm' below</span>}
+                           {isSelected && <span className="text-xs text-white animate-pulse font-bold block text-center mt-1">Tap 'Confirm' below</span>}
                         </div>
                      ) : (
                         <div className="flex flex-col gap-2">
