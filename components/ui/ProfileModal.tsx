@@ -15,7 +15,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
     userMode, 
     lifetimeStats, 
     bankBalance,
-    setScreen 
+    setScreen,
+    formatCurrency // Import the currency formatter
   } = useGameStore();
 
   const isGuest = userMode === 'GUEST';
@@ -112,8 +113,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                         <Wallet size={16} />
                         <span className="text-[10px] uppercase font-bold tracking-wider">Total Wealth</span>
                     </div>
+                    {/* Updated to use dynamic currency format */}
                     <div className="font-display font-bold text-xl text-slate-900">
-                        KES {bankBalance.toLocaleString()}
+                        {formatCurrency(bankBalance)}
                     </div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
@@ -139,8 +141,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                         <ShieldAlert size={16} />
                         <span className="text-[10px] uppercase font-bold tracking-wider">Bribes Paid</span>
                     </div>
+                    {/* Updated to use dynamic currency format */}
                     <div className="font-display font-bold text-xl text-red-900">
-                        KES {lifetimeStats.totalBribesPaid.toLocaleString()}
+                        {formatCurrency(lifetimeStats.totalBribesPaid)}
                     </div>
                 </div>
             </div>

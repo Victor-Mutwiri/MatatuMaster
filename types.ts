@@ -134,6 +134,23 @@ export interface GameState {
 declare global {
   namespace JSX {
     interface IntrinsicElements {
+      ambientLight: any;
+      pointLight: any;
+      directionalLight: any;
+      spotLight: any;
+      group: any;
+      mesh: any;
+      boxGeometry: any;
+      planeGeometry: any;
+      sphereGeometry: any;
+      cylinderGeometry: any;
+      coneGeometry: any;
+      circleGeometry: any;
+      dodecahedronGeometry: any;
+      meshStandardMaterial: any;
+      meshBasicMaterial: any;
+      fog: any;
+      color: any;
       [elemName: string]: any;
     }
   }
