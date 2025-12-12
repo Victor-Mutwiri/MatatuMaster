@@ -477,47 +477,22 @@ export const useGameStore = create<GameStore>()(
               return;
           }
 
-          let detectedCountry = null;
-
-          // Attempt 1: ipapi.co (Standard)
           try {
+              // Lightweight IP check for country detection
               const res = await fetch('https://ipapi.co/json/');
               if (res.ok) {
                   const data = await res.json();
-                  if (data.country_code) {
-                      detectedCountry = data.country_code;
+                  
+                  if (data.country_code === 'KE') {
+                      // Detected Kenya: Lock it forever
+                      set({ isInternational: false, isKenyaLocked: true, currency: 'KES' });
+                  } else {
+                      // International: Enable Beta Mode and USD
+                      set({ isInternational: true, currency: 'USD' });
                   }
               }
           } catch (e) {
-              console.warn("Primary Location check failed (ipapi.co). Trying backup...");
-          }
-
-          // Attempt 2: ipwho.is (Backup - good for handling ad blockers)
-          if (!detectedCountry) {
-              try {
-                  const res = await fetch('https://ipwho.is/');
-                  if (res.ok) {
-                      const data = await res.json();
-                      if (data.success && data.country_code) {
-                          detectedCountry = data.country_code;
-                      }
-                  }
-              } catch (e) {
-                  console.warn("Backup Location check failed (ipwho.is).");
-              }
-          }
-
-          if (detectedCountry) {
-              if (detectedCountry === 'KE') {
-                  // Detected Kenya: Lock it forever
-                  set({ isInternational: false, isKenyaLocked: true, currency: 'KES' });
-              } else {
-                  // International: Enable Beta Mode and USD
-                  set({ isInternational: true, currency: 'USD' });
-              }
-          } else {
-              // Default to Kenya if all checks fail (safe fallback)
-              console.warn("All location checks failed. Defaulting to Local Mode.");
+              console.warn("Location check failed, defaulting to local mode (Kenya).", e);
               set({ isInternational: false, currency: 'KES' });
           }
       },
