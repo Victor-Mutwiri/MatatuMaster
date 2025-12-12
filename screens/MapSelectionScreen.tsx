@@ -8,18 +8,24 @@ import { Clock, Lock, MapPin, ArrowLeft, TrendingUp, Car, Shield, Navigation } f
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const MapSelectionScreen: React.FC = () => {
-  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType } = useGameStore();
+  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType, getUpgradeMultiplier } = useGameStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
 
-  // Helper to get real potential earnings
-  const getEarnings = (mapId: string) => {
+  // Helper to get real potential earnings with upgrades
+  const getEarningsInfo = (mapId: string) => {
     const currentVehicle = vehicleType || '14-seater';
     const mapCaps = EARNINGS_CAPS[mapId];
+    
+    let baseEarnings = 0;
     if (mapCaps && mapCaps[currentVehicle]) {
-        return mapCaps[currentVehicle];
+        baseEarnings = mapCaps[currentVehicle];
     }
-    return 0;
+
+    const multiplier = vehicleType ? getUpgradeMultiplier(vehicleType) : 1;
+    const boostedEarnings = Math.floor(baseEarnings * multiplier);
+
+    return { baseEarnings, boostedEarnings, hasUpgrade: multiplier > 1 };
   };
 
   // Filter Maps: Single Player only shows HUSTLE mode maps
@@ -53,7 +59,7 @@ export const MapSelectionScreen: React.FC = () => {
   };
 
   const activeRoute = selectedRoute && selectedRoute.gamemode === 'HUSTLE' ? selectedRoute : displayedMaps[0];
-  const activeEarnings = getEarnings(activeRoute.id);
+  const { baseEarnings, boostedEarnings, hasUpgrade } = getEarningsInfo(activeRoute.id);
 
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
@@ -105,7 +111,14 @@ export const MapSelectionScreen: React.FC = () => {
                    </div>
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
                       <span className="text-slate-500 uppercase font-bold text-xs">Potential</span>
-                      <span className="text-green-400 font-mono">KES {activeEarnings}</span>
+                      <div className="text-right">
+                          {hasUpgrade && (
+                              <span className="text-slate-500 text-xs line-through block decoration-slate-500">KES {baseEarnings}</span>
+                          )}
+                          <span className={`${hasUpgrade ? 'text-green-400 font-bold' : 'text-slate-300'} font-mono`}>
+                              KES {boostedEarnings}
+                          </span>
+                      </div>
                    </div>
                    <div className="flex justify-between text-sm border-b border-slate-700 pb-2">
                       <span className="text-slate-500 uppercase font-bold text-xs">Difficulty</span>
@@ -134,7 +147,7 @@ export const MapSelectionScreen: React.FC = () => {
               {displayedMaps.map((map) => {
                 const isSelected = activeRoute.id === map.id;
                 const isLocked = map.isLocked;
-                const mapEarnings = getEarnings(map.id);
+                const { baseEarnings: mapBase, boostedEarnings: mapBoosted, hasUpgrade: mapHasUpgrade } = getEarningsInfo(map.id);
 
                 return (
                   <div 
@@ -165,9 +178,17 @@ export const MapSelectionScreen: React.FC = () => {
                           <h3 className={`font-display font-bold text-xl ${isSelected ? 'text-white' : 'text-slate-300'}`}>
                             {map.name}
                           </h3>
-                          <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                             <span className="flex items-center gap-1"><MapPin size={12}/> {map.distance}km</span>
-                             <span className="flex items-center gap-1 text-green-400 font-bold"><Car size={12}/> KES {mapEarnings}</span>
+                          <div className="flex flex-col mt-1">
+                             <div className="flex items-center gap-2 text-xs text-slate-400">
+                                 <MapPin size={12}/> {map.distance}km
+                             </div>
+                             <div className="flex items-center gap-2 text-xs">
+                                 <Car size={12} className={mapHasUpgrade ? "text-green-400" : "text-slate-400"}/> 
+                                 <div className="flex gap-2 items-baseline">
+                                     {mapHasUpgrade && <span className="text-[10px] text-slate-500 line-through">KES {mapBase}</span>}
+                                     <span className={`${mapHasUpgrade ? 'text-green-400' : 'text-slate-300'} font-bold`}>KES {mapBoosted}</span>
+                                 </div>
+                             </div>
                           </div>
                         </div>
                         {isLocked && <Lock className="text-slate-500 mb-1" />}
@@ -190,7 +211,10 @@ export const MapSelectionScreen: React.FC = () => {
                 </div>
                 <div className="text-right">
                    <div className="text-[10px] text-slate-500 uppercase font-bold Reward">Potential</div>
-                   <div className="text-green-400 font-mono font-bold">KES {activeEarnings}</div>
+                   {hasUpgrade && (
+                       <div className="text-[10px] text-slate-500 line-through decoration-slate-500">KES {baseEarnings}</div>
+                   )}
+                   <div className={`${hasUpgrade ? 'text-green-400' : 'text-slate-200'} font-mono font-bold`}>KES {boostedEarnings}</div>
                 </div>
              </div>
              

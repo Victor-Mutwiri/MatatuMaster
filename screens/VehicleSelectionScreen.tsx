@@ -4,12 +4,11 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { Bus, CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus } from 'lucide-react';
+import { CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus, TrendingDown, Hammer, Gauge } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
-// import { VehicleShowroomModal } from '../components/game/VehicleShowroomModal';
 
 export const VehicleSelectionScreen: React.FC = () => {
-  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle } = useGameStore();
+  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, purchaseUpgrade, getUpgradeCost } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -42,6 +41,14 @@ export const VehicleSelectionScreen: React.FC = () => {
       } else {
           setScreen('BANK');
       }
+  };
+
+  const handleUpgrade = (type: VehicleType) => {
+      if (userMode === 'GUEST') {
+          setShowAuthGate(true);
+          return;
+      }
+      purchaseUpgrade(type);
   };
 
   const vehicleOptions = [
@@ -107,7 +114,7 @@ export const VehicleSelectionScreen: React.FC = () => {
         isOpen={showAuthGate} 
         onClose={() => setShowAuthGate(false)}
         featureName="Vehicle Purchase & Banking"
-        message="You need a registered profile to access the bank and own new vehicles."
+        message="You need a registered profile to access the bank, own new vehicles, and upgrade them."
       />
 
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto p-4 md:p-6 lg:gap-8 relative">
@@ -135,13 +142,19 @@ export const VehicleSelectionScreen: React.FC = () => {
         </div>
 
         {/* --- GRID --- */}
-        <div className="flex-1 overflow-y-auto pb-24 lg:pb-0 px-1">
+        <div className="flex-1 overflow-y-auto pb-24 lg:pb-0 px-1 custom-scrollbar">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {vehicleOptions.map((v) => {
               const isSelected = selectedVehicle === v.type;
               const isUnlocked = unlockedVehicles.includes(v.type);
               const price = VEHICLE_SPECS[v.type].price;
               const canAfford = bankBalance >= price;
+              
+              // Upgrade Logic
+              const currentLevel = vehicleUpgrades[v.type] || 0;
+              const nextLevelCost = getUpgradeCost(v.type, currentLevel);
+              const canAffordUpgrade = bankBalance >= nextLevelCost;
+              const isMaxed = currentLevel >= 4;
 
               return (
                 <div 
@@ -191,20 +204,50 @@ export const VehicleSelectionScreen: React.FC = () => {
                      <div className="min-w-0">
                         <h4 className="font-display font-bold text-lg text-white truncate">{v.name}</h4>
                         <p className="text-[10px] text-slate-400 uppercase tracking-wide">{v.type.replace('-', ' ')}</p>
-                        {isUnlocked && (
+                        {isUnlocked ? (
                             <p className="text-xs text-slate-300 mt-1">{v.desc}</p>
-                        )}
+                        ) : null}
                      </div>
                   </div>
                   
-                  {/* Footer Action */}
+                  {/* Footer / Upgrades */}
                   <div className="mt-auto pt-3 border-t border-white/5">
                      {isUnlocked ? (
-                        <div className="flex justify-between items-center">
-                           <span className="text-green-400 text-xs font-bold uppercase flex items-center gap-1">
-                              <CheckCircle2 size={12} /> Owned
-                           </span>
-                           {isSelected && <span className="text-xs text-white animate-pulse font-bold">Tap 'Next'</span>}
+                        <div className="space-y-3">
+                           {/* Route Optimization Upgrade */}
+                           <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-700">
+                               <div className="flex justify-between items-center mb-1">
+                                   <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1"><Gauge size={10} /> Optimization</span>
+                                   <span className="text-[10px] font-bold text-green-400">+{currentLevel * 15}%</span>
+                               </div>
+                               
+                               <div className="flex gap-1 mb-2">
+                                   {[1,2,3,4].map(lvl => (
+                                       <div key={lvl} className={`h-1.5 flex-1 rounded-full ${lvl <= currentLevel ? 'bg-green-500' : 'bg-slate-700'}`}></div>
+                                   ))}
+                               </div>
+
+                               {!isMaxed && isSelected && (
+                                   <Button 
+                                      size="sm" 
+                                      fullWidth
+                                      variant={canAffordUpgrade ? 'outline' : 'secondary'}
+                                      className="py-1 text-[10px] h-8"
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!canAffordUpgrade) handleOpenBank();
+                                          else handleUpgrade(v.type);
+                                      }}
+                                   >
+                                      {canAffordUpgrade ? `Upgrade (Lv ${currentLevel + 1}) - KES ${nextLevelCost.toLocaleString()}` : 'Add Funds to Upgrade'}
+                                   </Button>
+                               )}
+                               {isMaxed && (
+                                   <div className="text-center text-[10px] text-matatu-yellow font-bold uppercase tracking-widest py-1">Max Level Reached</div>
+                               )}
+                           </div>
+
+                           {isSelected && <span className="text-xs text-white animate-pulse font-bold block text-center mt-2">Tap 'Confirm' below</span>}
                         </div>
                      ) : (
                         <div className="flex flex-col gap-2">

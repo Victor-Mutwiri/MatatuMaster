@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export type ScreenName = 'LANDING' | 'SETUP' | 'GAME_MODE' | 'VEHICLE_SELECT' | 'MULTIPLAYER_LOBBY' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD' | 'SETTINGS' | 'BANK';
@@ -62,6 +63,8 @@ export interface GameState {
   saccoName: string;
   vehicleType: VehicleType | null;
   unlockedVehicles: VehicleType[]; // List of owned vehicles
+  vehicleUpgrades: Record<VehicleType, number>; // Level 0-4 for each vehicle
+  
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
   totalRouteDistance: number; // Total length of route in Game units

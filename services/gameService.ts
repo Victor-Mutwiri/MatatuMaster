@@ -17,6 +17,7 @@ export interface DBProgress {
   total_bribes: number;
   reputation: number;
   unlocked_vehicles: VehicleType[];
+  vehicle_upgrades: Record<string, number>; // JSONB in DB
   lifetime_earnings: number;
   updated_at?: string;
 }
@@ -72,6 +73,7 @@ export const GameService = {
       lifetimeStats: LifetimeStats;
       reputation: number;
       unlockedVehicles: VehicleType[];
+      vehicleUpgrades: Record<VehicleType, number>;
     }
   ) => {
     if (userMode === 'GUEST' || !userId) {
@@ -90,6 +92,7 @@ export const GameService = {
             lifetime_earnings: Math.floor(data.lifetimeStats.totalCashEarned),
             reputation: Math.floor(data.reputation),
             unlocked_vehicles: data.unlockedVehicles,
+            vehicle_upgrades: data.vehicleUpgrades,
             updated_at: new Date().toISOString()
           });
 
@@ -508,6 +511,7 @@ export const GameService = {
           user_id: realUserId,
           bank_balance: 0,
           unlocked_vehicles: ['boda'],
+          vehicle_upgrades: {}, // Initialize empty
           updated_at: new Date().toISOString()
       });
 

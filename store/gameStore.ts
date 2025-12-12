@@ -291,6 +291,15 @@ export const EARNINGS_CAPS: Record<string, Record<VehicleType, number>> = {
   }
 };
 
+const DEFAULT_UPGRADES: Record<VehicleType, number> = {
+    'boda': 0,
+    'tuktuk': 0,
+    'personal-car': 0,
+    '14-seater': 0,
+    '32-seater': 0,
+    '52-seater': 0
+};
+
 interface GameStore extends GameState {
   userId: string | null; // Supabase Auth UID
   setScreen: (screen: ScreenName) => void;
@@ -309,7 +318,12 @@ interface GameStore extends GameState {
   registerUser: (uid: string) => void;
   loadUserData: (data: any) => void;
   unlockVehicle: (type: VehicleType) => void;
-  purchaseCash: (amount: number) => void; // Monetization
+  purchaseCash: (amount: number) => void; 
+  
+  // Upgrades
+  purchaseUpgrade: (type: VehicleType) => void;
+  getUpgradeCost: (type: VehicleType, currentLevel: number) => number;
+  getUpgradeMultiplier: (type: VehicleType) => number;
 
   // Controls
   setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
@@ -358,6 +372,7 @@ export const useGameStore = create<GameStore>()(
       saccoName: '',
       vehicleType: null,
       unlockedVehicles: ['boda'],
+      vehicleUpgrades: DEFAULT_UPGRADES,
       currentSpeed: 0,
       distanceTraveled: 0,
       totalRouteDistance: 0,
@@ -422,13 +437,14 @@ export const useGameStore = create<GameStore>()(
                 totalCashEarned: data.lifetime_earnings || 0,
                 totalDistanceKm: data.total_distance || 0,
                 totalBribesPaid: data.total_bribes || 0,
-                totalTripsCompleted: get().lifetimeStats.totalTripsCompleted // Not strictly tracked in DB schema provided, keep local or ignore
+                totalTripsCompleted: get().lifetimeStats.totalTripsCompleted
             },
             stats: {
                 ...get().stats,
                 reputation: data.reputation || 50
             },
-            unlockedVehicles: data.unlocked_vehicles || ['boda']
+            unlockedVehicles: data.unlocked_vehicles || ['boda'],
+            vehicleUpgrades: data.vehicle_upgrades || DEFAULT_UPGRADES
         });
       },
 
@@ -446,7 +462,6 @@ export const useGameStore = create<GameStore>()(
             unlockedVehicles: newUnlocked
           });
           
-          // Trigger cloud sync
           get().syncToCloud();
         }
       },
@@ -457,6 +472,48 @@ export const useGameStore = create<GameStore>()(
         set({ bankBalance: newBalance });
         playSfx('COIN');
         get().syncToCloud();
+      },
+
+      getUpgradeCost: (type: VehicleType, currentLevel: number) => {
+          if (currentLevel >= 4) return 0;
+          
+          const vehiclePrice = VEHICLE_SPECS[type].price || 5000; // Default base for boda
+          
+          // Scaling cost based on level:
+          // Lvl 0->1: 10%
+          // Lvl 1->2: 20%
+          // Lvl 2->3: 40%
+          // Lvl 3->4: 80%
+          
+          const factors = [0.1, 0.2, 0.4, 0.8];
+          return Math.floor(vehiclePrice * factors[currentLevel]);
+      },
+
+      getUpgradeMultiplier: (type: VehicleType) => {
+          const level = get().vehicleUpgrades[type] || 0;
+          return 1 + (level * 0.15); // +15% per level
+      },
+
+      purchaseUpgrade: (type: VehicleType) => {
+          const { bankBalance, vehicleUpgrades } = get();
+          const currentLevel = vehicleUpgrades[type] || 0;
+          
+          if (currentLevel >= 4) return;
+
+          const cost = get().getUpgradeCost(type, currentLevel);
+          
+          if (bankBalance >= cost) {
+              const newLevel = currentLevel + 1;
+              const newUpgrades = { ...vehicleUpgrades, [type]: newLevel };
+              
+              set({
+                  bankBalance: bankBalance - cost,
+                  vehicleUpgrades: newUpgrades
+              });
+              
+              playSfx('COIN');
+              get().syncToCloud();
+          }
       },
 
       setControl: (control, active) => {
@@ -482,22 +539,19 @@ export const useGameStore = create<GameStore>()(
           selectedRoute
         } = get();
         
-        // Check Destination / Completion
         if (activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= totalRouteDistance) {
-          set({ distanceTraveled: totalRouteDistance, currentSpeed: 0 }); // Force stop
+          set({ distanceTraveled: totalRouteDistance, currentSpeed: 0 });
           endGame('COMPLETED');
           return;
         }
 
-        // --- Fuel Logic ---
         let newFuel = fuel;
         let newFuelUsedLiters = fuelUsedLiters;
 
         if (vehicleType && currentSpeed > 0) {
-          const kmTraveled = amount / 1000; // Convert game units to km
+          const kmTraveled = amount / 1000;
           const baseEfficiency = FUEL_EFFICIENCY[vehicleType] || 9;
           
-          // Speed Penalty
           let speedPenalty = 1;
           const kmph = currentSpeed * 1.6;
           if (kmph > 80) {
@@ -510,25 +564,21 @@ export const useGameStore = create<GameStore>()(
           const litersConsumed = kmTraveled / realEfficiency;
           newFuelUsedLiters += litersConsumed;
 
-          // Update Gauge Percentage
           const capacity = TANK_CAPACITY[vehicleType] || 70;
           const percentConsumed = (litersConsumed / capacity) * 100;
           newFuel = Math.max(0, fuel - percentConsumed);
         }
 
-        // RACE MODE: No Police or Stages
         const isRace = selectedRoute?.gamemode === 'RACE';
 
-        // Check Police (Hustle Mode Only)
         if (!isRace && activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextPoliceDistance) {
-          set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
+          set({ distanceTraveled: nextPoliceDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters });
           triggerPoliceCheck();
           return;
         }
 
-        // Check Stage (Hustle Mode Only)
         if (!isRace && activeModal === 'NONE' && currentSpeed > 0 && distanceTraveled + amount >= nextStageDistance) {
-          set({ distanceTraveled: nextStageDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters }); // Force stop
+          set({ distanceTraveled: nextStageDistance, currentSpeed: 0, fuel: newFuel, fuelUsedLiters: newFuelUsedLiters });
           triggerStage();
           return;
         } 
@@ -537,7 +587,7 @@ export const useGameStore = create<GameStore>()(
       },
       
       triggerStage: () => {
-        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute } = get();
+        const { currentPassengers, nextStagePassengerCount, vehicleType, selectedRoute, vehicleUpgrades } = get();
         
         const waiting = nextStagePassengerCount; 
         const alighting = currentPassengers > 0 ? Math.floor(Math.random() * (currentPassengers + 1)) : 0;
@@ -545,7 +595,12 @@ export const useGameStore = create<GameStore>()(
         const mapId = selectedRoute?.id || 'kiambu-route';
         const vType = vehicleType || '14-seater';
         const mapCaps = EARNINGS_CAPS[mapId] || EARNINGS_CAPS['kiambu-route'];
-        const earningCap = mapCaps[vType] || 2000;
+        
+        // --- UPGRADE LOGIC ---
+        const baseCap = mapCaps[vType] || 2000;
+        const level = vehicleUpgrades[vType] || 0;
+        const multiplier = 1 + (level * 0.15); // +15% per level
+        const earningCap = baseCap * multiplier; 
 
         const estimatedStops = Math.ceil(selectedRoute!.distance / 2.5) || 5;
         const legalCapacity = VEHICLE_CAPACITY[vType].legal;
@@ -568,7 +623,7 @@ export const useGameStore = create<GameStore>()(
       },
       
       handleStageAction: (action) => {
-        const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness, totalPassengersCarried, vehicleType } = get();
+        const { stageData, currentPassengers, maxPassengers, stats, nextStageDistance, happiness, totalPassengersCarried, vehicleType, vehicleUpgrades } = get();
         if (!stageData) return;
 
         let newPassengerCount = currentPassengers;
@@ -598,9 +653,16 @@ export const useGameStore = create<GameStore>()(
         const nextDist = nextStageDistance + 2000 + Math.random() * 1000; 
         
         const happinessFactor = Math.max(0.1, happiness / 100);
+        
+        // --- UPGRADE EFFECT: BETTER PASSENGER SPAWNS ---
+        const vType = vehicleType || '14-seater';
+        const level = vehicleUpgrades[vType] || 0;
+        // Small bias: each level gives slight chance boost for fuller stops
+        const crowdBias = level * 0.05; 
+
         let maxPotentialPassengers = 0;
         
-        const chance = Math.random();
+        const chance = Math.random() + crowdBias; // Bias applied here
         if (chance > 0.8) {
              maxPotentialPassengers = limits.max;
         } else if (chance < 0.2) {
@@ -850,8 +912,6 @@ export const useGameStore = create<GameStore>()(
       }),
 
       endGame: (reason) => {
-        // Just halt the game and show the appropriate modal.
-        // DO NOT save to lifetime stats or sync to cloud here.
         set({ 
           gameStatus: 'GAME_OVER', 
           gameOverReason: reason,
@@ -888,21 +948,18 @@ export const useGameStore = create<GameStore>()(
             bankBalance: newBankBalance
         });
 
-        // Trigger Sync
         get().syncToCloud();
-        
-        // Return to Map
         get().exitToMapSelection();
       },
       
       syncToCloud: async () => {
         const state = get();
-        // Fire and forget sync (don't block UI)
         await GameService.syncProgress(state.userMode, state.userId || undefined, {
             bankBalance: state.bankBalance,
             lifetimeStats: state.lifetimeStats,
             reputation: state.stats.reputation,
-            unlockedVehicles: state.unlockedVehicles
+            unlockedVehicles: state.unlockedVehicles,
+            vehicleUpgrades: state.vehicleUpgrades
         });
       },
 
@@ -911,11 +968,9 @@ export const useGameStore = create<GameStore>()(
               if (get().userMode === 'REGISTERED') {
                  await GameService.deleteAccount();
               }
-              // Clear local state
               get().resetCareer(); 
           } catch (e) {
               console.error("Failed to delete account fully", e);
-              // Force local wipe anyway if backend fails or if it was guest
               get().resetCareer();
           }
       },
@@ -956,6 +1011,7 @@ export const useGameStore = create<GameStore>()(
         bankBalance: 0,
         userMode: 'GUEST',
         unlockedVehicles: ['boda'],
+        vehicleUpgrades: DEFAULT_UPGRADES,
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
@@ -984,6 +1040,7 @@ export const useGameStore = create<GameStore>()(
         userMode: state.userMode,
         userId: state.userId,
         unlockedVehicles: state.unlockedVehicles,
+        vehicleUpgrades: state.vehicleUpgrades,
         lifetimeStats: state.lifetimeStats,
         bankBalance: state.bankBalance,
         isSoundOn: state.isSoundOn,
@@ -996,6 +1053,9 @@ export const useGameStore = create<GameStore>()(
         if (state) {
             if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {
               state.unlockedVehicles = ['boda'];
+            }
+            if (!state.vehicleUpgrades) {
+                state.vehicleUpgrades = DEFAULT_UPGRADES;
             }
             if (!state.userMode) {
               state.userMode = 'GUEST';
