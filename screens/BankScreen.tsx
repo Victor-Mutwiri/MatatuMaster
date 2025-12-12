@@ -1,10 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
+import { GameService } from '../services/gameService';
 import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store, Gift, Timer, FlaskConical } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
+
+// --- CONFIG ---
+// Replace with your actual Public Key from Paystack Dashboard
+const PAYSTACK_PUBLIC_KEY = 'pk_test_fcc27a08346f3aeee5e030182cc1782bcd8a45cf'; 
 
 interface BundleProps {
   title: string;
@@ -44,15 +49,19 @@ const BundleCard: React.FC<BundleProps> = ({ title, cashAmount, price, icon, isB
 };
 
 export const BankScreen: React.FC = () => {
-  const { setScreen, bankBalance, purchaseCash, userMode, isInternational, claimDailyGrant, lastDailyGrantClaim, formatCurrency } = useGameStore();
+  const { setScreen, bankBalance, loadUserData, userMode, userId, isInternational, claimDailyGrant, lastDailyGrantClaim, formatCurrency } = useGameStore();
   const [showAuthGate, setShowAuthGate] = useState(userMode === 'GUEST');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
   // Grant Countdown Logic (72 Hours)
   const GRANT_INTERVAL = 3 * 24 * 60 * 60 * 1000; // 3 Days
   const [timeLeft, setTimeLeft] = useState<string>('');
   const canClaim = Date.now() - lastDailyGrantClaim >= GRANT_INTERVAL;
+
+  // Polling ref to stop loop
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
       if (canClaim) {
@@ -81,24 +90,112 @@ export const BankScreen: React.FC = () => {
       return () => clearInterval(interval);
   }, [lastDailyGrantClaim, canClaim]);
 
+  // Clean up polling on unmount
+  useEffect(() => {
+      return () => {
+          if (pollingRef.current) clearTimeout(pollingRef.current);
+      };
+  }, []);
+
   const handleBack = () => {
     setScreen('VEHICLE_SELECT');
   };
 
-  const handlePurchase = (amount: number) => {
+  const verifyTransaction = async (expectedAmount: number) => {
+      setVerifying(true);
+      const startBalance = bankBalance;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 15; // 30 seconds max
+
+      const check = async () => {
+          if (!userId) return;
+          try {
+              // Fetch latest data from Supabase
+              const { progress, profile } = await GameService.loadSave(userId);
+              
+              if (progress && progress.bank_balance > startBalance) {
+                  // Money Arrived!
+                  loadUserData(progress, profile?.country);
+                  setVerifying(false);
+                  setIsProcessing(false);
+                  setSuccessMsg(`Confirmed! ${formatCurrency(expectedAmount)} added.`);
+                  setTimeout(() => setSuccessMsg(null), 4000);
+                  return;
+              }
+          } catch (e) {
+              console.error("Verification poll failed", e);
+          }
+
+          attempts++;
+          if (attempts < MAX_ATTEMPTS) {
+              pollingRef.current = setTimeout(check, 2000); // Check every 2s
+          } else {
+              setVerifying(false);
+              setIsProcessing(false);
+              alert("Transaction taking longer than expected. Please check back later, your funds are safe.");
+          }
+      };
+
+      check();
+  };
+
+  const handlePurchase = async (cashAmount: number, priceKsh: number) => {
     if (userMode === 'GUEST') {
         setShowAuthGate(true);
         return;
     }
 
-    // SIMULATE PAYSTACK FLOW
+    if (!userId) return;
+
     setIsProcessing(true);
-    setTimeout(() => {
-        purchaseCash(amount);
+
+    try {
+        // 1. Get User Email
+        const user = await GameService.getCurrentUser();
+        if (!user || !user.email) {
+            alert("Account email missing. Cannot process payment.");
+            setIsProcessing(false);
+            return;
+        }
+
+        // 2. Setup Paystack Popup
+        const handler = window.PaystackPop.setup({
+            key: PAYSTACK_PUBLIC_KEY,
+            email: user.email,
+            amount: priceKsh * 100, // Convert to Kobo/Cents
+            currency: 'KES', // Explicitly set currency
+            ref: `MM_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // Unique Reference
+            metadata: {
+                custom_fields: [
+                    {
+                        display_name: "User ID",
+                        variable_name: "user_id",
+                        value: userId // Crucial for Webhook to credit correct user
+                    },
+                    {
+                        display_name: "Game Cash",
+                        variable_name: "game_cash_amount",
+                        value: cashAmount
+                    }
+                ]
+            },
+            callback: (response: any) => {
+                // 3. Payment Success -> Start Verification
+                // Response contains { reference, status, ... }
+                verifyTransaction(cashAmount);
+            },
+            onClose: () => {
+                setIsProcessing(false);
+            }
+        });
+
+        handler.openIframe();
+
+    } catch (e) {
+        console.error("Payment Error", e);
         setIsProcessing(false);
-        setSuccessMsg(`Successfully added ${formatCurrency(amount)} to your account!`);
-        setTimeout(() => setSuccessMsg(null), 3000);
-    }, 2000);
+        alert("Could not initialize payment system.");
+    }
   };
 
   const handleClaimGrant = () => {
@@ -121,19 +218,23 @@ export const BankScreen: React.FC = () => {
         message="Only registered conductors can access the bank to secure assets and receive grants."
       />
 
-      {/* Paystack Simulation Modal */}
+      {/* Processing / Verification Modal */}
       {isProcessing && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-fade-in">
               <div className="bg-white rounded-xl p-8 flex flex-col items-center text-slate-900 max-w-sm w-full shadow-2xl relative overflow-hidden">
-                  {/* Paystack decorative strip */}
-                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-green-500"></div>
+                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-green-500 animate-pulse"></div>
                   
                   <Loader2 className="text-green-500 animate-spin mb-4" size={48} />
-                  <h3 className="font-bold text-xl mb-2">Processing Payment</h3>
-                  <p className="text-slate-500 text-sm text-center mb-6">Connecting to secure gateway...</p>
-                  <div className="text-[10px] text-slate-400 bg-slate-100 px-2 py-1 rounded uppercase font-bold tracking-widest">
-                      Test Mode
-                  </div>
+                  <h3 className="font-bold text-xl mb-2">
+                      {verifying ? "Verifying Deposit..." : "Secure Checkout"}
+                  </h3>
+                  <p className="text-slate-500 text-sm text-center mb-6">
+                      {verifying ? "Waiting for bank confirmation. Do not close." : "Please complete the payment in the popup."}
+                  </p>
+                  
+                  {!verifying && (
+                      <button onClick={() => setIsProcessing(false)} className="text-red-500 text-xs font-bold uppercase underline">Cancel</button>
+                  )}
               </div>
           </div>
       )}
@@ -230,7 +331,7 @@ export const BankScreen: React.FC = () => {
                             cashAmount={15000} 
                             price={20} 
                             icon={<Store size={32} />} 
-                            onBuy={() => handlePurchase(15000)}
+                            onBuy={() => handlePurchase(15000, 20)}
                             formatCurrency={formatCurrency}
                         />
                         <BundleCard 
@@ -238,7 +339,7 @@ export const BankScreen: React.FC = () => {
                             cashAmount={50000} 
                             price={50} 
                             icon={<Coins size={32} />} 
-                            onBuy={() => handlePurchase(50000)}
+                            onBuy={() => handlePurchase(50000, 50)}
                             formatCurrency={formatCurrency}
                         />
                         <BundleCard 
@@ -246,7 +347,7 @@ export const BankScreen: React.FC = () => {
                             cashAmount={150000} 
                             price={100} 
                             icon={<CreditCard size={32} />} 
-                            onBuy={() => handlePurchase(150000)}
+                            onBuy={() => handlePurchase(150000, 100)}
                             formatCurrency={formatCurrency}
                         />
                         <BundleCard 
@@ -254,7 +355,7 @@ export const BankScreen: React.FC = () => {
                             cashAmount={500000} 
                             price={350} 
                             icon={<Gem size={32} />} 
-                            onBuy={() => handlePurchase(500000)}
+                            onBuy={() => handlePurchase(500000, 350)}
                             formatCurrency={formatCurrency}
                         />
                         <BundleCard 
@@ -263,7 +364,7 @@ export const BankScreen: React.FC = () => {
                             price={1000} 
                             isBestValue
                             icon={<div className="relative"><Gem size={32} /><div className="absolute -top-1 -right-1 animate-ping w-2 h-2 bg-white rounded-full"></div></div>} 
-                            onBuy={() => handlePurchase(2000000)}
+                            onBuy={() => handlePurchase(2000000, 1000)}
                             formatCurrency={formatCurrency}
                         />
                     </div>
@@ -271,7 +372,7 @@ export const BankScreen: React.FC = () => {
                     <div className="mt-12 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 text-center">
                         <Lock className="mx-auto text-slate-600 mb-2" size={24} />
                         <p className="text-xs text-slate-500 max-w-lg mx-auto">
-                            Payments are processed via Paystack (Simulation Mode). In the real version, you would be redirected to a secure payment page.
+                            Secure payments powered by Paystack. Supports M-Pesa and Cards.
                             <br/>Game Cash cannot be withdrawn for real money.
                         </p>
                     </div>

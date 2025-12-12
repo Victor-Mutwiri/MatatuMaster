@@ -151,6 +151,41 @@ declare global {
       meshBasicMaterial: any;
       fog: any;
       color: any;
+      primitive: any;
+      [elemName: string]: any;
+    }
+  }
+  
+  // Paystack Pop Interface
+  interface Window {
+    PaystackPop: {
+      setup: (config: any) => { openIframe: () => void };
+    };
+  }
+}
+
+// Module augmentation for React to fix IntrinsicElements errors in strict environments
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      ambientLight: any;
+      pointLight: any;
+      directionalLight: any;
+      spotLight: any;
+      group: any;
+      mesh: any;
+      boxGeometry: any;
+      planeGeometry: any;
+      sphereGeometry: any;
+      cylinderGeometry: any;
+      coneGeometry: any;
+      circleGeometry: any;
+      dodecahedronGeometry: any;
+      meshStandardMaterial: any;
+      meshBasicMaterial: any;
+      fog: any;
+      color: any;
+      primitive: any;
       [elemName: string]: any;
     }
   }
