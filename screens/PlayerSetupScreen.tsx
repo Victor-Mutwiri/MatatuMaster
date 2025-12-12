@@ -9,7 +9,7 @@ import { AlertTriangle, ArrowLeft, Ghost, LogIn, UserPlus, Mail, Lock, CheckCirc
 type SetupView = 'CHOICE' | 'AUTH_SELECT' | 'LOGIN' | 'SIGNUP' | 'VERIFY_EMAIL' | 'ONBOARDING';
 
 export const PlayerSetupScreen: React.FC = () => {
-  const { setScreen, playerName, saccoName, userMode, registerUser, setPlayerInfo, loadUserData, userId } = useGameStore();
+  const { setScreen, playerName, saccoName, userMode, registerUser, setPlayerInfo, loadUserData, userId, triggerCelebration } = useGameStore();
   
   const [view, setView] = useState<SetupView>('CHOICE');
   
@@ -68,6 +68,7 @@ export const PlayerSetupScreen: React.FC = () => {
                       setPlayerInfo(profile.username, profile.sacco);
                       registerUser(data.user.id);
                       if (progress) loadUserData(progress);
+                      triggerCelebration('PROFILE', `WELCOME BACK, ${profile.username}`);
                       setScreen('GAME_MODE');
                   } else {
                       // Login success, but no profile found -> Go to onboarding
@@ -153,7 +154,8 @@ export const PlayerSetupScreen: React.FC = () => {
             const confirmedUserId = await GameService.createProfile(localName, localSacco);
             
             setPlayerInfo(localName, localSacco);
-            registerUser(confirmedUserId); 
+            registerUser(confirmedUserId);
+            triggerCelebration('PROFILE', 'OFFICIAL BADGE ISSUED');
             setScreen('GAME_MODE');
         } catch (e: any) {
             console.error(e);

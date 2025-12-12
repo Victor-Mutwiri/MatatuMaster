@@ -13,6 +13,8 @@ export type GameOverReason = 'TIME_UP' | 'CRASH' | 'COMPLETED' | 'ARRESTED' | nu
 
 export type ActiveModal = 'NONE' | 'STAGE' | 'GAME_OVER' | 'POLICE' | 'QUIT_CONFIRM';
 
+export type CelebrationType = 'NONE' | 'UPGRADE' | 'UNLOCK' | 'PROFILE' | 'LEVEL_UP';
+
 export interface PlayerStats {
   cash: number;
   reputation: number; // 0-100
@@ -67,6 +69,9 @@ export interface GameState {
   vehicleFuelUpgrades: Record<VehicleType, number>; // Level 0-4 for fuel efficiency
   vehiclePerformanceUpgrades: Record<VehicleType, number>; // Level 0-4 for top speed
   
+  // Celebration State
+  activeCelebration: { type: CelebrationType; message?: string } | null;
+
   currentSpeed: number; // Game units per second
   distanceTraveled: number; // Game units
   totalRouteDistance: number; // Total length of route in Game units

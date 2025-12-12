@@ -13,6 +13,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { BankScreen } from './screens/BankScreen';
 import { useGameStore } from './store/gameStore';
 import { Route } from './types';
+import { CelebrationOverlay } from './components/ui/CelebrationOverlay';
 
 const App: React.FC = () => {
   const { currentScreen, stats, setScreen, selectRoute, resetGame } = useGameStore();
@@ -32,6 +33,8 @@ const App: React.FC = () => {
 
   return (
     <>
+      <CelebrationOverlay />
+
       {currentScreen === 'LANDING' && (
         <LandingScreen onStart={handleStartShift} />
       )}

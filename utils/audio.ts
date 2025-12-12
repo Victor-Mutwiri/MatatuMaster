@@ -1,5 +1,4 @@
 
-
 import { useGameStore } from '../store/gameStore';
 
 // Simple synth audio context singleton
@@ -164,7 +163,7 @@ export class EngineSynthesizer {
   }
 }
 
-export const playSfx = (type: 'COIN' | 'ENGINE' | 'HORN' | 'SIREN' | 'SWOOSH' | 'CRASH' | 'BEEP') => {
+export const playSfx = (type: 'COIN' | 'ENGINE' | 'HORN' | 'SIREN' | 'SWOOSH' | 'CRASH' | 'BEEP' | 'LEVEL_UP' | 'UNLOCK') => {
   const { isSoundOn } = useGameStore.getState();
   if (!isSoundOn) return;
 
@@ -278,6 +277,49 @@ export const playSfx = (type: 'COIN' | 'ENGINE' | 'HORN' | 'SIREN' | 'SWOOSH' | 
         
         noise.start(now);
         noise.stop(now + 1.0);
+    }
+    else if (type === 'LEVEL_UP') {
+      // Arpeggio C E G C
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          osc.connect(gain);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + i * 0.1);
+          gain.gain.setValueAtTime(0.2, now + i * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.2);
+          osc.start(now + i * 0.1);
+          osc.stop(now + i * 0.1 + 0.2);
+      });
+    }
+    else if (type === 'UNLOCK') {
+      // Major Chord Strike
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const osc3 = ctx.createOscillator();
+      
+      osc1.connect(gain);
+      osc2.connect(gain);
+      osc3.connect(gain);
+      
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc3.type = 'triangle'; // Add texture
+      
+      osc1.frequency.value = 440; // A
+      osc2.frequency.value = 554.37; // C#
+      osc3.frequency.value = 659.25; // E
+      
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+      
+      osc1.start(now);
+      osc2.start(now);
+      osc3.start(now);
+      
+      osc1.stop(now + 1.5);
+      osc2.stop(now + 1.5);
+      osc3.stop(now + 1.5);
     }
 
   } catch (e) {

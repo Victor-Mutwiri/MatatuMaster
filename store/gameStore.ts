@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
-import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode } from '../types';
+import { GameState, PlayerStats, Route, ScreenName, VehicleType, GameStatus, GameOverReason, StageData, PoliceData, LifetimeStats, UserMode, CelebrationType } from '../types';
 import { playSfx } from '../utils/audio';
 import { GameService } from '../services/gameService';
 
@@ -336,6 +336,9 @@ interface GameStore extends GameState {
   getPerformanceUpgradeCost: (type: VehicleType, currentLevel: number) => number;
   getPerformanceMultiplier: (type: VehicleType) => number;
 
+  // Celebration
+  triggerCelebration: (type: CelebrationType, message?: string) => void;
+
   // Controls
   setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
 
@@ -399,6 +402,8 @@ export const useGameStore = create<GameStore>()(
       
       lifetimeStats: INITIAL_LIFETIME,
 
+      activeCelebration: null,
+
       isAccelerating: false,
       isBraking: false,
 
@@ -441,6 +446,21 @@ export const useGameStore = create<GameStore>()(
 
       registerUser: (uid) => set({ userMode: 'REGISTERED', userId: uid }),
 
+      triggerCelebration: (type, message) => {
+          set({ activeCelebration: { type, message } });
+          if (type === 'UNLOCK') playSfx('UNLOCK');
+          else if (type === 'UPGRADE' || type === 'LEVEL_UP') playSfx('LEVEL_UP');
+          
+          // Auto dismiss after 3 seconds
+          setTimeout(() => {
+              // Only clear if it matches the current one (to avoid clearing a newer one)
+              const current = get().activeCelebration;
+              if (current && current.type === type) {
+                  set({ activeCelebration: null });
+              }
+          }, 3000);
+      },
+
       loadUserData: (data) => {
         // Hydrate store from Supabase 'player_progress' data
         if (!data) return;
@@ -468,7 +488,6 @@ export const useGameStore = create<GameStore>()(
         const price = VEHICLE_SPECS[type].price;
         
         if (bankBalance >= price && !unlockedVehicles.includes(type)) {
-          playSfx('COIN');
           const newUnlocked = [...unlockedVehicles, type];
           const newBalance = bankBalance - price;
           
@@ -477,6 +496,7 @@ export const useGameStore = create<GameStore>()(
             unlockedVehicles: newUnlocked
           });
           
+          get().triggerCelebration('UNLOCK', `${type.replace('-', ' ')} UNLOCKED!`);
           get().syncToCloud();
         }
       },
@@ -485,7 +505,7 @@ export const useGameStore = create<GameStore>()(
         const { bankBalance } = get();
         const newBalance = bankBalance + amount;
         set({ bankBalance: newBalance });
-        playSfx('COIN');
+        get().triggerCelebration('UNLOCK', `+ KES ${amount.toLocaleString()}`);
         get().syncToCloud();
       },
 
@@ -512,7 +532,7 @@ export const useGameStore = create<GameStore>()(
               const newLevel = currentLevel + 1;
               const newUpgrades = { ...vehicleUpgrades, [type]: newLevel };
               set({ bankBalance: bankBalance - cost, vehicleUpgrades: newUpgrades });
-              playSfx('COIN');
+              get().triggerCelebration('UPGRADE', `ROUTE LEVEL ${newLevel}`);
               get().syncToCloud();
           }
       },
@@ -542,7 +562,7 @@ export const useGameStore = create<GameStore>()(
               const newLevel = currentLevel + 1;
               const newUpgrades = { ...vehicleFuelUpgrades, [type]: newLevel };
               set({ bankBalance: bankBalance - cost, vehicleFuelUpgrades: newUpgrades });
-              playSfx('COIN');
+              get().triggerCelebration('UPGRADE', `FUEL LEVEL ${newLevel}`);
               get().syncToCloud();
           }
       },
@@ -572,7 +592,7 @@ export const useGameStore = create<GameStore>()(
               const newLevel = currentLevel + 1;
               const newUpgrades = { ...vehiclePerformanceUpgrades, [type]: newLevel };
               set({ bankBalance: bankBalance - cost, vehiclePerformanceUpgrades: newUpgrades });
-              playSfx('COIN');
+              get().triggerCelebration('UPGRADE', `ENGINE LEVEL ${newLevel}`);
               get().syncToCloud();
           }
       },
