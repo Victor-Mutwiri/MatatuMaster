@@ -69,6 +69,10 @@ export interface GameState {
   vehicleFuelUpgrades: Record<VehicleType, number>; // Level 0-4 for fuel efficiency
   vehiclePerformanceUpgrades: Record<VehicleType, number>; // Level 0-4 for top speed
   
+  // International Logic
+  isInternational: boolean;
+  lastDailyGrantClaim: number; // Timestamp
+
   // Celebration State
   activeCelebration: { type: CelebrationType; message?: string } | null;
 

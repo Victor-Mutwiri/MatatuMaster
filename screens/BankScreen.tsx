@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store } from 'lucide-react';
+import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store, Globe, Gift, Timer } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 interface BundleProps {
@@ -43,10 +43,35 @@ const BundleCard: React.FC<BundleProps> = ({ title, cashAmount, price, icon, isB
 };
 
 export const BankScreen: React.FC = () => {
-  const { setScreen, bankBalance, purchaseCash, userMode } = useGameStore();
+  const { setScreen, bankBalance, purchaseCash, userMode, isInternational, claimDailyGrant, lastDailyGrantClaim } = useGameStore();
   const [showAuthGate, setShowAuthGate] = useState(userMode === 'GUEST');
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  
+  // Grant Countdown Logic
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const canClaim = Date.now() - lastDailyGrantClaim >= 24 * 60 * 60 * 1000;
+
+  useEffect(() => {
+      if (canClaim) {
+          setTimeLeft('READY');
+          return;
+      }
+      const interval = setInterval(() => {
+          const now = Date.now();
+          const target = lastDailyGrantClaim + 24 * 60 * 60 * 1000;
+          const diff = target - now;
+          if (diff <= 0) {
+              setTimeLeft('READY');
+              clearInterval(interval);
+          } else {
+              const h = Math.floor(diff / (1000 * 60 * 60));
+              const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+              setTimeLeft(`${h}h ${m}m`);
+          }
+      }, 1000);
+      return () => clearInterval(interval);
+  }, [lastDailyGrantClaim, canClaim]);
 
   const handleBack = () => {
     setScreen('VEHICLE_SELECT');
@@ -68,6 +93,14 @@ export const BankScreen: React.FC = () => {
     }, 2000);
   };
 
+  const handleClaimGrant = () => {
+      if (userMode === 'GUEST') {
+          setShowAuthGate(true);
+          return;
+      }
+      claimDailyGrant();
+  };
+
   return (
     <GameLayout noMaxWidth className="bg-slate-950">
       <AuthGateModal 
@@ -77,7 +110,7 @@ export const BankScreen: React.FC = () => {
             if(userMode === 'GUEST') handleBack(); 
         }}
         featureName="Sacco Bank"
-        message="Only registered conductors can purchase game cash to secure their assets."
+        message="Only registered conductors can access the bank to secure assets and receive grants."
       />
 
       {/* Paystack Simulation Modal */}
@@ -123,66 +156,123 @@ export const BankScreen: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-20">
-            <div className="text-center mb-8">
-                <h3 className="text-white font-bold text-lg mb-2">Need capital for a new Matatu?</h3>
-                <p className="text-slate-400 text-sm max-w-md mx-auto">Top up your game account instantly. All transactions are secure and funds are available immediately.</p>
-            </div>
+            
+            {/* International View */}
+            {isInternational ? (
+                <div className="flex flex-col items-center justify-center py-8 animate-fade-in-up">
+                    <div className="bg-gradient-to-br from-blue-900/80 to-slate-900 border-2 border-blue-500/50 rounded-3xl p-8 max-w-2xl w-full text-center relative overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.15)]">
+                        {/* Background Globe Effect */}
+                        <Globe className="absolute -right-10 -bottom-10 text-blue-500/10" size={250} />
+                        
+                        <div className="relative z-10">
+                            <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6 border border-blue-500/30">
+                                <Globe size={14} /> International Pilot Program
+                            </div>
+                            
+                            <h2 className="font-display text-3xl md:text-4xl font-black text-white uppercase mb-4 leading-tight">
+                                Global Beta Grant
+                            </h2>
+                            <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-lg mx-auto mb-8">
+                                Welcome, international conductor! Payment gateways for your region are currently under construction.
+                                <br/><br/>
+                                As an early supporter, you are eligible for a <span className="text-white font-bold">daily stimulus package</span> to help you test the game economy.
+                            </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 px-2">
-                {/* Micro Bundle */}
-                <BundleCard 
-                    title="Street Kiosk" 
-                    cashAmount={15000} 
-                    price={20} 
-                    icon={<Store size={32} />} 
-                    onBuy={() => handlePurchase(15000)}
-                />
-                
-                {/* Small Bundle */}
-                <BundleCard 
-                    title="Handshake" 
-                    cashAmount={50000} 
-                    price={50} 
-                    icon={<Coins size={32} />} 
-                    onBuy={() => handlePurchase(50000)}
-                />
-                
-                {/* Medium Bundle */}
-                <BundleCard 
-                    title="Route Owner" 
-                    cashAmount={150000} 
-                    price={100} 
-                    icon={<CreditCard size={32} />} 
-                    onBuy={() => handlePurchase(150000)}
-                />
-                
-                {/* Large Bundle */}
-                <BundleCard 
-                    title="Fleet Manager" 
-                    cashAmount={500000} 
-                    price={350} 
-                    icon={<Gem size={32} />} 
-                    onBuy={() => handlePurchase(500000)}
-                />
-                
-                {/* Mega Bundle */}
-                <BundleCard 
-                    title="The Godfather" 
-                    cashAmount={2000000} 
-                    price={1000} 
-                    isBestValue
-                    icon={<div className="relative"><Gem size={32} /><div className="absolute -top-1 -right-1 animate-ping w-2 h-2 bg-white rounded-full"></div></div>} 
-                    onBuy={() => handlePurchase(2000000)}
-                />
-            </div>
+                            <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-700/50 mb-8 max-w-md mx-auto flex items-center justify-between gap-4">
+                                <div className="text-left">
+                                    <span className="text-xs text-slate-500 uppercase font-bold block">Daily Grant</span>
+                                    <span className="font-mono text-2xl font-bold text-green-400">KES 50,000</span>
+                                </div>
+                                <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
+                                    <Gift className="text-green-400" size={24} />
+                                </div>
+                            </div>
 
-            <div className="mt-12 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 text-center">
-                <Lock className="mx-auto text-slate-600 mb-2" size={24} />
-                <p className="text-xs text-slate-500 max-w-lg mx-auto">
-                    Payments are processed via Paystack (Simulation Mode). In the real version, you would be redirected to a secure payment page.
-                    <br/>Game Cash cannot be withdrawn for real money.
-                </p>
-            </div>
+                            <Button 
+                                variant={canClaim ? 'primary' : 'secondary'} 
+                                size="lg" 
+                                className="w-full max-w-xs h-14 text-lg shadow-xl"
+                                disabled={!canClaim}
+                                onClick={handleClaimGrant}
+                            >
+                                {canClaim ? (
+                                    <span className="flex items-center gap-2 justify-center"><CheckCircle2 /> Claim Grant</span>
+                                ) : (
+                                    <span className="flex items-center gap-2 justify-center text-slate-400"><Timer /> Next in {timeLeft}</span>
+                                )}
+                            </Button>
+                            
+                            <p className="text-xs text-slate-500 mt-6">
+                                * Grants reset every 24 hours. Connect later for Stripe integration updates.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                // Local (Kenyan) View
+                <>
+                    <div className="text-center mb-8">
+                        <h3 className="text-white font-bold text-lg mb-2">Need capital for a new Matatu?</h3>
+                        <p className="text-slate-400 text-sm max-w-md mx-auto">Top up your game account instantly via M-Pesa. All transactions are secure and funds are available immediately.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 px-2">
+                        {/* Micro Bundle */}
+                        <BundleCard 
+                            title="Street Kiosk" 
+                            cashAmount={15000} 
+                            price={20} 
+                            icon={<Store size={32} />} 
+                            onBuy={() => handlePurchase(15000)}
+                        />
+                        
+                        {/* Small Bundle */}
+                        <BundleCard 
+                            title="Handshake" 
+                            cashAmount={50000} 
+                            price={50} 
+                            icon={<Coins size={32} />} 
+                            onBuy={() => handlePurchase(50000)}
+                        />
+                        
+                        {/* Medium Bundle */}
+                        <BundleCard 
+                            title="Route Owner" 
+                            cashAmount={150000} 
+                            price={100} 
+                            icon={<CreditCard size={32} />} 
+                            onBuy={() => handlePurchase(150000)}
+                        />
+                        
+                        {/* Large Bundle */}
+                        <BundleCard 
+                            title="Fleet Manager" 
+                            cashAmount={500000} 
+                            price={350} 
+                            icon={<Gem size={32} />} 
+                            onBuy={() => handlePurchase(500000)}
+                        />
+                        
+                        {/* Mega Bundle */}
+                        <BundleCard 
+                            title="The Godfather" 
+                            cashAmount={2000000} 
+                            price={1000} 
+                            isBestValue
+                            icon={<div className="relative"><Gem size={32} /><div className="absolute -top-1 -right-1 animate-ping w-2 h-2 bg-white rounded-full"></div></div>} 
+                            onBuy={() => handlePurchase(2000000)}
+                        />
+                    </div>
+
+                    <div className="mt-12 p-6 bg-slate-900/50 rounded-2xl border border-slate-800 text-center">
+                        <Lock className="mx-auto text-slate-600 mb-2" size={24} />
+                        <p className="text-xs text-slate-500 max-w-lg mx-auto">
+                            Payments are processed via Paystack (Simulation Mode). In the real version, you would be redirected to a secure payment page.
+                            <br/>Game Cash cannot be withdrawn for real money.
+                        </p>
+                    </div>
+                </>
+            )}
         </div>
 
       </div>

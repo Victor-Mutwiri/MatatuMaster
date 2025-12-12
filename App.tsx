@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LandingScreen } from './screens/LandingScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { PlayerSetupScreen } from './screens/PlayerSetupScreen';
@@ -16,7 +16,11 @@ import { Route } from './types';
 import { CelebrationOverlay } from './components/ui/CelebrationOverlay';
 
 const App: React.FC = () => {
-  const { currentScreen, stats, setScreen, selectRoute, resetGame } = useGameStore();
+  const { currentScreen, stats, setScreen, selectRoute, resetGame, checkLocation } = useGameStore();
+
+  useEffect(() => {
+    checkLocation();
+  }, []);
 
   const handleStartShift = () => {
     setScreen('SETUP');

@@ -321,6 +321,10 @@ interface GameStore extends GameState {
   unlockVehicle: (type: VehicleType) => void;
   purchaseCash: (amount: number) => void; 
   
+  // International Logic
+  checkLocation: () => Promise<void>;
+  claimDailyGrant: () => void;
+
   // Upgrades
   purchaseUpgrade: (type: VehicleType) => void;
   getUpgradeCost: (type: VehicleType, currentLevel: number) => number;
@@ -393,6 +397,10 @@ export const useGameStore = create<GameStore>()(
       distanceTraveled: 0,
       totalRouteDistance: 0,
       
+      // International
+      isInternational: false,
+      lastDailyGrantClaim: 0,
+
       fuel: 100,
       fuelUsedLiters: 0,
       totalPassengersCarried: 0,
@@ -445,6 +453,43 @@ export const useGameStore = create<GameStore>()(
       setOverlapTimer: (time) => set({ overlapTimer: time }),
 
       registerUser: (uid) => set({ userMode: 'REGISTERED', userId: uid }),
+
+      checkLocation: async () => {
+          try {
+              // Lightweight IP check for country detection
+              const res = await fetch('https://ipapi.co/json/');
+              if (res.ok) {
+                  const data = await res.json();
+                  // If Country is NOT Kenya (KE), enable international mode
+                  if (data.country_code && data.country_code !== 'KE') {
+                      set({ isInternational: true });
+                      console.log("International Player Detected:", data.country_name);
+                  } else {
+                      set({ isInternational: false });
+                  }
+              }
+          } catch (e) {
+              console.warn("Location check failed, defaulting to local mode (Kenya).", e);
+              // Fail safe: assume local to ensure monetization works for target audience
+              set({ isInternational: false });
+          }
+      },
+
+      claimDailyGrant: () => {
+          const { lastDailyGrantClaim, bankBalance } = get();
+          const now = Date.now();
+          const ONE_DAY = 24 * 60 * 60 * 1000;
+          
+          if (now - lastDailyGrantClaim >= ONE_DAY) {
+              const grantAmount = 50000;
+              set({ 
+                  bankBalance: bankBalance + grantAmount, 
+                  lastDailyGrantClaim: now 
+              });
+              get().triggerCelebration('UNLOCK', `GLOBAL GRANT: KES ${grantAmount.toLocaleString()}`);
+              get().syncToCloud();
+          }
+      },
 
       triggerCelebration: (type, message) => {
           set({ activeCelebration: { type, message } });
@@ -1141,9 +1186,13 @@ export const useGameStore = create<GameStore>()(
         currentScreen: state.currentScreen,
         vehicleType: state.vehicleType,
         selectedRoute: state.selectedRoute,
+        lastDailyGrantClaim: state.lastDailyGrantClaim, // Persist grant time
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+            // Reset International flag on reload to allow testing
+            state.isInternational = false;
+
             if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {
               state.unlockedVehicles = ['boda'];
             }
