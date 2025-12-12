@@ -1,7 +1,6 @@
-
 import React from 'react';
 
-export type ScreenName = 'LANDING' | 'SETUP' | 'GAME_MODE' | 'VEHICLE_SELECT' | 'MULTIPLAYER_LOBBY' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD' | 'SETTINGS';
+export type ScreenName = 'LANDING' | 'SETUP' | 'GAME_MODE' | 'VEHICLE_SELECT' | 'MULTIPLAYER_LOBBY' | 'MAP_SELECT' | 'DASHBOARD' | 'GAME_LOOP' | 'LEADERBOARD' | 'SETTINGS' | 'BANK';
 
 export type VehicleType = 'boda' | 'tuktuk' | 'personal-car' | '14-seater' | '32-seater' | '52-seater';
 
@@ -152,13 +151,6 @@ interface R3FIntrinsicElements {
 
 // Global augmentation for React Three Fiber elements
 declare global {
-  namespace JSX {
-    interface IntrinsicElements extends R3FIntrinsicElements {}
-  }
-}
-
-// Module augmentation for React (necessary for some setups)
-declare module 'react' {
   namespace JSX {
     interface IntrinsicElements extends R3FIntrinsicElements {}
   }

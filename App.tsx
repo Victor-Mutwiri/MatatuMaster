@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { LandingScreen } from './screens/LandingScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -9,6 +10,7 @@ import { MapSelectionScreen } from './screens/MapSelectionScreen';
 import { GameLoopScreen } from './screens/GameLoopScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { BankScreen } from './screens/BankScreen';
 import { useGameStore } from './store/gameStore';
 import { Route } from './types';
 
@@ -48,6 +50,10 @@ const App: React.FC = () => {
 
       {currentScreen === 'VEHICLE_SELECT' && (
         <VehicleSelectionScreen />
+      )}
+
+      {currentScreen === 'BANK' && (
+        <BankScreen />
       )}
 
       {currentScreen === 'MULTIPLAYER_LOBBY' && (

@@ -309,6 +309,7 @@ interface GameStore extends GameState {
   registerUser: (uid: string) => void;
   loadUserData: (data: any) => void;
   unlockVehicle: (type: VehicleType) => void;
+  purchaseCash: (amount: number) => void; // Monetization
 
   // Controls
   setControl: (control: 'GAS' | 'BRAKE', active: boolean) => void;
@@ -448,6 +449,14 @@ export const useGameStore = create<GameStore>()(
           // Trigger cloud sync
           get().syncToCloud();
         }
+      },
+
+      purchaseCash: (amount) => {
+        const { bankBalance } = get();
+        const newBalance = bankBalance + amount;
+        set({ bankBalance: newBalance });
+        playSfx('COIN');
+        get().syncToCloud();
       },
 
       setControl: (control, active) => {

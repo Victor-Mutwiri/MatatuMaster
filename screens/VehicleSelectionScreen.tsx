@@ -4,7 +4,7 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { VehicleType } from '../types';
 import { useGameStore, VEHICLE_SPECS } from '../store/gameStore';
-import { Bus, CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp } from 'lucide-react';
+import { Bus, CheckCircle2, Lock, ArrowLeft, Bike, ShoppingCart, Car, Zap, Shield, TrendingUp, Plus } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 // import { VehicleShowroomModal } from '../components/game/VehicleShowroomModal';
 
@@ -34,6 +34,14 @@ export const VehicleSelectionScreen: React.FC = () => {
       return;
     }
     unlockVehicle(type);
+  };
+
+  const handleOpenBank = () => {
+      if (userMode === 'GUEST') {
+          setShowAuthGate(true);
+      } else {
+          setScreen('BANK');
+      }
   };
 
   const vehicleOptions = [
@@ -98,8 +106,8 @@ export const VehicleSelectionScreen: React.FC = () => {
       <AuthGateModal 
         isOpen={showAuthGate} 
         onClose={() => setShowAuthGate(false)}
-        featureName="Vehicle Purchase"
-        message="You need a registered profile to purchase and own new vehicles."
+        featureName="Vehicle Purchase & Banking"
+        message="You need a registered profile to access the bank and own new vehicles."
       />
 
       <div className="flex flex-col h-full w-full max-w-7xl mx-auto p-4 md:p-6 lg:gap-8 relative">
@@ -119,6 +127,9 @@ export const VehicleSelectionScreen: React.FC = () => {
                <div className="flex items-center gap-2 mt-1">
                  <span className="text-slate-400 text-xs uppercase tracking-widest">Balance:</span>
                  <span className="text-green-400 font-mono font-bold text-xs">KES {bankBalance.toLocaleString()}</span>
+                 <button onClick={handleOpenBank} className="bg-green-600 hover:bg-green-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center transition-colors shadow-lg ml-1" title="Get Cash">
+                    <Plus size={14} />
+                 </button>
                </div>
              </div>
         </div>
@@ -209,10 +220,14 @@ export const VehicleSelectionScreen: React.FC = () => {
                                  variant={userMode === 'GUEST' ? 'secondary' : canAfford ? 'primary' : 'outline'}
                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    handleUnlockAttempt(v.type);
+                                    if (!canAfford && userMode !== 'GUEST') {
+                                        handleOpenBank();
+                                    } else {
+                                        handleUnlockAttempt(v.type);
+                                    }
                                  }}
                               >
-                                 {userMode === 'GUEST' ? 'Login to Buy' : canAfford ? 'Buy Vehicle' : 'Insufficient Funds'}
+                                 {userMode === 'GUEST' ? 'Login to Buy' : canAfford ? 'Buy Vehicle' : 'Get Funds (Bank)'}
                               </Button>
                            )}
                         </div>
