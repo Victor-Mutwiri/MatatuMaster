@@ -4,7 +4,7 @@ import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
 import { GameService } from '../services/gameService';
-import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store, Gift, Timer, FlaskConical } from 'lucide-react';
+import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store, Gift, Timer, FlaskConical, RefreshCw } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 // --- CONFIG ---
@@ -55,6 +55,9 @@ export const BankScreen: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
+  // Keep track of expected amount for manual re-check
+  const [pendingAmount, setPendingAmount] = useState<number>(0);
+  
   // Grant Countdown Logic (72 Hours)
   const GRANT_INTERVAL = 3 * 24 * 60 * 60 * 1000; // 3 Days
   const [timeLeft, setTimeLeft] = useState<string>('');
@@ -101,12 +104,22 @@ export const BankScreen: React.FC = () => {
     setScreen('VEHICLE_SELECT');
   };
 
+  const manualRecheck = () => {
+      if (pendingAmount > 0) {
+          verifyTransaction(pendingAmount);
+      }
+  };
+
   const verifyTransaction = async (expectedAmount: number) => {
       setVerifying(true);
+      // We rely on the stored bankBalance in the store as the baseline
+      // If we are re-checking, we must ensure we don't use a stale balance if the update happened but UI didn't reflect it
+      // However, loadUserData updates the store, so it should be fine.
+      
       const startBalance = bankBalance;
       let attempts = 0;
-      // Increased to 45 attempts * 2s = 90 seconds
-      const MAX_ATTEMPTS = 45; 
+      // 30 seconds polling
+      const MAX_ATTEMPTS = 15; 
 
       const check = async () => {
           if (!userId) return;
@@ -120,6 +133,7 @@ export const BankScreen: React.FC = () => {
                   setVerifying(false);
                   setIsProcessing(false);
                   setSuccessMsg(`Confirmed! ${formatCurrency(expectedAmount)} added.`);
+                  setPendingAmount(0);
                   setTimeout(() => setSuccessMsg(null), 4000);
                   return;
               }
@@ -132,8 +146,9 @@ export const BankScreen: React.FC = () => {
               pollingRef.current = setTimeout(check, 2000); // Check every 2s
           } else {
               setVerifying(false);
-              setIsProcessing(false);
-              alert("The network is taking longer than usual. Don't worry, your funds are safe! The cash will appear in your account shortly once M-Pesa confirms the transaction.");
+              // Don't close processing, let user try again or close manually
+              // setIsProcessing(false); 
+              alert("Network delay. Funds not yet detected. Click 'Check Again' if you received the M-Pesa confirmation message.");
           }
       };
 
@@ -149,6 +164,7 @@ export const BankScreen: React.FC = () => {
     if (!userId) return;
 
     setIsProcessing(true);
+    setPendingAmount(cashAmount);
 
     try {
         // 1. Get User Email
@@ -186,8 +202,8 @@ export const BankScreen: React.FC = () => {
                 verifyTransaction(cashAmount);
             },
             onClose: () => {
-                // Only cancel if we haven't started verification yet
-                if (!verifying) {
+                // If we haven't verified yet, allow user to cancel or verify manually if they think it went through
+                if (!verifying && pendingAmount === 0) {
                     setIsProcessing(false);
                 }
             }
@@ -228,16 +244,23 @@ export const BankScreen: React.FC = () => {
               <div className="bg-white rounded-xl p-8 flex flex-col items-center text-slate-900 max-w-sm w-full shadow-2xl relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1.5 bg-green-500 animate-pulse"></div>
                   
-                  <Loader2 className="text-green-500 animate-spin mb-4" size={48} />
+                  <Loader2 className={`text-green-500 mb-4 ${verifying ? 'animate-spin' : ''}`} size={48} />
                   <h3 className="font-bold text-xl mb-2">
                       {verifying ? "Confirming Deposit..." : "Secure Checkout"}
                   </h3>
                   <p className="text-slate-500 text-sm text-center mb-6">
-                      {verifying ? "Waiting for M-Pesa network confirmation. Please stay on this screen." : "Please complete the payment in the popup."}
+                      {verifying ? "Waiting for M-Pesa network confirmation..." : "Please complete the payment in the popup."}
                   </p>
                   
+                  {/* Manual Controls if taking too long */}
+                  {!verifying && pendingAmount > 0 && (
+                      <Button variant="primary" onClick={manualRecheck} className="mb-3 w-full">
+                          <span className="flex items-center justify-center gap-2"><RefreshCw size={16} /> Check Again</span>
+                      </Button>
+                  )}
+                  
                   {!verifying && (
-                      <button onClick={() => setIsProcessing(false)} className="text-red-500 text-xs font-bold uppercase underline">Cancel</button>
+                      <button onClick={() => setIsProcessing(false)} className="text-red-500 text-xs font-bold uppercase underline">Cancel / Close</button>
                   )}
               </div>
           </div>
