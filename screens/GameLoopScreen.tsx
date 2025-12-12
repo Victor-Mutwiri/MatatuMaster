@@ -32,7 +32,8 @@ export const GameLoopScreen: React.FC = () => {
     selectedRoute,
     resumeGame,
     setQuitConfirmation,
-    userMode
+    userMode,
+    formatCurrency
   } = useGameStore();
 
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -131,26 +132,26 @@ export const GameLoopScreen: React.FC = () => {
             
             <div className="flex justify-between items-center text-sm text-green-400">
                <span>Base Earnings</span>
-               <span className="font-mono">+ KES {stats.cash}</span>
+               <span className="font-mono">+ {formatCurrency(stats.cash)}</span>
             </div>
             
             {bribesPaid > 0 && (
               <div className="flex justify-between items-center text-sm text-red-400">
                  <span>Bribes Paid</span>
-                 <span className="font-mono">- KES {bribesPaid}</span>
+                 <span className="font-mono">- {formatCurrency(bribesPaid)}</span>
               </div>
             )}
 
             <div className="flex justify-between items-center text-sm text-orange-400">
-               <span className="flex items-center gap-1">Fuel ({fuelUsedLiters.toFixed(1)}L @ 182)</span>
-               <span className="font-mono">- KES {fuelCost}</span>
+               <span className="flex items-center gap-1">Fuel ({fuelUsedLiters.toFixed(1)}L)</span>
+               <span className="font-mono">- {formatCurrency(fuelCost)}</span>
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-700 mt-2">
                <span className="font-bold text-white uppercase">Net Profit</span>
                <div className="text-right">
                  <span className="block font-display text-xl font-bold text-matatu-yellow">
-                   KES {Math.max(0, finalScore)}
+                   {formatCurrency(Math.max(0, finalScore))}
                  </span>
                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
                     Vibe: {Math.round(happiness)}%

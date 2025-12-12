@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { ShieldAlert, AlertTriangle, Wallet } from 'lucide-react';
 
 export const PoliceModal: React.FC = () => {
-  const { policeData, handlePoliceAction, stats } = useGameStore();
+  const { policeData, handlePoliceAction, stats, formatCurrency } = useGameStore();
 
   if (!policeData) return null;
 
@@ -42,7 +42,7 @@ export const PoliceModal: React.FC = () => {
              </div>
              <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-400">Demand</span>
-                <span className="text-matatu-yellow font-bold">KES {policeData.bribeAmount}</span>
+                <span className="text-matatu-yellow font-bold">{formatCurrency(policeData.bribeAmount)}</span>
              </div>
           </div>
 
@@ -61,7 +61,7 @@ export const PoliceModal: React.FC = () => {
               onClick={() => handlePoliceAction('PAY')}
             >
               <span className="flex items-center justify-center gap-2">
-                Pay Bribe (KES {policeData.bribeAmount}) <Wallet size={16} />
+                Pay Bribe ({formatCurrency(policeData.bribeAmount)}) <Wallet size={16} />
               </span>
             </Button>
             

@@ -1,12 +1,16 @@
+
 import React from 'react';
 import { PlayerStats } from '../types';
 import { Wallet, Clock, Zap } from 'lucide-react';
+import { useGameStore } from '../store/gameStore';
 
 interface HeaderProps {
   stats: PlayerStats;
 }
 
 export const Header: React.FC<HeaderProps> = ({ stats }) => {
+  const { formatCurrency } = useGameStore();
+
   return (
     <header className="sticky top-2 z-40 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl p-3 shadow-2xl mb-6">
       <div className="flex justify-between items-center text-xs sm:text-sm font-display font-bold">
@@ -14,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({ stats }) => {
         {/* Cash */}
         <div className="flex items-center text-green-400 gap-1.5">
           <Wallet size={16} />
-          <span>KES {stats.cash.toLocaleString()}</span>
+          <span>{formatCurrency(stats.cash)}</span>
         </div>
 
         {/* Time */}

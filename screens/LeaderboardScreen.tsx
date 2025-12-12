@@ -9,7 +9,7 @@ import { GameService, LeaderboardEntry } from '../services/gameService';
 type RankingMetric = 'CASH' | 'DISTANCE' | 'BRIBES';
 
 export const LeaderboardScreen: React.FC = () => {
-  const { setScreen, lifetimeStats, playerName, saccoName } = useGameStore();
+  const { setScreen, lifetimeStats, playerName, saccoName, formatCurrency } = useGameStore();
   const [activeMetric, setActiveMetric] = useState<RankingMetric>('CASH');
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,9 +31,9 @@ export const LeaderboardScreen: React.FC = () => {
 
   // Prepare Data
   const formatValue = (val: number, type: RankingMetric) => {
-    if (type === 'CASH') return `KES ${val.toLocaleString()}`;
+    if (type === 'CASH') return formatCurrency(val);
     if (type === 'DISTANCE') return `${val.toFixed(1)} KM`;
-    if (type === 'BRIBES') return `KES ${val.toLocaleString()}`;
+    if (type === 'BRIBES') return formatCurrency(val);
     return val;
   };
 

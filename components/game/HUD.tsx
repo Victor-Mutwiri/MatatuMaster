@@ -58,7 +58,8 @@ export const HUD: React.FC = () => {
     pauseGame,
     vehicleType,
     overlapTimer,
-    selectedRoute
+    selectedRoute,
+    formatCurrency
   } = useGameStore();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -295,7 +296,7 @@ export const HUD: React.FC = () => {
                   <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 lg:px-4 lg:py-2 rounded-lg border border-matatu-yellow/50 shadow-[0_0_15px_rgba(255,215,0,0.2)] flex items-center gap-3 pointer-events-none">
                     <div className="text-right leading-none">
                       <span className="block text-[8px] lg:text-[10px] text-matatu-yellow uppercase font-bold tracking-wider mb-0.5">Cash</span>
-                      <span className="font-display text-sm lg:text-lg font-bold text-green-400">KES {stats.cash.toLocaleString()}</span>
+                      <span className="font-display text-sm lg:text-lg font-bold text-green-400">{formatCurrency(stats.cash)}</span>
                     </div>
                     <Wallet className="text-green-400" size={16} />
                   </div>

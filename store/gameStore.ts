@@ -301,6 +301,8 @@ const DEFAULT_UPGRADES: Record<VehicleType, number> = {
     '52-seater': 0
 };
 
+const EXCHANGE_RATE = 130; // 1 USD = 130 KES
+
 interface GameStore extends GameState {
   userId: string | null; // Supabase Auth UID
   setScreen: (screen: ScreenName) => void;
@@ -324,6 +326,7 @@ interface GameStore extends GameState {
   // International Logic
   checkLocation: () => Promise<void>;
   claimDailyGrant: () => void;
+  formatCurrency: (amount: number) => string;
 
   // Upgrades
   purchaseUpgrade: (type: VehicleType) => void;
@@ -399,6 +402,8 @@ export const useGameStore = create<GameStore>()(
       
       // International
       isInternational: false,
+      isKenyaLocked: false,
+      currency: 'KES',
       lastDailyGrantClaim: 0,
 
       fuel: 100,
@@ -454,24 +459,41 @@ export const useGameStore = create<GameStore>()(
 
       registerUser: (uid) => set({ userMode: 'REGISTERED', userId: uid }),
 
+      formatCurrency: (amount: number) => {
+          const { currency } = get();
+          if (currency === 'USD') {
+              const usd = amount / EXCHANGE_RATE;
+              return `$${usd.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+          }
+          return `KES ${amount.toLocaleString()}`;
+      },
+
       checkLocation: async () => {
+          const { isKenyaLocked } = get();
+          
+          // Anti-Exploit: If already detected as Kenyan, FORCE Kenyan mode regardless of VPN
+          if (isKenyaLocked) {
+              set({ isInternational: false, currency: 'KES' });
+              return;
+          }
+
           try {
               // Lightweight IP check for country detection
               const res = await fetch('https://ipapi.co/json/');
               if (res.ok) {
                   const data = await res.json();
-                  // If Country is NOT Kenya (KE), enable international mode
-                  if (data.country_code && data.country_code !== 'KE') {
-                      set({ isInternational: true });
-                      console.log("International Player Detected:", data.country_name);
+                  
+                  if (data.country_code === 'KE') {
+                      // Detected Kenya: Lock it forever
+                      set({ isInternational: false, isKenyaLocked: true, currency: 'KES' });
                   } else {
-                      set({ isInternational: false });
+                      // International: Enable Beta Mode and USD
+                      set({ isInternational: true, currency: 'USD' });
                   }
               }
           } catch (e) {
               console.warn("Location check failed, defaulting to local mode (Kenya).", e);
-              // Fail safe: assume local to ensure monetization works for target audience
-              set({ isInternational: false });
+              set({ isInternational: false, currency: 'KES' });
           }
       },
 
@@ -481,12 +503,12 @@ export const useGameStore = create<GameStore>()(
           const ONE_DAY = 24 * 60 * 60 * 1000;
           
           if (now - lastDailyGrantClaim >= ONE_DAY) {
-              const grantAmount = 50000;
+              const grantAmount = 50000; // Value in KES
               set({ 
                   bankBalance: bankBalance + grantAmount, 
                   lastDailyGrantClaim: now 
               });
-              get().triggerCelebration('UNLOCK', `GLOBAL GRANT: KES ${grantAmount.toLocaleString()}`);
+              get().triggerCelebration('UNLOCK', `GRANT: ${get().formatCurrency(grantAmount)}`);
               get().syncToCloud();
           }
       },
@@ -550,7 +572,7 @@ export const useGameStore = create<GameStore>()(
         const { bankBalance } = get();
         const newBalance = bankBalance + amount;
         set({ bankBalance: newBalance });
-        get().triggerCelebration('UNLOCK', `+ KES ${amount.toLocaleString()}`);
+        get().triggerCelebration('UNLOCK', `+ ${get().formatCurrency(amount)}`);
         get().syncToCloud();
       },
 
@@ -1151,7 +1173,9 @@ export const useGameStore = create<GameStore>()(
         playerName: '',
         saccoName: '',
         currentScreen: 'LANDING',
-        stats: INITIAL_STATS
+        stats: INITIAL_STATS,
+        isKenyaLocked: false, // Reset lock on wipe
+        currency: 'KES'
       }),
       
       toggleStereo: () => set((state) => ({ isStereoOn: !state.isStereoOn })),
@@ -1186,11 +1210,13 @@ export const useGameStore = create<GameStore>()(
         currentScreen: state.currentScreen,
         vehicleType: state.vehicleType,
         selectedRoute: state.selectedRoute,
-        lastDailyGrantClaim: state.lastDailyGrantClaim, // Persist grant time
+        lastDailyGrantClaim: state.lastDailyGrantClaim, 
+        isKenyaLocked: state.isKenyaLocked, // PERSIST THE LOCK
+        currency: state.currency // Persist currency preference
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-            // Reset International flag on reload to allow testing
+            // Reset temporary international flag, but KEEP the lock and currency
             state.isInternational = false;
 
             if (!state.unlockedVehicles || state.unlockedVehicles.length === 0) {

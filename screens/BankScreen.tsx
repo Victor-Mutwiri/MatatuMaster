@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { GameLayout } from '../components/layout/GameLayout';
 import { Button } from '../components/ui/Button';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store, Globe, Gift, Timer } from 'lucide-react';
+import { ArrowLeft, CreditCard, Coins, CheckCircle2, ShieldCheck, Gem, Loader2, Lock, Store, Gift, Timer, FlaskConical } from 'lucide-react';
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 interface BundleProps {
@@ -13,9 +13,10 @@ interface BundleProps {
   icon: React.ReactNode;
   isBestValue?: boolean;
   onBuy: () => void;
+  formatCurrency: (amount: number) => string;
 }
 
-const BundleCard: React.FC<BundleProps> = ({ title, cashAmount, price, icon, isBestValue, onBuy }) => {
+const BundleCard: React.FC<BundleProps> = ({ title, cashAmount, price, icon, isBestValue, onBuy, formatCurrency }) => {
   return (
     <div className={`relative bg-slate-900 border-2 rounded-2xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:scale-105 cursor-pointer group ${isBestValue ? 'border-matatu-yellow shadow-[0_0_30px_rgba(255,215,0,0.15)]' : 'border-slate-700 hover:border-slate-500'}`} onClick={onBuy}>
       {isBestValue && (
@@ -30,7 +31,7 @@ const BundleCard: React.FC<BundleProps> = ({ title, cashAmount, price, icon, isB
       
       <h3 className="text-white font-display font-bold text-lg uppercase tracking-wide mb-1">{title}</h3>
       <div className="text-2xl font-mono font-bold text-green-400 mb-2">
-        KES {cashAmount.toLocaleString()}
+        {formatCurrency(cashAmount)}
       </div>
       
       <div className="mt-auto w-full">
@@ -43,7 +44,7 @@ const BundleCard: React.FC<BundleProps> = ({ title, cashAmount, price, icon, isB
 };
 
 export const BankScreen: React.FC = () => {
-  const { setScreen, bankBalance, purchaseCash, userMode, isInternational, claimDailyGrant, lastDailyGrantClaim } = useGameStore();
+  const { setScreen, bankBalance, purchaseCash, userMode, isInternational, claimDailyGrant, lastDailyGrantClaim, formatCurrency } = useGameStore();
   const [showAuthGate, setShowAuthGate] = useState(userMode === 'GUEST');
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -88,7 +89,7 @@ export const BankScreen: React.FC = () => {
     setTimeout(() => {
         purchaseCash(amount);
         setIsProcessing(false);
-        setSuccessMsg(`Successfully added KES ${amount.toLocaleString()} to your account!`);
+        setSuccessMsg(`Successfully added ${formatCurrency(amount)} to your account!`);
         setTimeout(() => setSuccessMsg(null), 3000);
     }, 2000);
   };
@@ -149,7 +150,7 @@ export const BankScreen: React.FC = () => {
              <div className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl flex items-center gap-3">
                  <div className="text-right leading-tight">
                      <span className="text-[10px] text-slate-500 uppercase font-bold block">Current Balance</span>
-                     <span className="text-green-400 font-mono font-bold">KES {bankBalance.toLocaleString()}</span>
+                     <span className="text-green-400 font-mono font-bold">{formatCurrency(bankBalance)}</span>
                  </div>
                  <ShieldCheck className="text-green-500" size={24} />
              </div>
@@ -160,28 +161,28 @@ export const BankScreen: React.FC = () => {
             {/* International View */}
             {isInternational ? (
                 <div className="flex flex-col items-center justify-center py-8 animate-fade-in-up">
-                    <div className="bg-gradient-to-br from-blue-900/80 to-slate-900 border-2 border-blue-500/50 rounded-3xl p-8 max-w-2xl w-full text-center relative overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.15)]">
-                        {/* Background Globe Effect */}
-                        <Globe className="absolute -right-10 -bottom-10 text-blue-500/10" size={250} />
+                    <div className="bg-gradient-to-br from-indigo-900/80 to-slate-900 border-2 border-indigo-500/50 rounded-3xl p-8 max-w-2xl w-full text-center relative overflow-hidden shadow-[0_0_50px_rgba(99,102,241,0.15)]">
+                        {/* Background Effect */}
+                        <FlaskConical className="absolute -right-10 -bottom-10 text-indigo-500/10" size={250} />
                         
                         <div className="relative z-10">
-                            <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6 border border-blue-500/30">
-                                <Globe size={14} /> International Pilot Program
+                            <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6 border border-indigo-500/30">
+                                <FlaskConical size={14} /> Beta Access
                             </div>
                             
                             <h2 className="font-display text-3xl md:text-4xl font-black text-white uppercase mb-4 leading-tight">
-                                Global Beta Grant
+                                Beta Tester Grant
                             </h2>
                             <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-lg mx-auto mb-8">
-                                Welcome, international conductor! Payment gateways for your region are currently under construction.
+                                Welcome to the Matatu Master Beta! As an early tester, you have been selected to receive a <span className="text-white font-bold">daily grant</span>.
                                 <br/><br/>
-                                As an early supporter, you are eligible for a <span className="text-white font-bold">daily stimulus package</span> to help you test the game economy.
+                                Use these funds to upgrade vehicles, test routes, and provide feedback on the game economy.
                             </p>
 
                             <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-700/50 mb-8 max-w-md mx-auto flex items-center justify-between gap-4">
                                 <div className="text-left">
-                                    <span className="text-xs text-slate-500 uppercase font-bold block">Daily Grant</span>
-                                    <span className="font-mono text-2xl font-bold text-green-400">KES 50,000</span>
+                                    <span className="text-xs text-slate-500 uppercase font-bold block">Daily Stimulus</span>
+                                    <span className="font-mono text-2xl font-bold text-green-400">{formatCurrency(50000)}</span>
                                 </div>
                                 <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
                                     <Gift className="text-green-400" size={24} />
@@ -203,7 +204,7 @@ export const BankScreen: React.FC = () => {
                             </Button>
                             
                             <p className="text-xs text-slate-500 mt-6">
-                                * Grants reset every 24 hours. Connect later for Stripe integration updates.
+                                * Grants reset every 24 hours. Enjoy the ride!
                             </p>
                         </div>
                     </div>
@@ -217,43 +218,38 @@ export const BankScreen: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 px-2">
-                        {/* Micro Bundle */}
                         <BundleCard 
                             title="Street Kiosk" 
                             cashAmount={15000} 
                             price={20} 
                             icon={<Store size={32} />} 
                             onBuy={() => handlePurchase(15000)}
+                            formatCurrency={formatCurrency}
                         />
-                        
-                        {/* Small Bundle */}
                         <BundleCard 
                             title="Handshake" 
                             cashAmount={50000} 
                             price={50} 
                             icon={<Coins size={32} />} 
                             onBuy={() => handlePurchase(50000)}
+                            formatCurrency={formatCurrency}
                         />
-                        
-                        {/* Medium Bundle */}
                         <BundleCard 
                             title="Route Owner" 
                             cashAmount={150000} 
                             price={100} 
                             icon={<CreditCard size={32} />} 
                             onBuy={() => handlePurchase(150000)}
+                            formatCurrency={formatCurrency}
                         />
-                        
-                        {/* Large Bundle */}
                         <BundleCard 
                             title="Fleet Manager" 
                             cashAmount={500000} 
                             price={350} 
                             icon={<Gem size={32} />} 
                             onBuy={() => handlePurchase(500000)}
+                            formatCurrency={formatCurrency}
                         />
-                        
-                        {/* Mega Bundle */}
                         <BundleCard 
                             title="The Godfather" 
                             cashAmount={2000000} 
@@ -261,6 +257,7 @@ export const BankScreen: React.FC = () => {
                             isBestValue
                             icon={<div className="relative"><Gem size={32} /><div className="absolute -top-1 -right-1 animate-ping w-2 h-2 bg-white rounded-full"></div></div>} 
                             onBuy={() => handlePurchase(2000000)}
+                            formatCurrency={formatCurrency}
                         />
                     </div>
 

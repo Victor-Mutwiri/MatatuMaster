@@ -22,7 +22,8 @@ export const VehicleUpgradeModal: React.FC<VehicleUpgradeModalProps> = ({ vehicl
     getUpgradeCost,
     getFuelUpgradeCost,
     getPerformanceUpgradeCost,
-    handleOpenBank
+    handleOpenBank,
+    formatCurrency
   } = useGameStore(state => ({
     bankBalance: state.bankBalance,
     vehicleUpgrades: state.vehicleUpgrades,
@@ -34,7 +35,8 @@ export const VehicleUpgradeModal: React.FC<VehicleUpgradeModalProps> = ({ vehicl
     getUpgradeCost: state.getUpgradeCost,
     getFuelUpgradeCost: state.getFuelUpgradeCost,
     getPerformanceUpgradeCost: state.getPerformanceUpgradeCost,
-    handleOpenBank: () => state.setScreen('BANK')
+    handleOpenBank: () => state.setScreen('BANK'),
+    formatCurrency: state.formatCurrency
   }));
 
   const vehicleName = VEHICLE_SPECS[vehicleType] ? vehicleType.replace('-', ' ') : 'Vehicle';
@@ -96,7 +98,7 @@ export const VehicleUpgradeModal: React.FC<VehicleUpgradeModalProps> = ({ vehicl
                    onClick={canAfford ? onUpgrade : handleOpenBank}
                 >
                    <span>{canAfford ? `Upgrade to Lv ${level + 1}` : 'Add Funds'}</span>
-                   <span className="font-mono">{canAfford ? `KES ${cost.toLocaleString()}` : `Need KES ${cost.toLocaleString()}`}</span>
+                   <span className="font-mono">{canAfford ? formatCurrency(cost) : `Need ${formatCurrency(cost)}`}</span>
                 </Button>
             )}
          </div>
@@ -125,7 +127,7 @@ export const VehicleUpgradeModal: React.FC<VehicleUpgradeModalProps> = ({ vehicl
         {/* Balance Strip */}
         <div className="bg-black/30 px-4 py-2 flex justify-between items-center">
             <span className="text-slate-400 text-xs uppercase font-bold">Workshop Funds</span>
-            <span className="text-green-400 font-mono font-bold">KES {bankBalance.toLocaleString()}</span>
+            <span className="text-green-400 font-mono font-bold">{formatCurrency(bankBalance)}</span>
         </div>
 
         {/* Scrollable Content */}

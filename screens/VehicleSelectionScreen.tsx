@@ -9,7 +9,7 @@ import { AuthGateModal } from '../components/ui/AuthGateModal';
 import { VehicleUpgradeModal } from '../components/game/VehicleUpgradeModal';
 
 export const VehicleSelectionScreen: React.FC = () => {
-  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, vehiclePerformanceUpgrades } = useGameStore();
+  const { setVehicleType, setScreen, bankBalance, userMode, unlockedVehicles, unlockVehicle, vehicleUpgrades, vehicleFuelUpgrades, vehiclePerformanceUpgrades, formatCurrency } = useGameStore();
   
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -137,7 +137,7 @@ export const VehicleSelectionScreen: React.FC = () => {
                </h2>
                <div className="flex items-center gap-2 mt-1">
                  <span className="text-slate-400 text-xs uppercase tracking-widest">Balance:</span>
-                 <span className="text-green-400 font-mono font-bold text-xs">KES {bankBalance.toLocaleString()}</span>
+                 <span className="text-green-400 font-mono font-bold text-xs">{formatCurrency(bankBalance)}</span>
                  <button onClick={handleOpenBank} className="bg-green-600 hover:bg-green-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center transition-colors shadow-lg ml-1" title="Get Cash">
                     <Plus size={14} />
                  </button>
@@ -252,7 +252,7 @@ export const VehicleSelectionScreen: React.FC = () => {
                         <div className="flex flex-col gap-2">
                            <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 uppercase font-bold">Price</span>
-                              <span className="text-white font-bold font-mono">KES {price.toLocaleString()}</span>
+                              <span className="text-white font-bold font-mono">{formatCurrency(price)}</span>
                            </div>
                            
                            {isSelected && (

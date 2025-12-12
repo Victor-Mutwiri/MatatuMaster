@@ -8,7 +8,7 @@ import { Clock, Lock, MapPin, ArrowLeft, TrendingUp, Car, Shield, Navigation } f
 import { AuthGateModal } from '../components/ui/AuthGateModal';
 
 export const MapSelectionScreen: React.FC = () => {
-  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType, getUpgradeMultiplier } = useGameStore();
+  const { selectRoute, selectedRoute, startGameLoop, setScreen, userMode, vehicleType, getUpgradeMultiplier, formatCurrency } = useGameStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
 
@@ -113,10 +113,10 @@ export const MapSelectionScreen: React.FC = () => {
                       <span className="text-slate-500 uppercase font-bold text-xs">Potential</span>
                       <div className="text-right">
                           {hasUpgrade && (
-                              <span className="text-slate-500 text-xs line-through block decoration-slate-500">KES {baseEarnings}</span>
+                              <span className="text-slate-500 text-xs line-through block decoration-slate-500">{formatCurrency(baseEarnings)}</span>
                           )}
                           <span className={`${hasUpgrade ? 'text-green-400 font-bold' : 'text-slate-300'} font-mono`}>
-                              KES {boostedEarnings}
+                              {formatCurrency(boostedEarnings)}
                           </span>
                       </div>
                    </div>
@@ -185,8 +185,8 @@ export const MapSelectionScreen: React.FC = () => {
                              <div className="flex items-center gap-2 text-xs">
                                  <Car size={12} className={mapHasUpgrade ? "text-green-400" : "text-slate-400"}/> 
                                  <div className="flex gap-2 items-baseline">
-                                     {mapHasUpgrade && <span className="text-[10px] text-slate-500 line-through">KES {mapBase}</span>}
-                                     <span className={`${mapHasUpgrade ? 'text-green-400' : 'text-slate-300'} font-bold`}>KES {mapBoosted}</span>
+                                     {mapHasUpgrade && <span className="text-[10px] text-slate-500 line-through">{formatCurrency(mapBase)}</span>}
+                                     <span className={`${mapHasUpgrade ? 'text-green-400' : 'text-slate-300'} font-bold`}>{formatCurrency(mapBoosted)}</span>
                                  </div>
                              </div>
                           </div>
@@ -212,9 +212,9 @@ export const MapSelectionScreen: React.FC = () => {
                 <div className="text-right">
                    <div className="text-[10px] text-slate-500 uppercase font-bold Reward">Potential</div>
                    {hasUpgrade && (
-                       <div className="text-[10px] text-slate-500 line-through decoration-slate-500">KES {baseEarnings}</div>
+                       <div className="text-[10px] text-slate-500 line-through decoration-slate-500">{formatCurrency(baseEarnings)}</div>
                    )}
-                   <div className={`${hasUpgrade ? 'text-green-400' : 'text-slate-200'} font-mono font-bold`}>KES {boostedEarnings}</div>
+                   <div className={`${hasUpgrade ? 'text-green-400' : 'text-slate-200'} font-mono font-bold`}>{formatCurrency(boostedEarnings)}</div>
                 </div>
              </div>
              

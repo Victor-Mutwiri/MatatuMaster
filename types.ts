@@ -69,8 +69,10 @@ export interface GameState {
   vehicleFuelUpgrades: Record<VehicleType, number>; // Level 0-4 for fuel efficiency
   vehiclePerformanceUpgrades: Record<VehicleType, number>; // Level 0-4 for top speed
   
-  // International Logic
+  // Region & Currency Logic
   isInternational: boolean;
+  isKenyaLocked: boolean; // If true, user is permanently treated as Kenyan (Anti-VPN exploit)
+  currency: 'KES' | 'USD';
   lastDailyGrantClaim: number; // Timestamp
 
   // Celebration State
